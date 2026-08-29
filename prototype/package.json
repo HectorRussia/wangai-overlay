@@ -1,0 +1,13 @@
+{
+  "name": "wangai-prototype",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter wa-ngai-api dev",
+    "test": "pnpm --recursive test",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint"
+  }
+}

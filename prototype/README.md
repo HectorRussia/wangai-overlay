@@ -41,9 +41,10 @@ The local API boundary is implemented in `apps/api`. It reads `GROQ_API_KEY` and
 
 ## Run locally
 
-1. In `apps/api`, run `npm run dev`.
-2. In `apps/web`, run `npm run dev`.
-3. Open the Vite URL. Development requests under `/v1` proxy to the local API on port 8787.
+1. From this directory, run `pnpm install`.
+2. In one terminal, run `pnpm dev:api`.
+3. In another terminal, run `pnpm dev:web`.
+4. Open the Vite URL. Development requests under `/v1` proxy to the local API on port 8787.
 
 ## Remaining owner validation
 
