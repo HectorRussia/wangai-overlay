@@ -12,7 +12,7 @@ use crate::{
 };
 
 const CHAT_COMPLETIONS_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
-const MAX_COMPLETION_TOKENS: u64 = 128;
+const MAX_COMPLETION_TOKENS: u64 = 512;
 
 #[async_trait]
 pub trait Translator: Send + Sync {
@@ -55,8 +55,9 @@ impl GroqTranslator {
 struct GroqRequest<'a> {
     model: &'a str,
     messages: Vec<GroqMessage<'a>>,
-    temperature: f32,
-    max_tokens: u64,
+    reasoning_effort: &'a str,
+    include_reasoning: bool,
+    max_completion_tokens: u64,
 }
 
 #[derive(Serialize)]
@@ -75,11 +76,13 @@ struct GroqResponse {
 #[derive(Debug, Deserialize)]
 struct GroqChoice {
     message: GroqResponseMessage,
+    #[serde(default)]
+    finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct GroqResponseMessage {
-    content: String,
+    content: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -205,8 +208,9 @@ impl GroqTranslator {
                     content: text,
                 },
             ],
-            temperature: 0.0,
-            max_tokens: MAX_COMPLETION_TOKENS,
+            reasoning_effort: "low",
+            include_reasoning: false,
+            max_completion_tokens: MAX_COMPLETION_TOKENS,
         };
         let mut last_error = None;
         for attempt in 0..2 {
@@ -223,12 +227,21 @@ impl GroqTranslator {
                         .json::<GroqResponse>()
                         .await
                         .context("อ่านคำตอบ Groq ไม่สำเร็จ")?;
-                    let translated = response
+                    let choice = response
                         .choices
                         .first()
-                        .map(|choice| choice.message.content.trim().to_string())
+                        .ok_or_else(|| anyhow!("Groq ไม่ส่งตัวเลือกคำแปลกลับมา"))?;
+                    let translated = choice
+                        .message
+                        .content
+                        .as_deref()
+                        .map(str::trim)
                         .filter(|value| !value.is_empty())
-                        .ok_or_else(|| anyhow!("Groq ส่งคำแปลว่าง"))?;
+                        .ok_or_else(|| {
+                            let reason = choice.finish_reason.as_deref().unwrap_or("unknown");
+                            anyhow!("Groq ส่งคำแปลว่าง (finish_reason={reason}) กรุณาลองใหม่")
+                        })?
+                        .to_string();
                     return Ok(GroqSuccess {
                         text: translated,
                         prompt_tokens: response.usage.prompt_tokens,
@@ -423,6 +436,10 @@ mod tests {
         let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
         assert!(request.contains("openai/gpt-oss-20b"));
         assert!(request.contains("Enemy on the left"));
+        assert!(request.contains("\"reasoning_effort\":\"low\""));
+        assert!(request.contains("\"include_reasoning\":false"));
+        assert!(request.contains("\"max_completion_tokens\":512"));
+        assert!(!request.contains("\"max_tokens\""));
     }
 
     fn read_http_request(stream: &mut std::net::TcpStream) -> Vec<u8> {

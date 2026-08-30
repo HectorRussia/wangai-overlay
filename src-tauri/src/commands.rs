@@ -1,8 +1,9 @@
 use crate::{
-    hotkeys,
+    audio, hotkeys,
     models::{
-        AppSettings, AppSnapshot, CaptureSource, GlossaryTerm, GroqModelOption, HotkeySettings,
-        OverlayPresentation, OverlaySettings, VadSettings,
+        AppSettings, AppSnapshot, AudioOutputDevice, CaptureSource, GameCaptureMode, GlossaryTerm,
+        GroqModelOption, HotkeySettings, OverlayPresentation, OverlaySettings, StreamKind,
+        VadSettings, VoiceChatSettings,
     },
     pipeline, processes,
     settings::{clear_groq_key, groq_model_catalog, set_groq_key},
@@ -16,6 +17,16 @@ use tauri::{
 
 type CommandResult<T> = std::result::Result<T, String>;
 
+fn sync_active_vad_runtime(app: &AppHandle, state: &AppState, settings: &AppSettings) {
+    let profile = settings.vad.active_profile(settings.game_capture_mode);
+    let runtime = state.update_runtime(|runtime| {
+        runtime.effective_vad_threshold = profile.vad_threshold;
+        runtime.effective_vad_gain_db = profile.gain_db;
+        runtime.last_error = None;
+    });
+    let _ = app.emit("runtime-state", runtime);
+}
+
 #[tauri::command]
 pub fn get_snapshot(state: State<'_, AppState>) -> AppSnapshot {
     state.snapshot()
@@ -24,6 +35,59 @@ pub fn get_snapshot(state: State<'_, AppState>) -> AppSnapshot {
 #[tauri::command]
 pub fn list_capture_sources() -> Vec<CaptureSource> {
     processes::list_capture_sources()
+}
+
+#[tauri::command]
+pub fn list_game_output_devices() -> CommandResult<Vec<AudioOutputDevice>> {
+    audio::list_game_output_devices().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn update_game_output_device(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    device_id: Option<String>,
+) -> CommandResult<AppSettings> {
+    let device_id = device_id.and_then(|value| {
+        let trimmed = value.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
+    });
+    if let Some(id) = device_id.as_deref() {
+        audio::resolve_game_output_device(Some(id)).map_err(|error| error.to_string())?;
+    }
+    let settings = state
+        .settings
+        .update_game_output_device(device_id)
+        .map_err(|error| error.to_string())?;
+    if state.runtime.read().unwrap().listening {
+        pipeline::attach_saved_process(&app).map_err(|error| error.to_string())?;
+    }
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn update_system_output_cloud_scan(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> CommandResult<AppSettings> {
+    let settings = state
+        .settings
+        .update_system_output_cloud_scan(enabled)
+        .map_err(|error| error.to_string())?;
+    if state.runtime.read().unwrap().listening {
+        pipeline::attach_saved_process(&app).map_err(|error| error.to_string())?;
+    }
+    let runtime = state.update_runtime(|runtime| {
+        runtime.status_message = if enabled {
+            "เปิด Auto Cloud Scan แล้ว: ส่งหน้าต่างเสียง 8 วินาทีทุกประมาณ 6 วินาที".into()
+        } else {
+            "ปิด Auto Cloud Scan แล้ว".into()
+        };
+        runtime.last_error = None;
+    });
+    let _ = app.emit("runtime-state", runtime);
+    Ok(settings)
 }
 
 #[tauri::command]
@@ -46,9 +110,78 @@ pub fn select_capture_source(
 }
 
 #[tauri::command]
+pub fn select_voice_chat_source(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    source: CaptureSource,
+) -> CommandResult<AppSettings> {
+    let settings = state
+        .settings
+        .update(|settings| {
+            settings.voice_chat.selected_process = Some((&source).into());
+            settings.voice_chat.enabled = true;
+            Ok(())
+        })
+        .map_err(|error| error.to_string())?;
+    if state.runtime.read().unwrap().listening {
+        pipeline::attach_voice_chat_process(&app).map_err(|error| error.to_string())?;
+    }
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn update_voice_chat(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    voice_chat: VoiceChatSettings,
+) -> CommandResult<AppSettings> {
+    let settings = state
+        .settings
+        .update(|settings| {
+            settings.voice_chat = voice_chat;
+            Ok(())
+        })
+        .map_err(|error| error.to_string())?;
+    state
+        .worker
+        .start(app.clone(), &settings)
+        .map_err(|error| error.to_string())?;
+    let runtime = state.update_runtime(|runtime| {
+        runtime.voice_chat_vad_threshold = settings.voice_chat.vad.vad_threshold;
+        runtime.voice_chat_vad_gain_db = settings.voice_chat.vad.gain_db;
+        runtime.last_error = None;
+    });
+    let _ = app.emit("runtime-state", runtime);
+    if state.runtime.read().unwrap().listening {
+        pipeline::attach_voice_chat_process(&app).map_err(|error| error.to_string())?;
+    }
+    Ok(settings)
+}
+
+#[tauri::command]
 pub fn toggle_listening(app: AppHandle, state: State<'_, AppState>) -> CommandResult<bool> {
     let enabled = !state.runtime.read().unwrap().listening;
     pipeline::set_listening(&app, enabled).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn probe_recent_game_audio(app: AppHandle, state: State<'_, AppState>) -> CommandResult<()> {
+    state
+        .groq_stt
+        .probe_recent_game_audio(app)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn probe_recent_source_audio(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    stream: StreamKind,
+) -> CommandResult<()> {
+    state
+        .groq_stt
+        .probe_recent_audio(app, stream)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -85,6 +218,9 @@ pub fn clear_groq_credentials(
 ) -> CommandResult<AppSettings> {
     clear_groq_key().map_err(|error| error.to_string())?;
     state.groq_stt.reset_stream(crate::models::StreamKind::Game);
+    state
+        .groq_stt
+        .reset_stream(crate::models::StreamKind::VoiceChat);
     state
         .groq_stt
         .reset_stream(crate::models::StreamKind::Microphone);
@@ -128,12 +264,13 @@ pub fn get_groq_model_catalog() -> Vec<GroqModelOption> {
 #[tauri::command]
 pub fn update_groq_models(
     state: State<'_, AppState>,
-    stt_model: String,
+    game_stt_model: String,
+    microphone_stt_model: String,
     translation_model: String,
 ) -> CommandResult<AppSettings> {
     state
         .settings
-        .update_groq_models(stt_model, translation_model)
+        .update_groq_models(game_stt_model, microphone_stt_model, translation_model)
         .map_err(|error| error.to_string())
 }
 
@@ -175,11 +312,46 @@ pub fn update_vad_settings(
         .settings
         .update_vad(vad)
         .map_err(|error| error.to_string())?;
-    state.groq_stt.set_pre_roll_ms(settings.vad.pre_roll_ms);
+    state.groq_stt.configure_game_buffer(
+        settings.vad.pre_roll_ms,
+        settings.vad.silence_ms,
+        settings.vad.max_utterance_ms,
+    );
     state
         .worker
-        .start(app, &settings)
+        .start(app.clone(), &settings)
         .map_err(|error| error.to_string())?;
+    sync_active_vad_runtime(&app, &state, &settings);
+    if state.runtime.read().unwrap().listening {
+        pipeline::attach_saved_process(&app).map_err(|error| error.to_string())?;
+    }
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn update_game_capture_mode(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    mode: GameCaptureMode,
+    cloud_scan_enabled: bool,
+) -> CommandResult<AppSettings> {
+    let settings = state
+        .settings
+        .update(|settings| {
+            settings.game_capture_mode = mode;
+            settings.system_output_cloud_scan =
+                mode == GameCaptureMode::SystemOutput && cloud_scan_enabled;
+            Ok(())
+        })
+        .map_err(|error| error.to_string())?;
+    state
+        .worker
+        .start(app.clone(), &settings)
+        .map_err(|error| error.to_string())?;
+    sync_active_vad_runtime(&app, &state, &settings);
+    if state.runtime.read().unwrap().listening {
+        pipeline::attach_saved_process(&app).map_err(|error| error.to_string())?;
+    }
     Ok(settings)
 }
 
@@ -268,10 +440,13 @@ pub fn copy_latest_reply(app: AppHandle) -> CommandResult<bool> {
 
 #[tauri::command]
 pub fn restart_worker(app: AppHandle, state: State<'_, AppState>) -> CommandResult<()> {
+    let settings = state.settings.snapshot();
     state
         .worker
-        .start(app, &state.settings.snapshot())
-        .map_err(|error| error.to_string())
+        .start(app.clone(), &settings)
+        .map_err(|error| error.to_string())?;
+    sync_active_vad_runtime(&app, &state, &settings);
+    Ok(())
 }
 
 #[tauri::command]

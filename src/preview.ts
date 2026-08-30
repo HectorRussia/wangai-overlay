@@ -1,4 +1,4 @@
-import type { AppSnapshot, CaptureSource } from "./types";
+import type { AppSnapshot, AudioOutputDevice, CaptureSource } from "./types";
 
 export function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -27,25 +27,53 @@ export const previewProcesses: CaptureSource[] = [
   },
 ];
 
+export const previewOutputDevices: AudioOutputDevice[] = [
+  { id: "Speakers (PRO)", name: "Speakers (PRO)", isDefault: true, sampleRate: 48_000, channels: 2 },
+  { id: "Speakers (Realtek(R) Audio)", name: "Speakers (Realtek(R) Audio)", isDefault: false, sampleRate: 48_000, channels: 2 },
+  { id: "Dell AW2720HF (NVIDIA High Definition Audio)", name: "Dell AW2720HF (NVIDIA High Definition Audio)", isDefault: false, sampleRate: 48_000, channels: 2 },
+];
+
 export function previewSnapshot(): AppSnapshot {
   const now = Date.now();
   const idle = new URLSearchParams(window.location.search).get("state") === "idle";
   const snapshot: AppSnapshot = {
     settings: {
-      schemaVersion: 4,
+      schemaVersion: 11,
       selectedProcess: {
         executablePath: previewProcesses[0].executablePath,
         executableName: previewProcesses[0].name,
         displayName: previewProcesses[0].displayName,
         lastPid: previewProcesses[0].pid,
       },
+      gameCaptureMode: "process_tree",
+      gameOutputDeviceId: "Speakers (PRO)",
+      systemOutputCloudScan: false,
+      voiceChat: {
+        enabled: true,
+        autoDetect: true,
+        selectedProcess: {
+          executablePath: previewProcesses[1].executablePath,
+          executableName: previewProcesses[1].name,
+          displayName: previewProcesses[1].displayName,
+          lastPid: previewProcesses[1].pid,
+        },
+        rescueScan: true,
+        vad: { vadThreshold: 0.35, gainDb: 6 },
+      },
       autoAttach: true,
       hotkeys: { toggleListening: "F8", pushToTalk: "F9", copyLatest: "F10", editOverlay: "F7" },
-      overlay: { opacity: 0.94, fontScale: 1, fadeSeconds: 30, maxItems: 3, width: 420, height: 236 },
-      vad: { vadThreshold: 0.5, silenceMs: 500, preRollMs: 200, maxUtteranceMs: 12000 },
+      overlay: { opacity: 0.94, fontScale: 1, fadeSeconds: 30, maxItems: 4, width: 420, height: 236 },
+      vad: {
+        processTree: { vadThreshold: 0.5, gainDb: 0 },
+        systemOutput: { vadThreshold: 0.35, gainDb: 9 },
+        silenceMs: 500,
+        preRollMs: 200,
+        maxUtteranceMs: 12000,
+      },
       groq: {
         configured: true,
-        sttModel: "whisper-large-v3-turbo",
+        gameSttModel: "whisper-large-v3",
+        microphoneSttModel: "whisper-large-v3-turbo",
         translationModel: "openai/gpt-oss-20b",
         monthlyBudgetMicrousd: 2_000_000,
         usageMonth: "2026-08",
@@ -70,12 +98,36 @@ export function previewSnapshot(): AppSnapshot {
       groqStatus: "Groq พร้อมใช้งาน",
       budgetExhausted: false,
       attachedProcess: previewProcesses[0],
+      effectiveCapturePid: 4100,
+      effectiveCaptureName: "MistfallHunter.exe",
+      effectiveOutputDeviceId: undefined,
+      effectiveOutputDeviceName: undefined,
+      effectiveOutputDeviceIsDefault: false,
+      gameAudioRmsDbfs: -31.5,
+      gameAudioPeakDbfs: -12.2,
+      gameAudioLastSeenAtMs: now,
+      gameVadActive: false,
+      effectiveVadThreshold: 0.5,
+      effectiveVadGainDb: 0,
+      effectiveVadAutoGainDb: 0,
+      droppedAudioChunks: 0,
+      voiceChatAttachedProcess: previewProcesses[1],
+      voiceChatEffectiveCapturePid: 7100,
+      voiceChatEffectiveCaptureName: "Discord.exe",
+      voiceChatAudioRmsDbfs: -32,
+      voiceChatAudioPeakDbfs: -14,
+      voiceChatAudioLastSeenAtMs: now,
+      voiceChatVadActive: false,
+      voiceChatVadThreshold: 0.35,
+      voiceChatVadGainDb: 6,
+      voiceChatDroppedAudioChunks: 0,
       statusMessage: "กำลังฟัง Mistfall Hunter",
     },
     history: [
       {
         segmentId: "game-preview",
         stream: "game",
+        sourceDisplayName: "Mistfall Hunter",
         originalLanguage: "en",
         originalText: "Join us at the north gate.",
         translatedText: "ไปรวมกันที่ประตูเหนือ",
@@ -98,6 +150,17 @@ export function previewSnapshot(): AppSnapshot {
     snapshot.runtime.listening = false;
     snapshot.runtime.groqSttBusy = false;
     snapshot.runtime.attachedProcess = undefined;
+    snapshot.runtime.effectiveCapturePid = undefined;
+    snapshot.runtime.effectiveCaptureName = undefined;
+    snapshot.runtime.gameAudioRmsDbfs = undefined;
+    snapshot.runtime.gameAudioPeakDbfs = undefined;
+    snapshot.runtime.gameAudioLastSeenAtMs = undefined;
+    snapshot.runtime.voiceChatAttachedProcess = undefined;
+    snapshot.runtime.voiceChatEffectiveCapturePid = undefined;
+    snapshot.runtime.voiceChatEffectiveCaptureName = undefined;
+    snapshot.runtime.voiceChatAudioRmsDbfs = undefined;
+    snapshot.runtime.voiceChatAudioPeakDbfs = undefined;
+    snapshot.runtime.voiceChatAudioLastSeenAtMs = undefined;
     snapshot.runtime.statusMessage = "พร้อมเริ่มฟังเสียงในเกม";
     snapshot.history = [];
   }

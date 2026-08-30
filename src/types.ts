@@ -1,6 +1,7 @@
-export type StreamKind = "game" | "microphone";
+export type StreamKind = "game" | "microphone" | "voice_chat";
 export type TranscriptKind = "partial" | "final";
 export type TranslationStatus = "pending" | "success" | "error" | "quota" | "source_only";
+export type GameCaptureMode = "process_tree" | "system_output";
 
 export interface CaptureSource {
   pid: number;
@@ -17,9 +18,18 @@ export interface SavedProcess {
   lastPid?: number;
 }
 
+export interface AudioOutputDevice {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  sampleRate: number;
+  channels: number;
+}
+
 export interface TranscriptEvent {
   segmentId: string;
   stream: StreamKind;
+  sourceDisplayName?: string;
   language: "en" | "th";
   text: string;
   kind: TranscriptKind;
@@ -40,6 +50,7 @@ export interface TranslationResult {
 export interface SubtitleItem {
   segmentId: string;
   stream: StreamKind;
+  sourceDisplayName?: string;
   originalLanguage: "en" | "th";
   originalText: string;
   translatedText?: string;
@@ -70,16 +81,31 @@ export interface OverlaySettings {
   height: number;
 }
 
-export interface VadSettings {
+export interface GameVadProfile {
   vadThreshold: number;
+  gainDb: number;
+}
+
+export interface VadSettings {
+  processTree: GameVadProfile;
+  systemOutput: GameVadProfile;
   silenceMs: number;
   preRollMs: number;
   maxUtteranceMs: number;
 }
 
+export interface VoiceChatSettings {
+  enabled: boolean;
+  autoDetect: boolean;
+  selectedProcess?: SavedProcess;
+  rescueScan: boolean;
+  vad: GameVadProfile;
+}
+
 export interface GroqSettings {
   configured: boolean;
-  sttModel: string;
+  gameSttModel: string;
+  microphoneSttModel: string;
   translationModel: string;
   monthlyBudgetMicrousd: number;
   usageMonth: string;
@@ -105,6 +131,10 @@ export interface GroqModelOption {
 export interface AppSettings {
   schemaVersion: number;
   selectedProcess?: SavedProcess;
+  gameCaptureMode: GameCaptureMode;
+  gameOutputDeviceId?: string;
+  systemOutputCloudScan: boolean;
+  voiceChat: VoiceChatSettings;
   autoAttach: boolean;
   hotkeys: HotkeySettings;
   overlay: OverlaySettings;
@@ -123,6 +153,31 @@ export interface RuntimeState {
   groqStatus: string;
   budgetExhausted: boolean;
   attachedProcess?: CaptureSource;
+  effectiveCapturePid?: number;
+  effectiveCaptureName?: string;
+  effectiveOutputDeviceId?: string;
+  effectiveOutputDeviceName?: string;
+  effectiveOutputDeviceIsDefault: boolean;
+  gameAudioRmsDbfs?: number;
+  gameAudioPeakDbfs?: number;
+  gameAudioLastSeenAtMs?: number;
+  gameVadActive: boolean;
+  effectiveVadThreshold: number;
+  effectiveVadGainDb: number;
+  effectiveVadAutoGainDb: number;
+  droppedAudioChunks: number;
+  captureWarning?: string;
+  voiceChatAttachedProcess?: CaptureSource;
+  voiceChatEffectiveCapturePid?: number;
+  voiceChatEffectiveCaptureName?: string;
+  voiceChatAudioRmsDbfs?: number;
+  voiceChatAudioPeakDbfs?: number;
+  voiceChatAudioLastSeenAtMs?: number;
+  voiceChatVadActive: boolean;
+  voiceChatVadThreshold: number;
+  voiceChatVadGainDb: number;
+  voiceChatDroppedAudioChunks: number;
+  voiceChatCaptureWarning?: string;
   statusMessage: string;
   lastError?: string;
 }

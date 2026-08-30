@@ -1,7 +1,8 @@
 """GameLingo local Silero VAD worker.
 
 stdin uses compact binary frames so raw PCM never touches a socket or disk:
-  u32-le payload length, u8 kind, u8 stream, u16 reserved, f32-le samples
+  u32-le payload length, u8 kind, u8 stream, u16 reserved,
+  u64-le start sample cursor, f32-le samples
 stdout is UTF-8 JSON Lines containing VAD status and speech boundary events only.
 """
 
@@ -31,6 +32,7 @@ KIND_FINALIZE = 3
 KIND_SHUTDOWN = 4
 STREAM_GAME = 1
 STREAM_MICROPHONE = 2
+STREAM_VOICE_CHAT = 3
 SAMPLE_RATE = 16_000
 VAD_FRAME_SAMPLES = 512
 
@@ -56,6 +58,7 @@ def read_exact(stream, length: int) -> bytes | None:
 class Frame:
     kind: int
     stream: int
+    start_sample_cursor: int
     samples: np.ndarray
 
 
@@ -64,14 +67,19 @@ def read_frame(stream) -> Frame | None:
     if raw_length is None:
         return None
     (length,) = struct.unpack("<I", raw_length)
-    if length < 4 or length > 4 + SAMPLE_RATE * 4 * 15:
+    if length < 12 or length > 12 + SAMPLE_RATE * 4 * 15:
         raise ValueError(f"invalid frame length: {length}")
     body = read_exact(stream, length)
     if body is None:
         return None
-    kind, stream_id, _reserved = struct.unpack("<BBH", body[:4])
-    pcm = np.frombuffer(body[4:], dtype="<f4").copy()
-    return Frame(kind=kind, stream=stream_id, samples=pcm)
+    kind, stream_id, _reserved, start_sample_cursor = struct.unpack("<BBHQ", body[:12])
+    pcm = np.frombuffer(body[12:], dtype="<f4").copy()
+    return Frame(
+        kind=kind,
+        stream=stream_id,
+        start_sample_cursor=start_sample_cursor,
+        samples=pcm,
+    )
 
 
 class FrameReader(threading.Thread):
@@ -92,24 +100,62 @@ class FrameReader(threading.Thread):
 
 
 class SileroVad:
-    def __init__(self, model, threshold: float, silence_ms: int):
-        from silero_vad import VADIterator
-
-        self.iterator = VADIterator(
-            model,
-            threshold=threshold,
-            sampling_rate=SAMPLE_RATE,
-            min_silence_duration_ms=silence_ms,
-            speech_pad_ms=0,
+    def __init__(
+        self,
+        model,
+        threshold: float,
+        silence_ms: int,
+        adaptive_floor: float | None = None,
+    ):
+        self.model = model
+        self.threshold = threshold
+        self.adaptive_floor = min(
+            threshold,
+            adaptive_floor if adaptive_floor is not None else threshold,
         )
+        self.end_threshold = max(
+            0.02,
+            min(threshold - 0.15, self.adaptive_floor * 0.8),
+        )
+        self.silence_samples = int(silence_ms * SAMPLE_RATE / 1_000)
+        self.speaking = False
+        self.weak_speech_frames = 0
+        self.silent_samples = 0
 
     def reset(self) -> None:
-        self.iterator.reset_states()
+        self.model.reset_states()
+        self.speaking = False
+        self.weak_speech_frames = 0
+        self.silent_samples = 0
 
     def process(self, samples: np.ndarray) -> dict | None:
         import torch
 
-        return self.iterator(torch.from_numpy(samples), return_seconds=False)
+        probability = float(
+            self.model(torch.from_numpy(samples), SAMPLE_RATE).item()
+        )
+        strong_speech = probability >= self.threshold
+        if probability >= self.adaptive_floor:
+            self.weak_speech_frames += 1
+        else:
+            self.weak_speech_frames = 0
+
+        if not self.speaking and (strong_speech or self.weak_speech_frames >= 3):
+            self.speaking = True
+            self.silent_samples = 0
+            return {"start": 0}
+
+        if self.speaking:
+            if probability < self.end_threshold:
+                self.silent_samples += len(samples)
+                if self.silent_samples >= self.silence_samples:
+                    self.speaking = False
+                    self.weak_speech_frames = 0
+                    self.silent_samples = 0
+                    return {"end": 0}
+            else:
+                self.silent_samples = 0
+        return None
 
 
 class EnergyVad:
@@ -153,50 +199,95 @@ class StreamSession:
         self.vad = vad
         self.emit_event = emit_event
         self.pending = np.empty(0, dtype=np.float32)
+        self.pending_start_cursor = 0
+        self.expected_cursor: int | None = None
         self.speaking = False
         self.speech_samples = 0
+        self.utterance_id = 0
+        self.current_utterance_id: int | None = None
 
-    def ingest(self, samples: np.ndarray) -> None:
+    def ingest(self, samples: np.ndarray, start_sample_cursor: int) -> None:
         if samples.size == 0:
             return
+        if self.expected_cursor is not None and start_sample_cursor != self.expected_cursor:
+            self.emit_event(
+                {
+                    "type": "audio_gap",
+                    "stream": self.stream_name,
+                    "expectedSampleCursor": self.expected_cursor,
+                    "actualSampleCursor": start_sample_cursor,
+                }
+            )
+            self._reset_detection(clear_pending=True)
+        if self.pending.size == 0:
+            self.pending_start_cursor = start_sample_cursor
         self.pending = np.concatenate((self.pending, samples))
+        self.expected_cursor = start_sample_cursor + len(samples)
         while len(self.pending) >= VAD_FRAME_SAMPLES:
+            frame_start_cursor = self.pending_start_cursor
+            frame_end_cursor = frame_start_cursor + VAD_FRAME_SAMPLES
             frame = self.pending[:VAD_FRAME_SAMPLES]
             self.pending = self.pending[VAD_FRAME_SAMPLES:]
+            self.pending_start_cursor = frame_end_cursor
             event = self.vad.process(frame)
             if event and "start" in event and not self.speaking:
                 self.speaking = True
                 self.speech_samples = 0
-                self._emit_state(True)
+                self.utterance_id += 1
+                self.current_utterance_id = self.utterance_id
+                self._emit_state(True, frame_end_cursor)
             if self.speaking:
                 self.speech_samples += len(frame)
             if event and "end" in event and self.speaking:
-                self._finish_speech()
+                self._finish_speech(frame_end_cursor, reset_vad=True)
             elif self.speaking and self.speech_samples >= self.max_samples:
-                self._finish_speech()
+                self._split_speech(frame_end_cursor)
 
     def finalize(self) -> None:
         if self.speaking:
-            self._finish_speech()
+            self._finish_speech(self.expected_cursor or self.pending_start_cursor, reset_vad=True)
         else:
             self.reset()
 
     def reset(self) -> None:
-        self.pending = np.empty(0, dtype=np.float32)
+        self._reset_detection(clear_pending=True)
+        self.expected_cursor = None
+        self.pending_start_cursor = 0
+        self.utterance_id = 0
+
+    def _reset_detection(self, clear_pending: bool) -> None:
+        if clear_pending:
+            self.pending = np.empty(0, dtype=np.float32)
         self.speaking = False
         self.speech_samples = 0
+        self.current_utterance_id = None
         self.vad.reset()
 
-    def _finish_speech(self) -> None:
-        self._emit_state(False)
-        self.reset()
+    def _finish_speech(self, sample_cursor: int, reset_vad: bool) -> None:
+        self._emit_state(False, sample_cursor)
+        self.speaking = False
+        self.speech_samples = 0
+        self.current_utterance_id = None
+        if reset_vad:
+            self.vad.reset()
 
-    def _emit_state(self, active: bool) -> None:
+    def _split_speech(self, sample_cursor: int) -> None:
+        self._emit_state(False, sample_cursor)
+        self.utterance_id += 1
+        self.current_utterance_id = self.utterance_id
+        self.speech_samples = 0
+        self._emit_state(True, sample_cursor)
+
+    def _emit_state(self, active: bool, sample_cursor: int) -> None:
+        if self.current_utterance_id is None:
+            return
         self.emit_event(
             {
                 "type": "speech_state",
                 "stream": self.stream_name,
                 "active": active,
+                "utteranceId": self.current_utterance_id,
+                "sampleCursor": sample_cursor,
             }
         )
 
@@ -205,17 +296,29 @@ def run(args) -> int:
     try:
         if args.mock:
             vad_factory = lambda: EnergyVad(args.silence_ms)
+            game_vad = vad_factory()
+            voice_chat_vad = vad_factory()
         else:
             from silero_vad import load_silero_vad
 
-            model = load_silero_vad(onnx=True)
-            vad_factory = lambda: SileroVad(model, args.vad_threshold, args.silence_ms)
+            game_vad = SileroVad(
+                load_silero_vad(onnx=True),
+                args.vad_threshold,
+                args.silence_ms,
+                args.adaptive_floor,
+            )
+            voice_chat_vad = SileroVad(
+                load_silero_vad(onnx=True),
+                args.voice_vad_threshold,
+                args.silence_ms,
+                args.voice_adaptive_floor,
+            )
         sessions = {
             STREAM_GAME: StreamSession(
-                "game", args.max_utterance_ms, vad_factory()
+                "game", args.max_utterance_ms, game_vad
             ),
-            STREAM_MICROPHONE: StreamSession(
-                "microphone", args.max_utterance_ms, vad_factory()
+            STREAM_VOICE_CHAT: StreamSession(
+                "voice_chat", args.max_utterance_ms, voice_chat_vad
             ),
         }
     except Exception as exc:
@@ -233,7 +336,7 @@ def run(args) -> int:
         if session is None:
             continue
         if frame.kind == KIND_AUDIO:
-            session.ingest(frame.samples)
+            session.ingest(frame.samples, frame.start_sample_cursor)
         elif frame.kind == KIND_FINALIZE:
             session.finalize()
         elif frame.kind == KIND_RESET:
@@ -242,9 +345,10 @@ def run(args) -> int:
 
 
 def self_test() -> int:
-    payload = struct.pack("<BBH", KIND_AUDIO, STREAM_GAME, 0) + np.zeros(320, dtype="<f4").tobytes()
+    payload = struct.pack("<BBHQ", KIND_AUDIO, STREAM_GAME, 0, 123) + np.zeros(320, dtype="<f4").tobytes()
     frame = read_frame(io.BytesIO(struct.pack("<I", len(payload)) + payload))
-    assert frame is not None and frame.kind == KIND_AUDIO and frame.samples.shape == (320,)
+    assert frame is not None and frame.kind == KIND_AUDIO
+    assert frame.start_sample_cursor == 123 and frame.samples.shape == (320,)
     assert read_exact(io.BytesIO(b"abc"), 3) == b"abc"
     print("GameLingo VAD worker protocol self-test: OK")
     return 0
@@ -253,6 +357,9 @@ def self_test() -> int:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--vad-threshold", type=float, default=0.5)
+    parser.add_argument("--adaptive-floor", type=float)
+    parser.add_argument("--voice-vad-threshold", type=float, default=0.35)
+    parser.add_argument("--voice-adaptive-floor", type=float)
     parser.add_argument("--silence-ms", type=int, default=500)
     parser.add_argument("--max-utterance-ms", type=int, default=12_000)
     parser.add_argument("--mock", action="store_true")

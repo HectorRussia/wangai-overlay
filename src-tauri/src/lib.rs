@@ -48,9 +48,16 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
             commands::list_capture_sources,
+            commands::list_game_output_devices,
             commands::select_capture_source,
+            commands::select_voice_chat_source,
+            commands::update_voice_chat,
+            commands::update_game_output_device,
+            commands::update_system_output_cloud_scan,
             commands::toggle_listening,
             commands::set_listening,
+            commands::probe_recent_game_audio,
+            commands::probe_recent_source_audio,
             commands::configure_groq,
             commands::clear_groq_credentials,
             commands::test_groq_configuration,
@@ -59,6 +66,7 @@ pub fn run() {
             commands::update_hotkeys,
             commands::update_overlay_settings,
             commands::update_vad_settings,
+            commands::update_game_capture_mode,
             commands::update_glossary,
             commands::set_overlay_edit_mode,
             commands::set_overlay_presentation,
@@ -74,8 +82,9 @@ pub fn run() {
     app.run(|app, event| {
         if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
             let state = app.state::<AppState>();
-            state.audio.stop_all(&state.worker);
+            state.audio.stop_all();
             state.groq_stt.reset_stream(models::StreamKind::Game);
+            state.groq_stt.reset_stream(models::StreamKind::VoiceChat);
             state.groq_stt.reset_stream(models::StreamKind::Microphone);
             let _ = state.settings.save();
             state.worker.stop();

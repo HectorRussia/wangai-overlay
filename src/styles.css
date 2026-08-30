@@ -194,6 +194,14 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
 .overlay-bubble.is-outgoing { align-self: flex-end; padding-right: 52px; background: #63c48b; }
 .overlay-bubble.is-outgoing strong { color: #102118; }
 .overlay-bubble.is-outgoing > span { color: rgba(16, 33, 24, .68); }
+.overlay-source-badge {
+  width: max-content;
+  border-radius: 999px;
+  color: #79dba1;
+  font: 750 .48em var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
 
 .overlay-copy,
 .overlay-copy-hint {

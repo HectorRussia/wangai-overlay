@@ -28,11 +28,16 @@ impl AppState {
     pub fn new(settings_path: PathBuf) -> Result<Self> {
         let settings = SettingsManager::load(settings_path)?;
         let snapshot = settings.snapshot();
-        let pre_roll_ms = snapshot.vad.pre_roll_ms;
+        let vad = snapshot.vad.clone();
         let mut runtime = RuntimeState::default();
         if snapshot.groq.configured {
             runtime.groq_status = "Groq พร้อมใช้งาน".into();
         }
+        let active_profile = snapshot.vad.active_profile(snapshot.game_capture_mode);
+        runtime.effective_vad_threshold = active_profile.vad_threshold;
+        runtime.effective_vad_gain_db = active_profile.gain_db;
+        runtime.voice_chat_vad_threshold = snapshot.voice_chat.vad.vad_threshold;
+        runtime.voice_chat_vad_gain_db = snapshot.voice_chat.vad.gain_db;
         runtime.budget_exhausted =
             snapshot.groq.estimated_spend_microusd >= snapshot.groq.monthly_budget_microusd;
         Ok(Self {
@@ -42,7 +47,7 @@ impl AppState {
             partial: RwLock::new(None),
             audio: AudioManager::default(),
             worker: WorkerManager::default(),
-            groq_stt: GroqSttManager::new(pre_roll_ms),
+            groq_stt: GroqSttManager::new(vad.pre_roll_ms, vad.silence_ms, vad.max_utterance_ms),
             translator: GroqTranslator::default(),
         })
     }
@@ -80,6 +85,7 @@ impl AppState {
         let item = SubtitleItem {
             segment_id: event.segment_id.clone(),
             stream: event.stream,
+            source_display_name: event.source_display_name.clone(),
             original_language: event.language.clone(),
             original_text: event.text.clone(),
             translated_text: None,
@@ -94,7 +100,11 @@ impl AppState {
             *existing = item.clone();
             return item;
         }
-        history.push_back(item.clone());
+        let insert_at = history
+            .iter()
+            .position(|value| value.created_at_ms > item.created_at_ms)
+            .unwrap_or(history.len());
+        history.insert(insert_at, item.clone());
         while history.len() > 100 {
             history.pop_front();
         }
@@ -135,6 +145,7 @@ mod tests {
             state.add_final(&TranscriptEvent {
                 segment_id: format!("s-{index}"),
                 stream: StreamKind::Game,
+                source_display_name: Some("GAME".into()),
                 language: "en".into(),
                 text: format!("text {index}"),
                 kind: TranscriptKind::Final,
@@ -154,5 +165,38 @@ mod tests {
         };
         let item = state.apply_translation(&result).expect("updated");
         assert_eq!(item.translated_text.as_deref(), Some("ข้อความ"));
+    }
+
+    #[test]
+    fn history_snapshot_orders_concurrent_sources_by_spoken_time() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let state = AppState::new(temp.path().join("settings.json")).expect("state");
+        for (segment_id, stream, ended_at_ms) in [
+            ("voice-late-result", StreamKind::VoiceChat, 100_i64),
+            ("game-newer", StreamKind::Game, 200_i64),
+        ] {
+            state.add_final(&TranscriptEvent {
+                segment_id: segment_id.into(),
+                stream,
+                source_display_name: Some(
+                    if stream == StreamKind::VoiceChat {
+                        "Discord"
+                    } else {
+                        "Mistfall Hunter"
+                    }
+                    .into(),
+                ),
+                language: "en".into(),
+                text: segment_id.into(),
+                kind: TranscriptKind::Final,
+                started_at_ms: ended_at_ms - 50,
+                ended_at_ms,
+            });
+        }
+
+        let history = state.snapshot().history;
+        assert_eq!(history[0].segment_id, "game-newer");
+        assert_eq!(history[1].segment_id, "voice-late-result");
+        assert_eq!(history[1].source_display_name.as_deref(), Some("Discord"));
     }
 }

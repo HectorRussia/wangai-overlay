@@ -45,7 +45,40 @@ describe("WANGAI overlay", () => {
     expect(screen.getByText("Join us at the north gate.").tagName).toBe("SPAN");
     expect(screen.getByText("On my way.").tagName).toBe("STRONG");
     expect(screen.getByText("กำลังไป").tagName).toBe("SPAN");
+    expect(screen.getByText("GAME")).toBeInTheDocument();
     await waitFor(() => expect(mocks.setOverlayPresentation).toHaveBeenCalledWith("expanded"));
+  });
+
+  it("labels voice chat and mixed subtitles by source", () => {
+    const snapshot = snapshotFixture();
+    snapshot.history = [
+      {
+        segmentId: "voice-1",
+        stream: "voice_chat",
+        sourceDisplayName: "Discord",
+        originalLanguage: "en",
+        originalText: "Push now",
+        translatedText: "บุกตอนนี้",
+        status: "success",
+        createdAtMs: Date.now(),
+      },
+      {
+        segmentId: "mixed-1",
+        stream: "game",
+        sourceDisplayName: "MIXED",
+        originalLanguage: "en",
+        originalText: "Fallback audio",
+        translatedText: "เสียงรวม",
+        status: "success",
+        createdAtMs: Date.now() - 1,
+      },
+    ];
+    mocks.snapshot = snapshot;
+
+    render(<OverlayApp />);
+
+    expect(screen.getByText("Discord")).toBeInTheDocument();
+    expect(screen.getByText("MIXED")).toBeInTheDocument();
   });
 
   it("collapses to a listening capsule after visible messages expire", async () => {

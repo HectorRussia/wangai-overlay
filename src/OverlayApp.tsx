@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AudioLines, Check, Clipboard, GripHorizontal, Headphones, Mic, Radio, TriangleAlert } from "lucide-react";
 import { api } from "./api";
-import { overlayPresentation, type OverlayPresentation } from "./overlayPresentation";
+import { overlayPresentation, visibleOverlayItems, type OverlayPresentation } from "./overlayPresentation";
 import { isPreviewMode } from "./preview";
 import { useSnapshot } from "./useSnapshot";
 
@@ -18,10 +18,12 @@ export function OverlayApp() {
 
   const visible = useMemo(() => {
     if (!snapshot) return [];
-    return snapshot.history
-      .filter((item) => clock - item.createdAtMs < snapshot.settings.overlay.fadeSeconds * 1000)
-      .slice(0, snapshot.settings.overlay.maxItems)
-      .reverse();
+    return visibleOverlayItems(
+      snapshot.history,
+      snapshot.settings.overlay.maxItems,
+      snapshot.settings.overlay.fadeSeconds,
+      clock,
+    );
   }, [clock, snapshot]);
 
   const presentation = snapshot
@@ -105,6 +107,7 @@ export function OverlayApp() {
           const primary = item.translatedText ?? (item.status === "pending" ? "กำลังแปล…" : "แปลไม่สำเร็จ");
           return (
             <article className={`overlay-bubble ${outgoing ? "is-outgoing" : "is-incoming"}`} key={item.segmentId}>
+              {!outgoing && <small className="overlay-source-badge">{sourceBadge(item.stream, item.sourceDisplayName)}</small>}
               <strong lang={outgoing ? "en" : "th"}>{primary}</strong>
               <span lang={outgoing ? "th" : "en"}>{item.originalText}</span>
               {outgoing && item.translatedText && (
@@ -139,4 +142,10 @@ export function OverlayApp() {
       </section>
     </main>
   );
+}
+
+function sourceBadge(stream: "game" | "voice_chat" | "microphone", displayName?: string): string {
+  if (displayName?.toUpperCase() === "MIXED") return "MIXED";
+  if (stream === "voice_chat") return displayName || "VOICE CHAT";
+  return "GAME";
 }
