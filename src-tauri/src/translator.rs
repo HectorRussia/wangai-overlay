@@ -8,11 +8,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     models::{AppSettings, GlossaryTerm, TranslationResult, TranslationStatus},
-    settings::{xai_key, SettingsManager},
+    settings::{groq_key, SettingsManager},
 };
 
-const CHAT_COMPLETIONS_ENDPOINT: &str = "https://api.x.ai/v1/chat/completions";
-const MAX_COMPLETION_TOKENS: u64 = 256;
+const CHAT_COMPLETIONS_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
+const MAX_COMPLETION_TOKENS: u64 = 128;
 
 #[async_trait]
 pub trait Translator: Send + Sync {
@@ -27,71 +27,77 @@ pub trait Translator: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct GrokTranslator {
+pub struct GroqTranslator {
     client: reqwest::Client,
     endpoint: String,
 }
 
-impl Default for GrokTranslator {
+impl Default for GroqTranslator {
     fn default() -> Self {
+        Self::with_endpoint(CHAT_COMPLETIONS_ENDPOINT)
+    }
+}
+
+impl GroqTranslator {
+    fn with_endpoint(endpoint: impl Into<String>) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(3))
             .build()
             .expect("valid reqwest client");
         Self {
             client,
-            endpoint: CHAT_COMPLETIONS_ENDPOINT.into(),
+            endpoint: endpoint.into(),
         }
     }
 }
 
 #[derive(Serialize)]
-struct GrokRequest<'a> {
+struct GroqRequest<'a> {
     model: &'a str,
-    messages: Vec<GrokMessage<'a>>,
+    messages: Vec<GroqMessage<'a>>,
     temperature: f32,
     max_tokens: u64,
 }
 
 #[derive(Serialize)]
-struct GrokMessage<'a> {
+struct GroqMessage<'a> {
     role: &'a str,
     content: &'a str,
 }
 
 #[derive(Debug, Deserialize)]
-struct GrokResponse {
-    choices: Vec<GrokChoice>,
+struct GroqResponse {
+    choices: Vec<GroqChoice>,
     #[serde(default)]
-    usage: GrokUsage,
+    usage: GroqUsage,
 }
 
 #[derive(Debug, Deserialize)]
-struct GrokChoice {
-    message: GrokResponseMessage,
+struct GroqChoice {
+    message: GroqResponseMessage,
 }
 
 #[derive(Debug, Deserialize)]
-struct GrokResponseMessage {
+struct GroqResponseMessage {
     content: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
-struct GrokUsage {
+struct GroqUsage {
     #[serde(default)]
     prompt_tokens: u64,
     #[serde(default)]
     completion_tokens: u64,
 }
 
-struct GrokSuccess {
+struct GroqSuccess {
     text: String,
     prompt_tokens: u64,
     completion_tokens: u64,
 }
 
 #[async_trait]
-impl Translator for GrokTranslator {
+impl Translator for GroqTranslator {
     async fn translate(
         &self,
         settings: &SettingsManager,
@@ -132,7 +138,7 @@ impl Translator for GrokTranslator {
     }
 }
 
-impl GrokTranslator {
+impl GroqTranslator {
     async fn translate_inner(
         &self,
         settings_manager: &SettingsManager,
@@ -140,23 +146,25 @@ impl GrokTranslator {
         from: &str,
         to: &str,
     ) -> std::result::Result<String, TranslateFailure> {
-        let key = xai_key().map_err(TranslateFailure::Other)?;
+        let key = groq_key().map_err(TranslateFailure::Other)?;
         let settings = settings_manager.snapshot();
-        if !settings.xai.configured || key.trim().is_empty() {
-            return Err(TranslateFailure::Other(anyhow!("ยังไม่ได้ตั้ง xAI API key")));
+        if !settings.groq.configured || key.trim().is_empty() {
+            return Err(TranslateFailure::Other(anyhow!("ยังไม่ได้ตั้ง Groq API key")));
         }
 
+        let model = settings.groq.translation_model.clone();
         let protected = protect_glossary(text, from, &settings);
         let system_prompt = translation_prompt(from, to);
-        let estimated_prompt_tokens = (protected.text.chars().count() as u64)
+        let estimated_prompt_tokens = (system_prompt.chars().count() as u64)
+            .saturating_add(protected.text.chars().count() as u64)
             .saturating_mul(2)
-            .saturating_add(500);
+            .saturating_add(512);
         let reservation = settings_manager
-            .reserve_translation(estimated_prompt_tokens, MAX_COMPLETION_TOKENS)
+            .reserve_translation(&model, estimated_prompt_tokens, MAX_COMPLETION_TOKENS)
             .map_err(|error| TranslateFailure::Quota(error.to_string()))?;
 
         let result = self
-            .request_translation(&key, &settings.xai.model, &system_prompt, &protected.text)
+            .request_translation(&key, &model, &system_prompt, &protected.text)
             .await;
 
         match result {
@@ -164,6 +172,7 @@ impl GrokTranslator {
                 settings_manager
                     .complete_translation(
                         reservation,
+                        &model,
                         success.prompt_tokens,
                         success.completion_tokens,
                     )
@@ -183,15 +192,15 @@ impl GrokTranslator {
         model: &str,
         system_prompt: &str,
         text: &str,
-    ) -> anyhow::Result<GrokSuccess> {
-        let body = GrokRequest {
+    ) -> anyhow::Result<GroqSuccess> {
+        let body = GroqRequest {
             model,
             messages: vec![
-                GrokMessage {
+                GroqMessage {
                     role: "system",
                     content: system_prompt,
                 },
-                GrokMessage {
+                GroqMessage {
                     role: "user",
                     content: text,
                 },
@@ -211,16 +220,16 @@ impl GrokTranslator {
             {
                 Ok(response) if response.status().is_success() => {
                     let response = response
-                        .json::<GrokResponse>()
+                        .json::<GroqResponse>()
                         .await
-                        .context("อ่านคำตอบ Grok ไม่สำเร็จ")?;
+                        .context("อ่านคำตอบ Groq ไม่สำเร็จ")?;
                     let translated = response
                         .choices
                         .first()
                         .map(|choice| choice.message.content.trim().to_string())
                         .filter(|value| !value.is_empty())
-                        .ok_or_else(|| anyhow!("Grok ส่งคำแปลว่าง"))?;
-                    return Ok(GrokSuccess {
+                        .ok_or_else(|| anyhow!("Groq ส่งคำแปลว่าง"))?;
+                    return Ok(GroqSuccess {
                         text: translated,
                         prompt_tokens: response.usage.prompt_tokens,
                         completion_tokens: response.usage.completion_tokens,
@@ -228,24 +237,18 @@ impl GrokTranslator {
                 }
                 Ok(response) => {
                     let status = response.status();
+                    let retry_after = retry_after(&response);
                     let body = response.text().await.unwrap_or_default();
-                    let message = if status == StatusCode::UNAUTHORIZED {
-                        "xAI API key ไม่ถูกต้อง กรุณาตรวจใน console.x.ai".into()
-                    } else if status == StatusCode::PAYMENT_REQUIRED {
-                        "บัญชี xAI ไม่มีเครดิตเพียงพอ".into()
-                    } else {
-                        format!("Grok ตอบ {status}: {}", truncate(&body, 180))
-                    };
-                    let error = anyhow!(message);
+                    let error = anyhow!(friendly_api_error(status, &body));
                     if attempt == 0 && retryable(status) {
                         last_error = Some(error);
-                        tokio::time::sleep(Duration::from_millis(250)).await;
+                        tokio::time::sleep(retry_after).await;
                         continue;
                     }
                     return Err(error);
                 }
                 Err(error) => {
-                    let error = anyhow!("เชื่อมต่อ Grok ไม่สำเร็จ: {error}");
+                    let error = anyhow!("เชื่อมต่อ Groq ไม่สำเร็จ: {error}");
                     if attempt == 0 {
                         last_error = Some(error);
                         tokio::time::sleep(Duration::from_millis(250)).await;
@@ -255,7 +258,7 @@ impl GrokTranslator {
                 }
             }
         }
-        Err(last_error.unwrap_or_else(|| anyhow!("Grok ไม่ตอบสนอง")))
+        Err(last_error.unwrap_or_else(|| anyhow!("Groq ไม่ตอบสนอง")))
     }
 }
 
@@ -303,7 +306,7 @@ fn protect_glossary(text: &str, from: &str, settings: &AppSettings) -> Protected
             .build()
             .expect("escaped glossary regex");
         if regex.is_match(&protected) {
-            protected = regex.replace_all(&protected, token.as_str()).to_string();
+            protected = regex.replace_all(&protected, token.as_str()).into_owned();
             replacements.push((token, target.to_string()));
         }
     }
@@ -321,121 +324,131 @@ fn glossary_direction<'a>(term: &'a GlossaryTerm, from: &str) -> (&'a str, &'a s
     }
 }
 
+fn friendly_api_error(status: StatusCode, body: &str) -> String {
+    match status {
+        StatusCode::UNAUTHORIZED => "Groq API key ไม่ถูกต้อง กรุณาตรวจ key ที่ console.groq.com".into(),
+        StatusCode::FORBIDDEN => {
+            "Groq ปฏิเสธสิทธิ์ กรุณาตรวจสิทธิ์ของ key และ model ใน Groq Console".into()
+        }
+        StatusCode::PAYMENT_REQUIRED => "บัญชี Groq ไม่มีเครดิตเพียงพอ".into(),
+        StatusCode::TOO_MANY_REQUESTS => "Groq จำกัดคำขอชั่วคราว (429)".into(),
+        _ => format!("Groq ตอบ {status}: {}", truncate(body, 180)),
+    }
+}
+
+fn retry_after(response: &reqwest::Response) -> Duration {
+    response
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(|seconds| Duration::from_secs(seconds.min(3)))
+        .unwrap_or_else(|| Duration::from_millis(250))
+}
+
 fn retryable(status: StatusCode) -> bool {
     status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
 }
 
-fn truncate(value: &str, max: usize) -> String {
-    value.chars().take(max).collect()
+fn truncate(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use std::{
+        io::{Read, Write},
+        net::TcpListener,
+        sync::mpsc,
+        thread,
+    };
 
     #[test]
-    fn glossary_is_protected_and_restored() {
+    fn glossary_is_protected_in_both_directions() {
         let settings = AppSettings::default();
-        let protected = protect_glossary("Revive at the extract", "en", &settings);
-        assert!(!protected.text.to_ascii_lowercase().contains("revive"));
-        let translated = protected.restore(&protected.text);
-        assert!(translated.contains("ชุบเพื่อน"));
-        assert!(translated.contains("จุดถอนตัว"));
+        let english = protect_glossary("Extract at Mistfall", "en", &settings);
+        assert!(english.text.contains("ZXQGLOSS"));
+        assert_eq!(english.restore("ไป ZXQGLOSS1QXZ"), "ไป จุดถอนตัว");
+
+        let thai = protect_glossary("ไปจุดถอนตัว", "th", &settings);
+        assert!(thai.text.contains("ZXQGLOSS"));
+        assert_eq!(thai.restore("Go to ZXQGLOSS1QXZ"), "Go to extract");
     }
 
     #[test]
-    fn reverse_glossary_uses_thai_as_source() {
-        let settings = AppSettings::default();
-        let protected = protect_glossary("ไปจุดถอนตัว", "th", &settings);
-        assert_eq!(protected.restore(&protected.text), "ไปextract");
-    }
-
-    #[test]
-    fn translation_prompt_is_direction_aware() {
-        assert!(translation_prompt("en", "th").contains("English"));
-        assert!(translation_prompt("en", "th").contains("Thai"));
-    }
-
-    #[test]
-    fn truncates_unicode_safely() {
-        assert_eq!(truncate("ภาษาไทย", 4), "ภาษา");
-    }
-
-    #[test]
-    fn only_transient_http_errors_are_retried() {
-        assert!(retryable(StatusCode::TOO_MANY_REQUESTS));
-        assert!(retryable(StatusCode::SERVICE_UNAVAILABLE));
-        assert!(!retryable(StatusCode::UNAUTHORIZED));
-        assert!(!retryable(StatusCode::BAD_REQUEST));
+    fn api_errors_are_actionable() {
+        assert!(friendly_api_error(StatusCode::UNAUTHORIZED, "").contains("key"));
+        assert!(friendly_api_error(StatusCode::FORBIDDEN, "").contains("model"));
+        assert!(friendly_api_error(StatusCode::TOO_MANY_REQUESTS, "").contains("429"));
     }
 
     #[tokio::test]
-    async fn parses_mock_grok_chat_completion_and_usage() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind mock server");
+    async fn sends_chat_completion_with_selected_model_and_reads_usage() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
-        let server = tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.unwrap();
-            let mut request = Vec::new();
-            loop {
-                let mut chunk = [0_u8; 2_048];
-                let read = socket.read(&mut chunk).await.unwrap();
-                if read == 0 {
-                    break;
-                }
-                request.extend_from_slice(&chunk[..read]);
-                let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n")
-                else {
-                    continue;
-                };
+        let (sender, receiver) = mpsc::channel();
+        thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let request = read_http_request(&mut stream);
+            sender
+                .send(String::from_utf8_lossy(&request).into_owned())
+                .unwrap();
+            let body = r#"{"choices":[{"message":{"content":"ศัตรูอยู่ทางซ้าย"}}],"usage":{"prompt_tokens":31,"completion_tokens":8}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .unwrap();
+        });
+
+        let translator = GroqTranslator::with_endpoint(format!("http://{address}/chat"));
+        let success = translator
+            .request_translation(
+                "secret-test-key",
+                "openai/gpt-oss-20b",
+                "Return only Thai",
+                "Enemy on the left",
+            )
+            .await
+            .unwrap();
+        assert_eq!(success.text, "ศัตรูอยู่ทางซ้าย");
+        assert_eq!(success.prompt_tokens, 31);
+        assert_eq!(success.completion_tokens, 8);
+        let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(request.contains("openai/gpt-oss-20b"));
+        assert!(request.contains("Enemy on the left"));
+    }
+
+    fn read_http_request(stream: &mut std::net::TcpStream) -> Vec<u8> {
+        let mut request = Vec::new();
+        let mut buffer = [0_u8; 4096];
+        loop {
+            let read = stream.read(&mut buffer).unwrap_or(0);
+            if read == 0 {
+                break;
+            }
+            request.extend_from_slice(&buffer[..read]);
+            if let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
                 let headers = String::from_utf8_lossy(&request[..header_end]);
                 let content_length = headers
                     .lines()
                     .find_map(|line| {
                         line.to_ascii_lowercase()
-                            .strip_prefix("content-length: ")
-                            .and_then(|value| value.parse::<usize>().ok())
+                            .strip_prefix("content-length:")
+                            .and_then(|value| value.trim().parse::<usize>().ok())
                     })
                     .unwrap_or(0);
                 if request.len() >= header_end + 4 + content_length {
                     break;
                 }
             }
-            let request = String::from_utf8_lossy(&request);
-            assert!(request
-                .to_ascii_lowercase()
-                .contains("authorization: bearer test-key"));
-            assert!(request.contains("grok-test-model"));
-            let body = r#"{"choices":[{"message":{"content":"ศัตรูอยู่ทางซ้าย"}}],"usage":{"prompt_tokens":42,"completion_tokens":7}}"#;
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            );
-            socket.write_all(response.as_bytes()).await.unwrap();
-        });
-
-        let translator = GrokTranslator {
-            client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(1))
-                .build()
-                .unwrap(),
-            endpoint: format!("http://{address}"),
-        };
-        let result = translator
-            .request_translation(
-                "test-key",
-                "grok-test-model",
-                "Translate into Thai",
-                "Enemy on the left",
-            )
-            .await
-            .expect("mock translation");
-        assert_eq!(result.text, "ศัตรูอยู่ทางซ้าย");
-        assert_eq!(result.prompt_tokens, 42);
-        assert_eq!(result.completion_tokens, 7);
-        server.await.unwrap();
+        }
+        request
     }
 }

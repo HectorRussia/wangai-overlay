@@ -1,11 +1,11 @@
-# GameLingo Realtime Translator Overlay
+# WANGAI Realtime Translator Overlay
 
-GameLingo เป็น Windows overlay สำหรับแปลเสียงพูดในเกมแบบ realtime โดยจับเสียงเฉพาะ process เกมด้วย WASAPI Application Loopback ไม่ inject DLL และไม่แตะ memory/renderer ของเกม
+WANGAI เป็น Windows overlay สำหรับแปลเสียงพูดในเกมแบบ realtime โดยจับเสียงเฉพาะ process เกมด้วย WASAPI Application Loopback ไม่ inject DLL และไม่แตะ memory/renderer ของเกม
 
-- เสียงเกมอังกฤษ: แสดง English partial ระหว่างพูด แล้วแสดง English final + คำแปลไทย
+- เสียงเกมอังกฤษ: แสดงสถานะกำลังฟัง แล้วแสดง English final + คำแปลไทยเมื่อจบวลี
 - กด `F9` ค้างแล้วพูดไทย: ถอดเสียงและแปลเป็นอังกฤษ พร้อมปุ่ม Copy / `F10`
-- Silero VAD ตรวจจับคำพูดในเครื่อง แล้วส่งเฉพาะช่วงคำพูดไป xAI Streaming STT
-- ส่งเฉพาะ final transcript ไป Grok เพื่อแปลภาษา และไม่บันทึกไฟล์เสียง
+- Silero VAD ตรวจจับคำพูดในเครื่อง แล้วส่งเฉพาะวลีที่จบแล้วไป Groq Whisper
+- ส่งเฉพาะ final transcript ไป Groq Chat Completions เพื่อแปลภาษา และไม่บันทึกไฟล์เสียง
 - รองรับ Borderless และ Windowed; ไม่รองรับ Exclusive Fullscreen
 
 ## โครงสร้าง
@@ -13,12 +13,12 @@ GameLingo เป็น Windows overlay สำหรับแปลเสีย�
 ```text
 React/TypeScript UI
        ↕ typed Tauri events/commands
-Rust: process picker · WASAPI · hotkeys · secrets · xAI STT · Grok · budget
+Rust: process picker · WASAPI · hotkeys · secrets · Groq Whisper/translation · budget
        ↕ framed binary stdin / JSONL stdout
 Python 3.12: Silero VAD only
 ```
 
-Rust downmix/resample เป็น PCM mono 16 kHz และส่งให้ Python ผ่าน stdin โดยไม่มี local TCP port เมื่อ VAD พบคำพูด Rust จะแปลงเป็น PCM16 และส่งไป xAI ผ่าน WebSocket ส่วน xAI key อยู่ใน Windows Credential Manager และไม่เข้าสู่ React/Python
+Rust downmix/resample เป็น PCM mono 16 kHz และส่งให้ Python ผ่าน stdin โดยไม่มี local TCP port เมื่อ VAD จบวลี Rust จะสร้าง WAV ในหน่วยความจำแล้วส่งไป Groq ผ่าน HTTPS ส่วน Groq key อยู่ใน Windows Credential Manager และไม่เข้าสู่ React/Python
 
 ## ติดตั้งสำหรับพัฒนา
 
@@ -41,13 +41,14 @@ pnpm tauri dev
 
 หากต้องการชี้ Python เอง ให้ตั้ง `GAMELINGO_PYTHON` เป็น absolute path ของ `python.exe`
 
-## ตั้งค่า xAI / Grok
+## ตั้งค่า Groq
 
-1. สร้าง API key และเติมเครดิตที่ [xAI Console](https://console.x.ai/)
-2. เปิด GameLingo แล้วใส่ xAI API key ในหน้า **xAI Streaming STT + Grok**
+1. สร้าง API key และตรวจสิทธิ์ใช้งานที่ [Groq Console](https://console.groq.com/keys)
+2. เปิด WANGAI แล้วใส่ Groq API key ในหน้า **Groq Whisper + Translation**
 3. กด **ทดสอบคำแปล** ก่อนเริ่มฟังเกม
+4. เลือก Whisper และ translation model แยกกันได้ โดยมีผลกับคำขอถัดไปทันที
 
-แอปมี hard limit ภายใน `$2/เดือน` ครอบคลุมทั้ง Streaming STT และ token การแปล โดยใช้อัตราที่กำหนดในโค้ดเพื่อประมาณค่าใช้จ่าย แอปจะหยุดส่งเสียงและข้อความใหม่เมื่อถึงเพดาน ไม่มี local Whisper fallback ยอดใน xAI Billing เป็นยอดจริงและอาจต่างจากค่าประมาณเล็กน้อยหาก xAI เปลี่ยนราคา
+แอปมี hard limit ภายใน `$2/เดือน` ครอบคลุมทั้ง Whisper STT และ token การแปล โดยคิดตามโมเดลที่ใช้และขั้นต่ำเสียง 10 วินาทีต่อคำขอ แอปจะหยุดส่งเสียงและข้อความใหม่เมื่อถึงเพดาน ไม่มี local Whisper fallback ยอดใน Groq Billing เป็นยอดจริงและอาจต่างจากค่าประมาณหากราคาเปลี่ยน
 
 ## วิธีใช้กับ Mistfall Hunter
 
@@ -80,4 +81,4 @@ python -m unittest worker\test_worker.py worker\test_integration.py
 
 ## ขอบเขต MVP
 
-เสียงเอฟเฟกต์และ voice chat ที่ออกจาก process เดียวกันอาจเข้ามาพร้อมกัน; MVP ใช้ Silero VAD และ xAI STT รับมือแต่ยังไม่มี source separation แอปไม่ auto-type เข้าเกม ไม่มี TTS/virtual mic, speaker identification, updater หรือ installerสำหรับแจกสาธารณะ
+เสียงเอฟเฟกต์และ voice chat ที่ออกจาก process เดียวกันอาจเข้ามาพร้อมกัน; MVP ใช้ Silero VAD และ Groq Whisper รับมือแต่ยังไม่มี source separation แอปไม่ auto-type เข้าเกม ไม่มี TTS/virtual mic, speaker identification, updater หรือ installerสำหรับแจกสาธารณะ

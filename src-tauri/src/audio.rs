@@ -12,7 +12,7 @@ use flexaudio::{open, OutputFormat, ProcessMode, SourceKind, StreamConfig};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{
-    cloud_stt::CloudSttManager,
+    cloud_stt::GroqSttManager,
     models::{CaptureSource, StreamKind},
     processes,
     state::AppState,
@@ -45,15 +45,15 @@ impl AudioManager {
         app: AppHandle,
         source: CaptureSource,
         worker: WorkerManager,
-        cloud_stt: CloudSttManager,
+        groq_stt: GroqSttManager,
     ) -> Result<()> {
         self.stop_game();
         if !processes::process_is_alive(source.pid) {
             return Err(anyhow!("process {} ไม่ได้ทำงานแล้ว", source.pid));
         }
         worker.reset_stream(StreamKind::Game);
-        cloud_stt.reset_stream(StreamKind::Game);
-        let handle = spawn_capture(app, StreamKind::Game, Some(source.pid), worker, cloud_stt)?;
+        groq_stt.reset_stream(StreamKind::Game);
+        let handle = spawn_capture(app, StreamKind::Game, Some(source.pid), worker, groq_stt)?;
         *self.game.lock().expect("game capture lock poisoned") = Some(handle);
         Ok(())
     }
@@ -68,20 +68,20 @@ impl AudioManager {
         &self,
         app: AppHandle,
         worker: WorkerManager,
-        cloud_stt: CloudSttManager,
+        groq_stt: GroqSttManager,
     ) -> Result<()> {
         let mut guard = self.microphone.lock().expect("mic capture lock poisoned");
         if guard.is_some() {
             return Ok(());
         }
         worker.reset_stream(StreamKind::Microphone);
-        cloud_stt.reset_stream(StreamKind::Microphone);
+        groq_stt.reset_stream(StreamKind::Microphone);
         *guard = Some(spawn_capture(
             app,
             StreamKind::Microphone,
             None,
             worker,
-            cloud_stt,
+            groq_stt,
         )?);
         Ok(())
     }
@@ -111,7 +111,7 @@ fn spawn_capture(
     stream_kind: StreamKind,
     target_pid: Option<u32>,
     worker: WorkerManager,
-    cloud_stt: CloudSttManager,
+    groq_stt: GroqSttManager,
 ) -> Result<CaptureHandle> {
     let stop = Arc::new(AtomicBool::new(false));
     let thread_stop = stop.clone();
@@ -159,7 +159,7 @@ fn spawn_capture(
                 let mut had_audio = false;
                 while let Some(chunk) = stream.poll_chunk() {
                     had_audio = true;
-                    if !cloud_stt.ingest_audio(stream_kind, &chunk.data) {
+                    if !groq_stt.ingest_audio(stream_kind, &chunk.data) {
                         dropped += 1;
                     }
                     if !worker.send_audio(stream_kind, chunk.data) {

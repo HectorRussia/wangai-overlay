@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "GameLingo",
+  "productName": "WANGAI",
   "version": "0.1.0",
   "identifier": "dev.gamelingo.overlay",
   "build": {
@@ -13,8 +13,8 @@
     "windows": [
       {
         "label": "main",
-        "title": "GameLingo",
-        "url": "index.html?view=settings",
+        "title": "WANGAI Settings",
+        "url": "index.html#/settings/overview",
         "width": 1180,
         "height": 780,
         "minWidth": 980,
@@ -24,10 +24,10 @@
       },
       {
         "label": "overlay",
-        "title": "GameLingo Overlay",
-        "url": "index.html?view=overlay",
-        "width": 920,
-        "height": 240,
+        "title": "WANGAI Overlay",
+        "url": "index.html#/overlay",
+        "width": 420,
+        "height": 236,
         "x": 500,
         "y": 760,
         "transparent": true,
@@ -52,4 +52,3 @@
     ]
   }
 }
-

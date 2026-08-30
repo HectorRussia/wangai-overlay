@@ -4,12 +4,12 @@ use anyhow::Result;
 
 use crate::{
     audio::AudioManager,
-    cloud_stt::CloudSttManager,
+    cloud_stt::GroqSttManager,
     models::{
         AppSnapshot, RuntimeState, StreamKind, SubtitleItem, TranscriptEvent, TranslationResult,
     },
     settings::SettingsManager,
-    translator::GrokTranslator,
+    translator::GroqTranslator,
     worker::WorkerManager,
 };
 
@@ -20,8 +20,8 @@ pub struct AppState {
     pub partial: RwLock<Option<TranscriptEvent>>,
     pub audio: AudioManager,
     pub worker: WorkerManager,
-    pub cloud_stt: CloudSttManager,
-    pub translator: GrokTranslator,
+    pub groq_stt: GroqSttManager,
+    pub translator: GroqTranslator,
 }
 
 impl AppState {
@@ -30,11 +30,11 @@ impl AppState {
         let snapshot = settings.snapshot();
         let pre_roll_ms = snapshot.vad.pre_roll_ms;
         let mut runtime = RuntimeState::default();
-        if snapshot.xai.configured {
-            runtime.xai_status = "พร้อมเชื่อมต่อ xAI เมื่อพบเสียงพูด".into();
+        if snapshot.groq.configured {
+            runtime.groq_status = "Groq พร้อมใช้งาน".into();
         }
         runtime.budget_exhausted =
-            snapshot.xai.estimated_spend_microusd >= snapshot.xai.monthly_budget_microusd;
+            snapshot.groq.estimated_spend_microusd >= snapshot.groq.monthly_budget_microusd;
         Ok(Self {
             settings,
             runtime: RwLock::new(runtime),
@@ -42,8 +42,8 @@ impl AppState {
             partial: RwLock::new(None),
             audio: AudioManager::default(),
             worker: WorkerManager::default(),
-            cloud_stt: CloudSttManager::new(pre_roll_ms),
-            translator: GrokTranslator::default(),
+            groq_stt: GroqSttManager::new(pre_roll_ms),
+            translator: GroqTranslator::default(),
         })
     }
 

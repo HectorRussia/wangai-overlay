@@ -62,6 +62,8 @@ class ProtocolTests(unittest.TestCase):
             code = source.read().lower()
         self.assertNotIn("faster" + "_whisper", code)
         self.assertNotIn("cuda", code)
+        self.assertNotIn("langchain", code)
+        self.assertNotIn("import groq", code)
 
 
 if __name__ == "__main__":

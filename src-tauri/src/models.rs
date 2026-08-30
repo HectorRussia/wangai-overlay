@@ -148,16 +148,22 @@ impl Default for OverlaySettings {
             max_items: 3,
             x: None,
             y: None,
-            width: 920,
-            height: 240,
+            width: 420,
+            height: 236,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OverlayPresentation {
+    Collapsed,
+    Expanded,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct VadSettings {
-    pub partial_interval_ms: u64,
     pub vad_threshold: f32,
     pub silence_ms: u64,
     pub pre_roll_ms: u64,
@@ -167,7 +173,6 @@ pub struct VadSettings {
 impl Default for VadSettings {
     fn default() -> Self {
         Self {
-            partial_interval_ms: 1_000,
             vad_threshold: 0.5,
             silence_ms: 500,
             pre_roll_ms: 200,
@@ -178,31 +183,54 @@ impl Default for VadSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct XaiSettings {
+pub struct GroqSettings {
     #[serde(default)]
     pub configured: bool,
-    pub model: String,
+    pub stt_model: String,
+    pub translation_model: String,
     pub monthly_budget_microusd: u64,
     pub usage_month: String,
-    pub audio_millis: u64,
+    pub actual_audio_millis: u64,
+    pub billed_audio_millis: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
     pub estimated_spend_microusd: u64,
 }
 
-impl Default for XaiSettings {
+impl Default for GroqSettings {
     fn default() -> Self {
         Self {
             configured: false,
-            model: "grok-4.20-0309-non-reasoning".into(),
+            stt_model: "whisper-large-v3-turbo".into(),
+            translation_model: "openai/gpt-oss-20b".into(),
             monthly_budget_microusd: 2_000_000,
             usage_month: chrono::Local::now().format("%Y-%m").to_string(),
-            audio_millis: 0,
+            actual_audio_millis: 0,
+            billed_audio_millis: 0,
             prompt_tokens: 0,
             completion_tokens: 0,
             estimated_spend_microusd: 0,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GroqModelKind {
+    SpeechToText,
+    Translation,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GroqModelOption {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub kind: GroqModelKind,
+    pub input_microusd_per_million: u64,
+    pub output_microusd_per_million: u64,
+    pub audio_microusd_per_hour: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -214,20 +242,20 @@ pub struct AppSettings {
     pub hotkeys: HotkeySettings,
     pub overlay: OverlaySettings,
     pub vad: VadSettings,
-    pub xai: XaiSettings,
+    pub groq: GroqSettings,
     pub glossary: Vec<GlossaryTerm>,
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            schema_version: 2,
+            schema_version: 4,
             selected_process: None,
             auto_attach: true,
             hotkeys: HotkeySettings::default(),
             overlay: OverlaySettings::default(),
             vad: VadSettings::default(),
-            xai: XaiSettings::default(),
+            groq: GroqSettings::default(),
             glossary: vec![
                 GlossaryTerm {
                     source: "Mistfall".into(),
@@ -258,8 +286,8 @@ pub struct RuntimeState {
     pub overlay_edit_mode: bool,
     pub worker_ready: bool,
     pub worker_model: Option<String>,
-    pub xai_stt_connected: bool,
-    pub xai_status: String,
+    pub groq_stt_busy: bool,
+    pub groq_status: String,
     pub budget_exhausted: bool,
     pub attached_process: Option<CaptureSource>,
     pub status_message: String,
@@ -274,8 +302,8 @@ impl Default for RuntimeState {
             overlay_edit_mode: false,
             worker_ready: false,
             worker_model: None,
-            xai_stt_connected: false,
-            xai_status: "ยังไม่ได้ตั้งค่า xAI".into(),
+            groq_stt_busy: false,
+            groq_status: "ยังไม่ได้ตั้งค่า Groq".into(),
             budget_exhausted: false,
             attached_process: None,
             status_message: "กำลังเตรียมระบบถอดเสียง".into(),

@@ -71,22 +71,35 @@ export interface OverlaySettings {
 }
 
 export interface VadSettings {
-  partialIntervalMs: number;
   vadThreshold: number;
   silenceMs: number;
   preRollMs: number;
   maxUtteranceMs: number;
 }
 
-export interface XaiSettings {
+export interface GroqSettings {
   configured: boolean;
-  model: string;
+  sttModel: string;
+  translationModel: string;
   monthlyBudgetMicrousd: number;
   usageMonth: string;
-  audioMillis: number;
+  actualAudioMillis: number;
+  billedAudioMillis: number;
   promptTokens: number;
   completionTokens: number;
   estimatedSpendMicrousd: number;
+}
+
+export type GroqModelKind = "speech_to_text" | "translation";
+
+export interface GroqModelOption {
+  id: string;
+  label: string;
+  description: string;
+  kind: GroqModelKind;
+  inputMicrousdPerMillion: number;
+  outputMicrousdPerMillion: number;
+  audioMicrousdPerHour: number;
 }
 
 export interface AppSettings {
@@ -96,7 +109,7 @@ export interface AppSettings {
   hotkeys: HotkeySettings;
   overlay: OverlaySettings;
   vad: VadSettings;
-  xai: XaiSettings;
+  groq: GroqSettings;
   glossary: GlossaryTerm[];
 }
 
@@ -106,8 +119,8 @@ export interface RuntimeState {
   overlayEditMode: boolean;
   workerReady: boolean;
   workerModel?: string;
-  xaiSttConnected: boolean;
-  xaiStatus: string;
+  groqSttBusy: boolean;
+  groqStatus: string;
   budgetExhausted: boolean;
   attachedProcess?: CaptureSource;
   statusMessage: string;

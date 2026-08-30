@@ -51,14 +51,17 @@ pub fn run() {
             commands::select_capture_source,
             commands::toggle_listening,
             commands::set_listening,
-            commands::configure_xai,
-            commands::clear_xai_credentials,
-            commands::test_xai_translation,
+            commands::configure_groq,
+            commands::clear_groq_credentials,
+            commands::test_groq_configuration,
+            commands::get_groq_model_catalog,
+            commands::update_groq_models,
             commands::update_hotkeys,
             commands::update_overlay_settings,
             commands::update_vad_settings,
             commands::update_glossary,
             commands::set_overlay_edit_mode,
+            commands::set_overlay_presentation,
             commands::save_overlay_bounds,
             commands::start_overlay_drag,
             commands::copy_latest_reply,
@@ -72,8 +75,8 @@ pub fn run() {
         if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
             let state = app.state::<AppState>();
             state.audio.stop_all(&state.worker);
-            state.cloud_stt.reset_stream(models::StreamKind::Game);
-            state.cloud_stt.reset_stream(models::StreamKind::Microphone);
+            state.groq_stt.reset_stream(models::StreamKind::Game);
+            state.groq_stt.reset_stream(models::StreamKind::Microphone);
             let _ = state.settings.save();
             state.worker.stop();
         }

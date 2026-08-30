@@ -71,6 +71,18 @@ pub fn set_overlay_edit_mode(app: &AppHandle, enabled: bool) -> Result<bool> {
     let overlay = app
         .get_webview_window("overlay")
         .context("ไม่พบ overlay window")?;
+    if !enabled {
+        let position = overlay.outer_position()?;
+        let size = overlay.outer_size()?;
+        let scale_factor = overlay.scale_factor()?;
+        state.settings.update(|settings| {
+            settings.overlay.x = Some(position.x);
+            settings.overlay.y = Some(position.y);
+            settings.overlay.width = (size.width as f64 / scale_factor).round().max(1.0) as u32;
+            settings.overlay.height = (size.height as f64 / scale_factor).round().max(1.0) as u32;
+            Ok(())
+        })?;
+    }
     overlay.set_ignore_cursor_events(!enabled)?;
     overlay.set_resizable(enabled)?;
     if enabled {

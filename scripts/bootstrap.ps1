@@ -16,4 +16,4 @@ if (Get-Command uv -ErrorAction SilentlyContinue) {
     & $PythonExecutable -m pip install -r (Join-Path $ProjectRoot "worker\requirements.txt")
 }
 
-Write-Host "Python Silero VAD worker is ready. Speech transcription runs through xAI."
+Write-Host "Python Silero VAD worker is ready. Speech transcription runs through Groq Whisper."

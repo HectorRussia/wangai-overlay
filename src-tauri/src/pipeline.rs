@@ -41,9 +41,9 @@ pub async fn handle_worker_event(app: AppHandle, event: WorkerEvent) {
                 state.update_runtime(|runtime| runtime.microphone_active = active);
             }
             if active {
-                state.cloud_stt.start_speech(app.clone(), stream);
+                state.groq_stt.start_speech(app.clone(), stream);
             } else {
-                state.cloud_stt.end_speech(stream);
+                state.groq_stt.end_speech(app.clone(), stream);
             }
             let _ = app.emit("speech-state", (stream, active));
         }
@@ -92,13 +92,27 @@ pub async fn handle_transcript_event(app: AppHandle, mut transcript: TranscriptE
     if result.status == crate::models::TranslationStatus::Quota {
         let runtime = state.update_runtime(|runtime| {
             runtime.budget_exhausted = true;
-            runtime.xai_status = "ถึงงบ xAI รายเดือนแล้ว".into();
+            runtime.groq_status = "ถึงงบ Groq รายเดือนแล้ว".into();
             runtime.last_error = result.message.clone();
         });
         let _ = app.emit("runtime-state", runtime);
     } else if result.status == crate::models::TranslationStatus::Error {
+        let fatal_cloud = result.message.as_deref().is_some_and(|message| {
+            message.contains("API key")
+                || message.contains("ไม่มีเครดิต")
+                || message.contains("ปฏิเสธสิทธิ์")
+        });
+        if fatal_cloud {
+            let _ = state.settings.update(|settings| {
+                settings.groq.configured = false;
+                Ok(())
+            });
+        }
         let runtime = state.update_runtime(|runtime| {
             runtime.last_error = result.message.clone();
+            if fatal_cloud {
+                runtime.groq_status = "Groq ต้องตรวจสอบ key หรือเครดิต".into();
+            }
         });
         let _ = app.emit("runtime-state", runtime);
     }
@@ -111,7 +125,7 @@ pub fn set_listening(app: &AppHandle, enabled: bool) -> Result<bool> {
     if !enabled {
         state.audio.stop_game();
         state.worker.reset_stream(StreamKind::Game);
-        state.cloud_stt.reset_stream(StreamKind::Game);
+        state.groq_stt.reset_stream(StreamKind::Game);
         let runtime = state.update_runtime(|runtime| {
             runtime.listening = false;
             runtime.attached_process = None;
@@ -122,11 +136,11 @@ pub fn set_listening(app: &AppHandle, enabled: bool) -> Result<bool> {
     }
 
     let settings = state.settings.snapshot();
-    if !settings.xai.configured {
-        return Err(anyhow::anyhow!("ตั้งค่า xAI API key ก่อนเริ่มฟังเกม"));
+    if !settings.groq.configured {
+        return Err(anyhow::anyhow!("ตั้งค่า Groq API key ก่อนเริ่มฟังเกม"));
     }
     if state.settings.budget_exhausted() {
-        return Err(anyhow::anyhow!("ถึงงบ xAI รายเดือนแล้ว"));
+        return Err(anyhow::anyhow!("ถึงงบ Groq รายเดือนแล้ว"));
     }
 
     state.update_runtime(|runtime| {
@@ -159,7 +173,7 @@ pub fn attach_saved_process(app: &AppHandle) -> Result<()> {
         app.clone(),
         source.clone(),
         state.worker.clone(),
-        state.cloud_stt.clone(),
+        state.groq_stt.clone(),
     )?;
     state.update_runtime(|runtime| {
         runtime.attached_process = Some(source.clone());
@@ -171,15 +185,15 @@ pub fn attach_saved_process(app: &AppHandle) -> Result<()> {
 
 pub fn start_push_to_talk(app: &AppHandle) -> Result<()> {
     let state = app.state::<AppState>();
-    if !state.settings.snapshot().xai.configured {
-        return Err(anyhow::anyhow!("ตั้งค่า xAI API key ก่อนใช้ F9"));
+    if !state.settings.snapshot().groq.configured {
+        return Err(anyhow::anyhow!("ตั้งค่า Groq API key ก่อนใช้ F9"));
     }
     if state.settings.budget_exhausted() {
-        return Err(anyhow::anyhow!("ถึงงบ xAI รายเดือนแล้ว"));
+        return Err(anyhow::anyhow!("ถึงงบ Groq รายเดือนแล้ว"));
     }
     state
         .audio
-        .start_microphone(app.clone(), state.worker.clone(), state.cloud_stt.clone())?;
+        .start_microphone(app.clone(), state.worker.clone(), state.groq_stt.clone())?;
     let runtime = state.update_runtime(|runtime| {
         runtime.microphone_active = true;
         runtime.status_message = "กำลังฟังไมค์ภาษาไทย".into();
@@ -191,7 +205,9 @@ pub fn start_push_to_talk(app: &AppHandle) -> Result<()> {
 pub fn stop_push_to_talk(app: &AppHandle) {
     let state = app.state::<AppState>();
     state.audio.stop_microphone(&state.worker, true);
-    state.cloud_stt.end_speech(StreamKind::Microphone);
+    state
+        .groq_stt
+        .end_speech(app.clone(), StreamKind::Microphone);
     let runtime = state.update_runtime(|runtime| {
         runtime.microphone_active = false;
         runtime.status_message = if runtime.listening {
@@ -221,7 +237,7 @@ pub fn start_auto_attach_monitor(app: AppHandle) {
                 continue;
             }
             state.audio.stop_game();
-            state.cloud_stt.reset_stream(StreamKind::Game);
+            state.groq_stt.reset_stream(StreamKind::Game);
             state.update_runtime(|runtime| runtime.attached_process = None);
             if let Err(error) = attach_saved_process(&app) {
                 state.update_runtime(|runtime| {
