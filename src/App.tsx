@@ -11,5 +11,7 @@ export function App() {
     document.body.className = `${route.view === "overlay" ? "overlay-body" : "settings-body"}${isPreviewMode() ? " preview-body" : ""}`;
   }, [route.view]);
 
-  return route.view === "overlay" ? <OverlayApp /> : <SettingsApp activeTab={route.tab} />;
+  return route.view === "overlay"
+    ? <OverlayApp />
+    : <SettingsApp activeTab={route.tab} advancedSection={route.advancedSection} />;
 }

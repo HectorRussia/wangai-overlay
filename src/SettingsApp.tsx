@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Activity,
   AudioLines,
   Check,
+  ChevronDown,
   Cloud,
   Cpu,
   Gamepad2,
@@ -11,12 +11,10 @@ import {
   KeyRound,
   Languages,
   LoaderCircle,
-  Mic,
   Plus,
   RefreshCw,
   Save,
   Search,
-  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Trash2,
@@ -27,17 +25,17 @@ import {
   Zap,
 } from "lucide-react";
 import { api } from "./api";
-import { settingsHref, type SettingsTab } from "./router";
+import { ProcessPickerDialog } from "./ProcessPickerDialog";
+import { ReadyRoom } from "./ReadyRoom";
+import { advancedHref, settingsHref, type AdvancedSection, type SettingsTab } from "./router";
 import { isPreviewMode, previewOutputDevices, previewProcesses } from "./preview";
 import type {
-  AppSettings,
   AudioOutputDevice,
   CaptureSource,
   GlossaryTerm,
   GroqModelOption,
   HotkeySettings,
   OverlaySettings,
-  RuntimeState,
   SubtitleItem,
   VadSettings,
   VoiceChatSettings,
@@ -55,12 +53,10 @@ const dangerButton =
 const inputClass =
   "min-h-11 w-full rounded-xl border border-white/10 bg-[#202229] px-3 text-sm text-[#f0f1f4] outline-none transition placeholder:text-[#666975] focus:border-[#63c48b]/60 focus:ring-4 focus:ring-[#63c48b]/10 disabled:text-[#7f828d]";
 
-const tabs: Array<{ id: SettingsTab; label: string; icon: ReactNode }> = [
-  { id: "overview", label: "Overview", icon: <Activity /> },
+const advancedTabs: Array<{ id: AdvancedSection; label: string; icon: ReactNode }> = [
   { id: "audio", label: "Audio", icon: <AudioLines /> },
   { id: "ai", label: "AI & Terms", icon: <Sparkles /> },
-  { id: "controls", label: "Controls", icon: <SlidersHorizontal /> },
-  { id: "history", label: "History", icon: <Languages /> },
+  { id: "controls", label: "Controls & Overlay", icon: <SlidersHorizontal /> },
 ];
 
 const previewGroqModelCatalog: GroqModelOption[] = [
@@ -70,7 +66,7 @@ const previewGroqModelCatalog: GroqModelOption[] = [
   { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B", description: "เน้นคุณภาพภาษาไทย", kind: "translation", inputMicrousdPerMillion: 150_000, outputMicrousdPerMillion: 600_000, audioMicrousdPerHour: 0 },
 ];
 
-export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
+export function SettingsApp({ activeTab, advancedSection = "audio" }: { activeTab: SettingsTab; advancedSection?: AdvancedSection }) {
   const { snapshot, refresh, loadingError } = useSnapshot();
   const [processes, setProcesses] = useState<CaptureSource[]>([]);
   const [outputDevices, setOutputDevices] = useState<AudioOutputDevice[]>([]);
@@ -90,6 +86,8 @@ export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
   const [vad, setVad] = useState<VadSettings>();
   const [voiceChat, setVoiceChat] = useState<VoiceChatSettings>();
   const [glossary, setGlossary] = useState<GlossaryTerm[]>([]);
+  const [processPicker, setProcessPicker] = useState<"game" | "voice">();
+  const closeProcessPicker = useCallback(() => setProcessPicker(undefined), []);
 
   useEffect(() => {
     if (!snapshot) return;
@@ -126,14 +124,14 @@ export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "audio") {
+    if (activeTab === "overview" || (activeTab === "advanced" && advancedSection === "audio")) {
       void loadProcesses();
       void loadOutputDevices();
     }
-  }, [activeTab, loadOutputDevices, loadProcesses]);
+  }, [activeTab, advancedSection, loadOutputDevices, loadProcesses]);
 
   useEffect(() => {
-    if (activeTab !== "ai") return;
+    if (activeTab !== "advanced" || advancedSection !== "ai") return;
     if (isPreviewMode()) {
       setModelCatalog(previewGroqModelCatalog);
       return;
@@ -141,7 +139,7 @@ export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
     void api.getGroqModelCatalog().then(setModelCatalog).catch((error) => {
       setToast({ kind: "error", text: errorText(error) });
     });
-  }, [activeTab]);
+  }, [activeTab, advancedSection]);
 
   const run = async (key: string, task: () => Promise<unknown>, ok: string) => {
     setBusy(key);
@@ -240,61 +238,40 @@ export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
           ? "Voice Chat ส่ง digital silence"
           : "ได้รับเสียง Voice Chat แล้ว แต่ Silero ยังไม่พบคำพูด";
 
+  const toggleListening = () => void run(
+    "listen",
+    () => api.toggleListening(),
+    runtime.listening ? "หยุดฟังเสียงแล้ว" : "เริ่มฟังเสียงแล้ว",
+  );
+  const pageTitle = activeTab === "overview" ? "Ready Room" : activeTab === "history" ? "History" : "Advanced";
+
   return (
-    <main className="min-h-screen bg-[#15161a] px-5 py-8 text-[#f6f6f8] selection:bg-[#63c48b]/30 lg:px-8 lg:py-10">
-      <div className="mx-auto w-full max-w-[1080px]">
-        <header className="mb-7 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="mb-3 font-mono text-[10px] font-bold tracking-[0.2em] text-[#858894]">LIVE TRANSLATION · WINDOWS</p>
-            <div className="flex items-end gap-3">
-              <h1 className="text-4xl font-extrabold tracking-[-0.065em] text-white sm:text-5xl">WANGAI</h1>
-              <span className="pb-1 text-base font-bold text-[#b9becc]">ว่าไง</span>
-            </div>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-[#989ba7]">ฟังทีมต่างชาติแบบเรียลไทม์ แล้วตอบกลับเป็นอังกฤษโดยไม่ต้องออกจากเกม</p>
+    <main className="settings-app min-h-screen bg-[#15161a] px-5 pt-6 pb-3 text-[#f6f6f8] selection:bg-[#63c48b]/30 lg:px-7 lg:pt-7 lg:pb-3">
+      <div className="mx-auto w-full max-w-[1180px]">
+        <header className="wangai-header">
+          <div className="wangai-brand-lockup">
+            <a aria-label="ไป Ready Room" href={settingsHref("overview")}><h1>WANGAI</h1></a>
+            <span />
+            <strong>{pageTitle}</strong>
           </div>
-          <button
-            className={`${primaryButton} min-w-40 ${runtime.listening ? "!border !border-[#63c48b]/35 !bg-[#63c48b]/15 !text-[#7dddA4]" : ""}`}
-            disabled={busy === "listen" || previewMode}
-            onClick={() =>
-              void run(
-                "listen",
-                () => api.toggleListening(),
-                runtime.listening ? "หยุดฟังเสียงเกมแล้ว" : "เริ่มฟังเสียงเกมแล้ว",
-              )
-            }
-          >
-            {busy === "listen" ? <LoaderCircle className="animate-spin" /> : <Headphones />}
-            {runtime.listening ? "หยุดฟัง · F8" : "เริ่มฟัง · F8"}
-          </button>
+          {activeTab !== "overview" && (
+            <div className="wangai-header-actions">
+              <nav aria-label="เมนูหลัก">
+                <a href={settingsHref("overview")}>Ready Room</a>
+                <a aria-current={activeTab === "history" ? "page" : undefined} href={settingsHref("history")}>History</a>
+                <a aria-current={activeTab === "advanced" ? "page" : undefined} href={advancedHref(advancedSection)}>Advanced</a>
+              </nav>
+              <button
+                className={`header-listen-button ${runtime.listening ? "is-listening" : ""}`}
+                disabled={busy === "listen" || previewMode}
+                onClick={toggleListening}
+              >
+                {busy === "listen" ? <LoaderCircle className="animate-spin" /> : <Headphones />}
+                {runtime.listening ? "หยุดฟัง · F8" : "เริ่มฟัง · F8"}
+              </button>
+            </div>
+          )}
         </header>
-
-        {previewMode && (
-          <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-300/30 bg-red-300/10 px-4 py-3 text-red-100" role="alert">
-            <TriangleAlert className="mt-0.5 size-5 shrink-0" />
-            <div>
-              <strong className="block text-sm">Browser Preview — ไม่ได้เชื่อมกับตัวจับเสียง</strong>
-              <p className="mt-1 text-[11px] leading-5 text-red-100/75">หน้า localhost ใช้ข้อมูลจำลอง จึงเลือก Discord หรือกดตรวจเสียงจริงไม่ได้ กรุณาใช้หน้าต่าง “WANGAI Settings” ที่เปิดจาก <code className="rounded bg-black/20 px-1.5 py-0.5">pnpm tauri dev</code></p>
-            </div>
-          </div>
-        )}
-
-        <nav aria-label="Settings" className="mb-5 flex gap-1 overflow-x-auto rounded-2xl border border-white/8 bg-[#1c1d24]/90 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,.2)]">
-          {tabs.map((tab) => (
-            <a
-              aria-current={activeTab === tab.id ? "page" : undefined}
-              className={`flex min-w-max flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition ${
-                activeTab === tab.id
-                  ? "bg-[#30323b] text-white shadow-sm"
-                  : "text-[#898c98] hover:bg-white/4 hover:text-[#d7d9df]"
-              }`}
-              href={settingsHref(tab.id)}
-              key={tab.id}
-            >
-              <span className="[&>svg]:size-4">{tab.icon}</span>
-              {tab.label}
-            </a>
-          ))}
-        </nav>
 
         <div aria-live="polite">
           {toast && (
@@ -313,17 +290,41 @@ export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
         </div>
 
         {activeTab === "overview" && (
-          <OverviewTab
-            hotkeys={hotkeys}
+          <ReadyRoom
+            busy={busy}
+            history={snapshot.history}
+            onOpenGamePicker={() => setProcessPicker("game")}
+            onOpenVoicePicker={() => setProcessPicker("voice")}
+            onToggleListening={toggleListening}
+            previewMode={previewMode}
             runtime={runtime}
             settings={settings}
-            onDemo={() => void api.injectDemo()}
-            onEdit={() => void run("overlay-edit", () => api.setOverlayEditMode(!runtime.overlayEditMode), runtime.overlayEditMode ? "ล็อก overlay แล้ว" : "ลาก overlay ได้แล้ว")}
           />
         )}
 
-        {activeTab === "audio" && (
-          <div className="grid gap-4">
+        {activeTab === "advanced" && (
+          <section className="advanced-heading">
+            <div><p className="eyebrow">การตั้งค่าขั้นสูง</p><h2>ตั้งค่า WANGAI</h2><span>เครื่องมือปรับแต่งและแก้ปัญหา</span></div>
+            <nav aria-label="Advanced settings">
+              {advancedTabs.map((tab) => (
+                <a aria-current={advancedSection === tab.id ? "page" : undefined} href={advancedHref(tab.id)} key={tab.id}>
+                  {tab.icon}{tab.label}
+                </a>
+              ))}
+            </nav>
+            {previewMode && <p className="advanced-preview-note">Browser Preview ใช้ข้อมูลจำลอง การบันทึกและตรวจเสียงจริงถูกปิดไว้</p>}
+          </section>
+        )}
+
+        {activeTab === "advanced" && advancedSection === "audio" && (
+          <div className="advanced-stack">
+            <section className="advanced-source-overview">
+              <div><span><Gamepad2 /></span><div><small>GAME</small><strong>{settings.selectedProcess?.displayName ?? "ยังไม่ได้เลือกเกม"}</strong><p>{runtime.captureWarning ?? "แหล่งเสียงหลักสำหรับบทสนทนาในเกม"}</p></div><button onClick={() => setProcessPicker("game")}>เปลี่ยนเกม</button></div>
+              <div><span><Wifi /></span><div><small>VOICE CHAT</small><strong>{settings.voiceChat.selectedProcess?.displayName ?? "ค้นหา Discord อัตโนมัติ"}</strong><p>{runtime.voiceChatCaptureWarning ?? "แยกเสียงเพื่อนออกจาก GAME"}</p></div><button onClick={() => setProcessPicker("voice")}>เปลี่ยนแอป</button></div>
+            </section>
+            <details className="advanced-diagnostics">
+              <summary><span><SlidersHorizontal /></span><div><strong>แก้ปัญหาเสียงและปรับความไว</strong><small>PID, VAD, Rescue Scan, output device และเครื่องมือทดสอบอยู่ที่นี่</small></div><ChevronDown /></summary>
+              <div className="grid gap-4 advanced-diagnostics-body">
             <SettingsCard icon={<Volume2 />} title="Game audio diagnostics" subtitle="วัดระดับใน Rust เท่านั้น ไม่มี PCM หรือเสียงดิบถูกส่งเข้า React">
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                 <div>
@@ -649,10 +650,12 @@ export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
                 <button className={secondaryButton} onClick={() => void run("worker", () => api.restartWorker(), "กำลัง restart VAD worker")}><Cpu />Restart worker</button>
               </div>
             </SettingsCard>
+              </div>
+            </details>
           </div>
         )}
 
-        {activeTab === "ai" && (
+        {activeTab === "advanced" && advancedSection === "ai" && (
           <div className="grid gap-4">
             <SettingsCard icon={<Cloud />} title="Groq Whisper + Translation" subtitle="API key อยู่ใน Windows Credential Manager และไม่ถูกส่งเข้า React หรือ Python">
               <div className="mb-5 rounded-2xl border border-white/7 bg-[#202229] p-4">
@@ -711,7 +714,7 @@ export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
           </div>
         )}
 
-        {activeTab === "controls" && (
+        {activeTab === "advanced" && advancedSection === "controls" && (
           <div className="grid gap-4">
             <SettingsCard icon={<KeyRound />} title="Global hotkeys" subtitle="ทำงานได้แม้เกมเป็นหน้าต่างที่กำลังใช้งาน">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -752,61 +755,39 @@ export function SettingsApp({ activeTab }: { activeTab: SettingsTab }) {
           </SettingsCard>
         )}
 
-        <footer className="mt-5 flex flex-wrap items-center justify-between gap-2 px-2 text-[9px] text-[#646773]">
-          <span>WANGAI · Borderless / Windowed · ไม่ inject DLL</span>
-          <span>schema v{settings.schemaVersion}</span>
-        </footer>
+        {processPicker && (
+          <ProcessPickerDialog
+            kind={processPicker}
+            loading={processLoading}
+            onClose={closeProcessPicker}
+            onRefresh={() => void loadProcesses()}
+            onSelect={async (source) => {
+              await run(
+                processPicker === "game" ? "process" : "voice-process",
+                () => processPicker === "game" ? api.selectProcess(source) : api.selectVoiceChatProcess(source),
+                processPicker === "game" ? `เลือก ${source.displayName} แล้ว` : `เลือก ${source.displayName} เป็น Voice Chat แล้ว`,
+              );
+              closeProcessPicker();
+            }}
+            previewMode={previewMode}
+            processes={processes}
+            selected={processPicker === "game" ? settings.selectedProcess : settings.voiceChat.selectedProcess}
+          />
+        )}
+
+        {activeTab !== "overview" && (
+          <footer className="mt-5 flex flex-wrap items-center justify-between gap-2 px-2 text-[9px] text-[#646773]">
+            <span>WANGAI · Borderless / Windowed · ไม่ inject DLL</span>
+            <span>schema v{settings.schemaVersion}</span>
+          </footer>
+        )}
       </div>
     </main>
   );
 }
 
-function OverviewTab({ runtime, settings, hotkeys, onDemo, onEdit }: {
-  runtime: RuntimeState;
-  settings: AppSettings;
-  hotkeys: HotkeySettings;
-  onDemo: () => void;
-  onEdit: () => void;
-}) {
-  const statuses = [
-    { icon: <Gamepad2 />, label: "Game audio", value: runtime.attachedProcess?.displayName ?? "ยังไม่ attach", active: Boolean(runtime.attachedProcess) },
-    { icon: <Cpu />, label: "Local VAD", value: runtime.workerModel ?? "กำลัง warm up", active: runtime.workerReady },
-    { icon: <Mic />, label: "Thai reply", value: runtime.microphoneActive ? "กำลังฟังภาษาไทย" : `Hold ${hotkeys.pushToTalk}`, active: runtime.microphoneActive },
-    { icon: <Wifi />, label: "Groq", value: runtime.groqStatus, active: runtime.groqSttBusy || settings.groq.configured },
-  ];
-  return (
-    <div className="grid gap-4">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {statuses.map((status) => <StatusCard {...status} key={status.label} />)}
-      </section>
-      <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
-        <div className="rounded-[24px] border border-white/8 bg-[#1c1d24] p-5 shadow-[0_20px_60px_rgba(0,0,0,.22)] sm:p-6">
-          <div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-bold tracking-[0.16em] text-[#7f828e]">YOUR LIVE SPACE</p><h2 className="mt-2 text-xl font-bold tracking-tight">{runtime.listening ? "กำลังฟังทีมของคุณ" : "พร้อมเมื่อคุณพร้อม"}</h2><p className="mt-2 text-xs leading-6 text-[#9497a3]">{runtime.statusMessage}</p></div><span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-[10px] font-bold ${runtime.listening ? "bg-[#63c48b]/14 text-[#7dddA4]" : "bg-white/5 text-[#888b96]"}`}><StatusDot active={runtime.listening} />{runtime.listening ? "Listening" : "Ready"}</span></div>
-          <div className="mt-6 grid gap-3">
-            <ConversationPreview side="incoming" original="Join us at the north gate." translation="ไปรวมกันที่ประตูเหนือ" />
-            <ConversationPreview side="outgoing" original="กำลังไป" translation="On my way." />
-          </div>
-          <div className="mt-6 flex flex-wrap gap-2"><button className={secondaryButton} onClick={onEdit}><GripHorizontal />จัดตำแหน่ง Overlay</button><button className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold text-[#7dddA4] hover:bg-[#63c48b]/8" onClick={onDemo}><Zap />ลองข้อความตัวอย่าง</button></div>
-        </div>
-        <div className="grid content-start gap-4">
-          <div className="rounded-[22px] border border-[#63c48b]/14 bg-[#63c48b]/7 p-5"><ShieldCheck className="mb-4 size-5 text-[#70d99b]" /><h3 className="text-sm font-bold">เสียงอยู่ในเครื่องจนกว่าจะพบคำพูด</h3><p className="mt-2 text-xs leading-6 text-[#9ea1ac]">Silero VAD ส่งเฉพาะวลีที่จบแล้วไปยัง Groq Whisper และ WANGAI ไม่สร้างไฟล์เสียงหรือ transcript บนดิสก์</p></div>
-          <div className="rounded-[22px] border border-white/8 bg-[#1c1d24] p-5"><p className="text-[9px] font-bold tracking-[0.16em] text-[#7f828e]">SHORTCUT FLOW</p><div className="mt-4 grid gap-3 text-xs text-[#b6b9c3]"><ShortcutRow keys={hotkeys.toggleListening} text="เปิดหรือหยุดฟังเกม" /><ShortcutRow keys={hotkeys.pushToTalk} text="กดค้างเพื่อพูดไทย" /><ShortcutRow keys={hotkeys.copyLatest} text="Copy อังกฤษล่าสุด" /></div></div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
 function SettingsCard({ icon, title, subtitle, children }: { icon: ReactNode; title: string; subtitle: string; children: ReactNode }) {
   return <section className="rounded-[24px] border border-white/8 bg-[#1c1d24] p-5 shadow-[0_20px_60px_rgba(0,0,0,.18)] sm:p-6"><header className="mb-5 flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/5 text-[#70d99b] [&>svg]:size-5">{icon}</span><div><h2 className="text-base font-bold">{title}</h2><p className="mt-1 text-[11px] leading-5 text-[#888b96]">{subtitle}</p></div></header>{children}</section>;
-}
-
-function StatusDot({ active, warning = false }: { active: boolean; warning?: boolean }) {
-  return <span className={`inline-block size-1.5 rounded-full ${warning ? "bg-amber-300" : active ? "bg-[#70d99b] shadow-[0_0_0_3px_rgba(112,217,155,.12)]" : "bg-[#626570]"}`} />;
-}
-
-function StatusCard({ icon, label, value, active }: { icon: ReactNode; label: string; value: string; active: boolean }) {
-  return <article className="flex min-w-0 gap-3 rounded-[18px] border border-white/8 bg-[#1c1d24] p-4"><span className={`grid size-10 shrink-0 place-items-center rounded-xl [&>svg]:size-5 ${active ? "bg-[#63c48b]/12 text-[#70d99b]" : "bg-white/5 text-[#7d808b]"}`}>{icon}</span><div className="min-w-0"><small className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-[#7f828e]"><StatusDot active={active} />{label}</small><strong className="mt-1.5 block truncate text-xs" title={value}>{value}</strong></div></article>;
 }
 
 function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
@@ -838,12 +819,4 @@ function HistoryRow({ item }: { item: SubtitleItem }) {
 
 function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="mx-1 rounded-md border border-white/12 bg-black/20 px-2 py-1 font-mono text-[10px] font-bold text-[#7dddA4]">{children}</kbd>;
-}
-
-function ShortcutRow({ keys, text }: { keys: string; text: string }) {
-  return <div className="flex items-center justify-between gap-4"><span>{text}</span><Kbd>{keys}</Kbd></div>;
-}
-
-function ConversationPreview({ side, original, translation }: { side: "incoming" | "outgoing"; original: string; translation: string }) {
-  return <div className={`grid max-w-[82%] gap-1 rounded-2xl px-4 py-3 ${side === "outgoing" ? "justify-self-end bg-[#63c48b] text-[#102118]" : "justify-self-start bg-[#25272f] text-[#f2f3f6]"}`}><strong className="text-sm">{translation}</strong><span className={`text-[11px] ${side === "outgoing" ? "text-[#183323]/70" : "text-[#9699a4]"}`}>{original}</span></div>;
 }

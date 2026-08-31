@@ -35,7 +35,7 @@ export const previewOutputDevices: AudioOutputDevice[] = [
 
 export function previewSnapshot(): AppSnapshot {
   const now = Date.now();
-  const idle = new URLSearchParams(window.location.search).get("state") === "idle";
+  const previewState = new URLSearchParams(window.location.search).get("state");
   const snapshot: AppSnapshot = {
     settings: {
       schemaVersion: 11,
@@ -146,7 +146,12 @@ export function previewSnapshot(): AppSnapshot {
     ],
   };
 
-  if (idle) {
+  if (previewState === "ready") {
+    snapshot.runtime.listening = false;
+    snapshot.runtime.statusMessage = "พร้อมเริ่มฟังเสียงในเกม";
+  }
+
+  if (previewState === "idle") {
     snapshot.runtime.listening = false;
     snapshot.runtime.groqSttBusy = false;
     snapshot.runtime.attachedProcess = undefined;
@@ -162,6 +167,28 @@ export function previewSnapshot(): AppSnapshot {
     snapshot.runtime.voiceChatAudioPeakDbfs = undefined;
     snapshot.runtime.voiceChatAudioLastSeenAtMs = undefined;
     snapshot.runtime.statusMessage = "พร้อมเริ่มฟังเสียงในเกม";
+    snapshot.history = [];
+  }
+
+  if (previewState === "warning") {
+    snapshot.runtime.captureWarning = "ได้รับเสียงเกมไม่ต่อเนื่อง กรุณาตรวจ process ที่เลือก";
+    snapshot.runtime.voiceChatCaptureWarning = "ยังไม่ได้รับเสียงจาก Discord";
+    snapshot.runtime.gameAudioPeakDbfs = undefined;
+    snapshot.runtime.voiceChatAudioPeakDbfs = undefined;
+  }
+
+  if (previewState === "setup") {
+    snapshot.settings.selectedProcess = undefined;
+    snapshot.settings.voiceChat.enabled = false;
+    snapshot.settings.voiceChat.autoDetect = false;
+    snapshot.settings.voiceChat.selectedProcess = undefined;
+    snapshot.settings.groq.configured = false;
+    snapshot.runtime.listening = false;
+    snapshot.runtime.attachedProcess = undefined;
+    snapshot.runtime.voiceChatAttachedProcess = undefined;
+    snapshot.runtime.gameAudioPeakDbfs = undefined;
+    snapshot.runtime.voiceChatAudioPeakDbfs = undefined;
+    snapshot.runtime.statusMessage = "ตั้งค่าอีกนิดก่อนเริ่มฟัง";
     snapshot.history = [];
   }
 
