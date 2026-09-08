@@ -1,0 +1,25 @@
+[package]
+name = "wangai-server"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+
+[dependencies]
+wangai-ai-protocol = { path = "../ai-protocol" }
+anyhow = "1"
+axum = { version = "0.8", features = ["multipart"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "time", "sync"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+chrono = "0.4"
+httpdate = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+regex = "1"
+dotenvy = "0.15"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+tempfile = "3"
