@@ -1,0 +1,58 @@
+name: Draft Windows release
+on:
+  push:
+    tags: ['v*.*.*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+  package:
+    needs: verify
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: '1.86.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-worker
+          path: output/worker/wangai-worker
+      - run: pnpm install --frozen-lockfile
+      - name: Validate inputs and build signed per-user installer
+        shell: pwsh
+        env:
+          WANGAI_API_BASE_URL: ${{ vars.WANGAI_API_BASE_URL }}
+          WANGAI_UPDATER_PUBLIC_KEY: ${{ vars.WANGAI_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          node scripts/prepare-release.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm tauri build --ci --bundles nsis --config src-tauri/tauri.release.generated.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/release-assets.mjs
+      - name: Create draft only (owner reviews and publishes)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$env:GITHUB_REF_NAME" --repo HectorRussia/wangai-overlay --verify-tag --draft --title "WANGAI $env:GITHUB_REF_NAME" --notes-file output/release/RELEASE-NOTES.md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $assets = Get-ChildItem -LiteralPath output/release -File | ForEach-Object { $_.FullName }
+          gh release upload "$env:GITHUB_REF_NAME" @assets --repo HectorRussia/wangai-overlay
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-windows-release
+          path: output/release/
+          retention-days: 14
