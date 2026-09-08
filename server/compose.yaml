@@ -1,0 +1,14 @@
+services:
+  ai:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    env_file: .env
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - usage:/data
+    restart: unless-stopped
+    stop_grace_period: 150s
+volumes:
+  usage:

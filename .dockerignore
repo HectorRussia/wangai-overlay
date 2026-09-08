@@ -1,0 +1,9 @@
+**/.env
+**/.env.*
+**/target
+**/node_modules
+.git
+.venv
+dist
+output
+prototype
