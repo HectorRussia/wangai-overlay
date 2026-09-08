@@ -71,6 +71,36 @@ fn configuration_is_dynamic_and_errors_are_redacted() {
     assert!(Config::load(|_| None).is_err());
 }
 
+#[test]
+fn placeholder_credentials_and_models_are_rejected_without_echoing_values() {
+    for field in [
+        "STT_API_KEY",
+        "TRANSLATION_API_KEY",
+        "STT_INCOMING_MODEL",
+        "STT_MICROPHONE_MODEL",
+        "TRANSLATION_MODEL",
+    ] {
+        let error = Config::load(|key| {
+            Some(if key == field {
+                "replace-with-private-value".into()
+            } else if key.ends_with("BASE_URL") {
+                "https://api.groq.com/openai/v1".into()
+            } else if key.ends_with("API_KEY") {
+                "test-credential".into()
+            } else if key.contains("MODEL") {
+                "model-a".into()
+            } else {
+                return None;
+            })
+        })
+        .err()
+        .unwrap()
+        .to_string();
+        assert!(error.contains(field));
+        assert!(!error.contains("private-value"));
+    }
+}
+
 fn wav(seconds: usize) -> Vec<u8> {
     let size = seconds * 32_000;
     let mut data = b"RIFF".to_vec();

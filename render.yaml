@@ -1,0 +1,38 @@
+# Trial only: /data is ephemeral on Free. No disk and no keep-alive service.
+services:
+  - type: web
+    name: wangai-ai
+    runtime: docker
+    plan: free
+    region: singapore
+    numInstances: 1
+    dockerContext: .
+    dockerfilePath: ./server/Dockerfile
+    autoDeployTrigger: "off"
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 150
+    envVars:
+      - key: BIND_ADDRESS
+        value: 0.0.0.0:10000
+      - key: DATABASE_PATH
+        value: /data/usage.sqlite3
+      - key: MAX_CONCURRENT_REQUESTS
+        value: "32"
+      - key: UPSTREAM_TIMEOUT_SECONDS
+        value: "15"
+      - key: STT_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: STT_INCOMING_MODEL
+        value: whisper-large-v3
+      - key: STT_MICROPHONE_MODEL
+        value: whisper-large-v3-turbo
+      - key: STT_API_KEY
+        sync: false
+      - key: TRANSLATION_BASE_URL
+        sync: false
+      - key: TRANSLATION_MODEL
+        sync: false
+      - key: TRANSLATION_API_KEY
+        sync: false
+      - key: TRANSLATION_OPTIONS_JSON
+        value: '{}'

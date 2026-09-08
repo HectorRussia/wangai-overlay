@@ -24,9 +24,20 @@ impl Config {
 
     pub fn load(get: impl Fn(&str) -> Option<String>) -> Result<Self> {
         let required = |name: &str| -> Result<String> {
-            get(name)
+            let value = get(name)
                 .filter(|v| !v.trim().is_empty())
-                .ok_or_else(|| anyhow::anyhow!("Missing {name}"))
+                .ok_or_else(|| anyhow::anyhow!("Missing {name}"))?;
+            let normalized = value.trim().to_ascii_lowercase();
+            if normalized.contains("replace-")
+                || normalized.contains("example.com")
+                || normalized.starts_with('<')
+                || normalized == "changeme"
+                || normalized == "your-api-key"
+                || normalized == "server-secret"
+            {
+                bail!("Invalid {name}: placeholder");
+            }
+            Ok(value)
         };
         let credential = |name: &str| -> Result<String> {
             let value = required(name)?;
