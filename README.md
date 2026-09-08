@@ -4,9 +4,9 @@ WANGAI เป็น Windows overlay สำหรับแปลเสียง�
 
 - เสียงเกมอังกฤษ: แสดงสถานะกำลังฟัง แล้วแสดง English final + คำแปลไทยเมื่อจบวลี
 - กด `F9` ค้างแล้วพูดไทย: ถอดเสียงและแปลเป็นอังกฤษ พร้อมปุ่ม Copy / `F10`
-- ระบบมี audio stream จริงเพียง `INCOMING` และ `MICROPHONE`; F9 ใช้จังหวะกด/ปล่อยเป็นขอบเขตวลี แล้วส่งเฉพาะวลีที่จบแล้วไป Groq Whisper
+- ระบบมี audio stream จริงเพียง `INCOMING` และ `MICROPHONE`; F9 ใช้จังหวะกด/ปล่อยเป็นขอบเขตวลี แล้วส่งเฉพาะวลีที่จบแล้วไปบริการ AI กลาง
 - Overlay ติดป้ายตามแอปที่เลือก เช่น `MISTFALL`, `DISCORD`, `CHROME` หรือ `MIXED`; Rescue Scan ใช้ PCM ต้นฉบับและกรอง activity/confidence ก่อนยอมรับผล
-- ส่งเฉพาะ final transcript ไป Groq Chat Completions เพื่อแปลภาษา และไม่บันทึกไฟล์เสียง
+- ส่งเฉพาะ final transcript ผ่านบริการ AI กลาง เพื่อแปลภาษา และไม่บันทึกไฟล์เสียง
 - รองรับ Borderless และ Windowed; ไม่รองรับ Exclusive Fullscreen
 
 ## โครงสร้าง
@@ -16,14 +16,14 @@ React/TypeScript UI
        ↕ Tauri commands หรือ loopback REST/WebSocket
 Axum Local Web Companion · 127.0.0.1 · session cookie
        ↕
-Rust: process picker · WASAPI · hotkeys · secrets · Groq Whisper/translation · budget
+Rust: process picker · WASAPI · hotkeys · HTTPS AI gateway client
        ↕ framed binary stdin / JSONL stdout
 Python 3.12: Silero VAD only
 ```
 
-Rust downmix/resample เป็น PCM mono 16 kHz และส่งเสียงพร้อม sample cursor ให้ Python ผ่าน stdin เมื่อ VAD จบวลี Rust จะตัดช่วงเสียงตาม cursor แล้วสร้าง WAV ในหน่วยความจำเพื่อส่งไป Groq ผ่าน HTTPS ส่วน Groq key อยู่ใน Windows Credential Manager และไม่เข้าสู่ React/Python/REST/WebSocket
+Rust downmix/resample เป็น PCM mono 16 kHz และส่งเสียงพร้อม sample cursor ให้ Python ผ่าน stdin เมื่อ VAD จบวลี Rust จะตัดช่วงเสียงตาม cursor แล้วสร้าง WAV ในหน่วยความจำเพื่อส่งผ่าน HTTPS ไปยัง WANGAI AI Gateway ส่วน provider key อยู่ใน env ของ server เท่านั้น ไม่เข้าสู่ Desktop/React/Python/Local Web Companion
 
-Local Web Companion bind เฉพาะ `127.0.0.1`; production ขอ port ว่างจาก Windows ทุกครั้งและคืน port เมื่อ Desktop ปิด ปุ่ม **เปิด Web App** แลก token ใน URL fragment เป็น `HttpOnly`/`SameSite=Strict` cookie หน้าเว็บตั้งหรือลบ Groq API key ไม่ได้และใช้งานไม่ได้เมื่อ Desktop engine ปิด
+Local Web Companion bind เฉพาะ `127.0.0.1`; production ขอ port ว่างจาก Windows ทุกครั้งและคืน port เมื่อ Desktop ปิด ปุ่ม **เปิด Web App** แลก token ใน URL fragment เป็น `HttpOnly`/`SameSite=Strict` cookie ทั้ง Desktop และหน้าเว็บใช้ AI กลางโดยไม่มีฟอร์ม keyและใช้งานไม่ได้เมื่อ Desktop engine ปิด
 
 ## ติดตั้งสำหรับพัฒนา
 
@@ -46,14 +46,13 @@ pnpm tauri dev
 
 หากต้องการชี้ Python เอง ให้ตั้ง `GAMELINGO_PYTHON` เป็น absolute path ของ `python.exe`
 
-## ตั้งค่า Groq
+## ตั้งค่าบริการ AI กลาง
 
-1. สร้าง API key และตรวจสิทธิ์ใช้งานที่ [Groq Console](https://console.groq.com/keys)
-2. เปิด WANGAI แล้วใส่ Groq API key ในหน้า **Groq Whisper + Translation**
-3. กด **ทดสอบคำแปล** ก่อนเริ่มฟังเกม
-4. เลือก Whisper สำหรับเสียงขาเข้า, Whisper สำหรับ F9 และ translation model แยกกันได้ โดยมีผลกับคำขอถัดไปทันที ค่าแนะนำคือ Large V3 สำหรับเสียงขาเข้าและ Turbo สำหรับ F9
+ดู [คู่มือ AI Gateway](server/README.md) สำหรับ env, Docker, HTTPS และการเปลี่ยน provider/model/key
+ต้องเปิด gateway ก่อนใช้งาน AI; debug Desktop ใช้ `http://127.0.0.1:8080` เป็นค่าเริ่มต้น
+ผู้ใช้ไม่ต้อง login หรือใส่ API key และไม่มีเพดานงบ $2 ฝั่งแอป
+Local Web Companion ยังเป็นคนละ server และใช้ได้เฉพาะเครื่องที่เปิด Desktop
 
-แอปมี hard limit ภายใน `$2/เดือน` ครอบคลุมทั้ง Whisper STT และ token การแปล โดยคิดตามโมเดลที่ใช้และขั้นต่ำเสียง 10 วินาทีต่อคำขอ แอปจะหยุดส่งเสียงและข้อความใหม่เมื่อถึงเพดาน ไม่มี local Whisper fallback ยอดใน Groq Billing เป็นยอดจริงและอาจต่างจากค่าประมาณหากราคาเปลี่ยน
 
 ## วิธีใช้กับ Mistfall Hunter
 
@@ -66,8 +65,8 @@ pnpm tauri dev
 5. หาก Process Tree ไม่ได้รับ voice chat ภายในเกม ให้เปิด **System Output fallback** หลังอ่านคำเตือนว่าอาจรวมเสียง Discord/browser/การแจ้งเตือน และติดป้ายผลเป็น `MIXED`
 6. ใน **Output endpoint** เลือก Speakers, หูฟัง หรือจอที่ได้ยินเสียงแอปอยู่จริง หรือเลือก `Windows default` เพื่อให้ตามอุปกรณ์หลักของ Windows
 7. หน้า Incoming audio diagnostics จะแสดงชื่อ endpoint ที่จับจริง หากไม่มี frame ภายใน 3 วินาทีให้ลอง endpoint อื่น ถ้าอุปกรณ์ที่บันทึกไว้ถูกถอด แอปจะหยุด capture และไม่ fallback ไปอุปกรณ์อื่นเอง
-   หาก meter ขึ้นแต่ Silero ไม่พบคำพูด ให้กด **ตรวจเสียง 6 วิล่าสุดด้วย Groq** ทันทีหลังเพื่อนพูด เพื่อแยกว่า endpoint มีเสียงเพื่อนจริงหรือมีเพียงเสียงเกม การทดสอบนี้ข้าม VAD และถูกคิดขั้นต่ำ 10 วินาทีหนึ่งครั้ง
-8. Process Tree และ System Output จำค่า VAD แยกกัน ทั้ง manual gain และ auto-level เปลี่ยนเฉพาะสำเนาที่ส่ง Silero ไม่เปลี่ยน PCM ต้นฉบับที่ส่ง Groq
+   หาก meter ขึ้นแต่ Silero ไม่พบคำพูด ให้กด **ตรวจเสียง 6 วินาที** ทันทีหลังเพื่อนพูด เพื่อแยกว่า endpoint มีเสียงเพื่อนจริงหรือมีเพียงเสียงเกม การทดสอบนี้ข้าม VAD และคิดค่าบริการตาม provider ที่ผู้ดูแลตั้งไว้
+8. Process Tree และ System Output จำค่า VAD แยกกัน ทั้ง manual gain และ auto-level เปลี่ยนเฉพาะสำเนาที่ส่ง Silero ไม่เปลี่ยน PCM ต้นฉบับที่ส่งบริการ AI
 9. แอปที่เลือกปิดแล้ว WANGAI จะหยุดฟังและรอ auto-attach เมื่อ process เดิมเปิดใหม่ กด `F7` เพื่อย้าย/ปรับขนาด overlay
 
 ## Browser Media และ Web Companion
