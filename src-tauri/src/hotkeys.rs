@@ -83,7 +83,10 @@ pub fn set_overlay_edit_mode(app: &AppHandle, enabled: bool) -> Result<bool> {
             Ok(())
         })?;
     }
-    overlay.set_ignore_cursor_events(!enabled)?;
+    let collapsed = state
+        .overlay_collapsed
+        .load(std::sync::atomic::Ordering::Relaxed);
+    overlay.set_ignore_cursor_events(!overlay_accepts_input(collapsed, enabled))?;
     overlay.set_resizable(enabled)?;
     if enabled {
         let _ = overlay.set_focus();
@@ -91,6 +94,10 @@ pub fn set_overlay_edit_mode(app: &AppHandle, enabled: bool) -> Result<bool> {
     let runtime = state.update_runtime(|runtime| runtime.overlay_edit_mode = enabled);
     let _ = app.emit("runtime-state", runtime);
     Ok(enabled)
+}
+
+pub fn overlay_accepts_input(collapsed: bool, edit_mode: bool) -> bool {
+    collapsed || edit_mode
 }
 
 pub fn copy_latest(app: &AppHandle) -> Result<bool> {

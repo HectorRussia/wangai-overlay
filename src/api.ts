@@ -74,6 +74,12 @@ function unavailableOnWeb(feature: string): Promise<never> {
 }
 
 export const api = {
+  openSettingsWindow: () => {
+    if (tauriRuntime) return invoke<void>("open_settings_window");
+    if (previewRuntime) { window.location.hash = "#/settings/overview"; return Promise.resolve(); }
+    return unavailableOnWeb("การเปิดหน้าตั้งค่า Desktop");
+  },
+  quitApp: () => tauriRuntime ? invoke<void>("quit_app") : unavailableOnWeb("การออกจากโปรแกรม Desktop"),
   listRunningApps: () => tauriRuntime
     ? invoke<RunningApp[]>("list_running_apps")
     : webJson<RunningApp[]>("/api/v1/apps"),

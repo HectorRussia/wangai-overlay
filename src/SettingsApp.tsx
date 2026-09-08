@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AudioLines, Cloud, Cpu, Globe2, KeyRound, Languages, LoaderCircle, Plus, RefreshCw, Save, SlidersHorizontal, Trash2, TriangleAlert, Volume2 } from "lucide-react";
+import { AudioLines, Cloud, Cpu, Globe2, KeyRound, Languages, LoaderCircle, Plus, Power, RefreshCw, Save, SlidersHorizontal, Trash2, TriangleAlert, Volume2 } from "lucide-react";
 import { api, type WebCompanionInfo } from "./api";
 import { ProcessPickerDialog } from "./ProcessPickerDialog";
 import { ReadyRoom } from "./ReadyRoom";
@@ -73,6 +73,7 @@ export function SettingsApp({ activeTab, advancedSection = "audio" }: { activeTa
       <span className="h-8 w-px bg-white/15" />
       <span className="text-sm font-bold text-[#70d99b]">{activeTab === "overview" ? "Ready Room" : activeTab === "history" ? "History" : "Advanced"}</span>
     </header>
+    {isDesktop() && <div className="mb-4 flex items-center justify-end gap-3 text-xs text-[#a9afb8]"><span>{runtime.listening || runtime.microphoneActive ? "ปิดหน้าต่างนี้เพื่อกลับไปใช้ Overlay" : "กดเริ่มฟัง · F8 เพื่อเปิด Overlay"}</span><button className={button} onClick={() => void api.quitApp().catch((error) => setToast({ kind: "error", text: errorText(error) }))}><Power className="size-4" />ออกจากโปรแกรม</button></div>}
     {toast && <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${toast.kind === "error" ? "border-red-400/30 bg-red-400/10 text-red-200" : "border-[#63c48b]/30 bg-[#63c48b]/10 text-[#8bf0b1]"}`}>{toast.text}</div>}
     {activeTab === "overview" && <ReadyRoom settings={settings} runtime={runtime} history={snapshot.history} busy={busy} previewMode={isPreviewMode()} onToggleListening={() => void run("listen", api.toggleListening, runtime.listening ? "หยุดฟังแล้ว" : "เริ่มฟังแล้ว")} onOpenSourcePicker={() => setPicker(true)} onOpenWebCompanion={!isWeb() ? () => void run("web", api.openWebCompanion, "เปิด Web App แล้ว") : undefined} webCompanionOrigin={webInfo?.origin} webRuntime={isWeb()} />}
     {activeTab === "history" && <HistoryView history={snapshot.history} />}

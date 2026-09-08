@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSnapshot } from "./types";
 import { snapshotFixture } from "./test/fixtures";
@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   snapshot: undefined as AppSnapshot | undefined,
   setOverlayPresentation: vi.fn(async () => undefined),
   copyLatestReply: vi.fn(async () => true),
+  openSettingsWindow: vi.fn(async () => undefined),
 }));
 
 vi.mock("./useSnapshot", () => ({
@@ -17,6 +18,7 @@ vi.mock("./api", () => ({
   api: {
     setOverlayPresentation: mocks.setOverlayPresentation,
     copyLatestReply: mocks.copyLatestReply,
+    openSettingsWindow: mocks.openSettingsWindow,
     startOverlayDrag: vi.fn(async () => undefined),
   },
 }));
@@ -31,6 +33,7 @@ describe("WANGAI overlay", () => {
     });
     mocks.snapshot = snapshotFixture();
     mocks.setOverlayPresentation.mockClear();
+    mocks.openSettingsWindow.mockReset();
   });
 
   afterEach(() => {
@@ -113,5 +116,26 @@ describe("WANGAI overlay", () => {
 
     expect(screen.getByText("LIVE")).toBeInTheDocument();
     expect(screen.getByText("Enemy behind us")).toHaveAttribute("lang", "en");
+  });
+
+  it("opens settings from the startup capsule", async () => {
+    mocks.snapshot = snapshotFixture();
+    mocks.snapshot.history = [];
+    mocks.snapshot.runtime.listening = false;
+    render(<OverlayApp />);
+    const button = screen.getByRole("button", { name: "เปิดหน้าตั้งค่า WANGAI" });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.openSettingsWindow).toHaveBeenCalledOnce());
+  });
+
+  it("requires edit mode to click settings over expanded subtitles", () => {
+    const view = render(<OverlayApp />);
+    expect(screen.getByRole("button", { name: "เปิดหน้าตั้งค่า WANGAI" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "เปิดหน้าตั้งค่า WANGAI" })).toHaveAttribute("title", "กด F7 เพื่อคลิกตั้งค่า");
+    mocks.snapshot = { ...mocks.snapshot!, runtime: { ...mocks.snapshot!.runtime, overlayEditMode: true } };
+    view.rerender(<OverlayApp />);
+    fireEvent.click(screen.getByRole("button", { name: "เปิดหน้าตั้งค่า WANGAI" }));
+    expect(mocks.openSettingsWindow).toHaveBeenCalledOnce();
   });
 });

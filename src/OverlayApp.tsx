@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { AudioLines, Check, Clipboard, GripHorizontal, Headphones, Mic, Radio, TriangleAlert } from "lucide-react";
+import { AudioLines, Check, Clipboard, GripHorizontal, Headphones, Mic, Radio, Settings, TriangleAlert } from "lucide-react";
 import { api } from "./api";
 import { overlayPresentation, visibleOverlayItems, type OverlayPresentation } from "./overlayPresentation";
 import { isPreviewMode } from "./preview";
@@ -9,6 +9,7 @@ export function OverlayApp() {
   const { snapshot } = useSnapshot();
   const [clock, setClock] = useState(Date.now());
   const [copied, setCopied] = useState(false);
+  const [settingsError, setSettingsError] = useState<string>();
   const lastPresentation = useRef<OverlayPresentation | undefined>(undefined);
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export function OverlayApp() {
     "--overlay-scale": settings.overlay.fontScale,
   } as CSSProperties;
   const listening = runtime.listening && Boolean(runtime.attachedSource);
+  const setupNeeded = !settings.groq.configured || !settings.listeningSource;
   const hearingGameSpeech = runtime.groqStatus === "กำลังฟัง…" && !runtime.microphoneActive;
   const warning = Boolean(runtime.lastError) || runtime.budgetExhausted || (runtime.listening && !runtime.attachedSource);
   const status = runtime.microphoneActive
@@ -72,6 +74,20 @@ export function OverlayApp() {
     window.setTimeout(() => setCopied(false), 1500);
   };
 
+  const openSettings = async () => {
+    setSettingsError(undefined);
+    try { await api.openSettingsWindow(); }
+    catch { setSettingsError("เปิดหน้าตั้งค่าไม่สำเร็จ กรุณาลองอีกครั้ง"); }
+  };
+
+  const settingsButton = (enabled: boolean) => <button
+    className="overlay-settings-button"
+    aria-label="เปิดหน้าตั้งค่า WANGAI"
+    title={enabled ? "เปิดหน้าตั้งค่า WANGAI" : `กด ${settings.hotkeys.editOverlay} เพื่อคลิกตั้งค่า`}
+    disabled={!enabled}
+    onClick={() => void openSettings()}
+  ><Settings />{!enabled && <small>{settings.hotkeys.editOverlay}</small>}</button>;
+
   if (presentation === "collapsed") {
     return (
       <main className="overlay-capsule" style={style} aria-live="polite">
@@ -79,10 +95,11 @@ export function OverlayApp() {
           {warning ? <TriangleAlert /> : listening ? <Radio /> : <Headphones />}
         </span>
         <div className="min-w-0 flex-1">
-          <strong className="block truncate text-[12px] font-bold text-[#f2f3f6]">{warning ? "WANGAI ต้องการตรวจสอบ" : listening ? "กำลังฟังเสียงในเกม" : "WANGAI พร้อมแล้ว"}</strong>
-          <span className="block truncate text-[9px] text-[#858894]">{warning ? runtime.lastError ?? status : status}</span>
+          <strong className="block truncate text-[12px] font-bold text-[#f2f3f6]">{warning ? "WANGAI ต้องการตรวจสอบ" : setupNeeded ? "ตั้งค่า WANGAI เพื่อเริ่มฟัง" : listening ? "กำลังฟังเสียงขาเข้า" : "WANGAI พร้อมแล้ว"}</strong>
+          <span className="block truncate text-[9px] text-[#858894]">{settingsError ?? (warning ? runtime.lastError ?? status : setupNeeded ? "กดเฟืองเพื่อเลือกแอปและตั้งค่าการแปล" : status)}</span>
         </div>
         <span className="overlay-key"><Mic />{settings.hotkeys.pushToTalk}</span>
+        {settingsButton(true)}
       </main>
     );
   }
@@ -94,12 +111,13 @@ export function OverlayApp() {
           <span className={`overlay-dot ${warning ? "is-warning" : listening || runtime.microphoneActive ? "is-active" : ""}`} />
           <span className="truncate text-[9px] font-bold tracking-[0.08em] text-[#858894]">{status}</span>
         </div>
-        {runtime.overlayEditMode ? (
+        <div className="overlay-header-actions">{runtime.overlayEditMode ? (
           <button className="overlay-drag" onMouseDown={() => void api.startOverlayDrag()}><GripHorizontal />ลาก · F7 เพื่อล็อก</button>
         ) : (
           <span className="overlay-key"><Mic />Hold {settings.hotkeys.pushToTalk}</span>
-        )}
+        )}{settingsButton(runtime.overlayEditMode)}</div>
       </header>
+      {settingsError && <p role="alert" className="text-xs text-red-200">{settingsError}</p>}
 
       <section className="wangai-scrollbar flex min-h-0 flex-1 flex-col justify-end gap-1.5 overflow-hidden py-1" aria-live="polite">
         {visible.map((item) => {

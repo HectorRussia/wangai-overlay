@@ -1,4 +1,8 @@
-use std::{collections::VecDeque, path::PathBuf, sync::RwLock};
+use std::{
+    collections::VecDeque,
+    path::PathBuf,
+    sync::{atomic::AtomicBool, RwLock},
+};
 
 use anyhow::Result;
 
@@ -14,6 +18,7 @@ use crate::{
 };
 
 pub struct AppState {
+    pub overlay_collapsed: AtomicBool,
     pub settings: SettingsManager,
     pub runtime: RwLock<RuntimeState>,
     pub history: RwLock<VecDeque<SubtitleItem>>,
@@ -39,6 +44,7 @@ impl AppState {
         runtime.budget_exhausted =
             snapshot.groq.estimated_spend_microusd >= snapshot.groq.monthly_budget_microusd;
         Ok(Self {
+            overlay_collapsed: AtomicBool::new(true),
             settings,
             runtime: RwLock::new(runtime),
             history: RwLock::new(VecDeque::with_capacity(100)),

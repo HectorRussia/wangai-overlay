@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Globe2, LoaderCircle, Monitor, RefreshCw, Search, X } from "lucide-react";
+import { Check, ChevronDown, Globe2, Info, LoaderCircle, Monitor, RefreshCw, Search, X } from "lucide-react";
 import type { CaptureSource, RunningApp, SavedProcess } from "./types";
 
 type Props = {
@@ -59,7 +59,8 @@ export function ProcessPickerDialog({ apps, selected, loading, error, previewMod
   return <div className="process-dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <div aria-labelledby="process-dialog-title" aria-modal="true" className="process-dialog" ref={dialogRef} role="dialog">
       <header><div><span><Globe2 /></span><div><p>แอปที่กำลังเปิดอยู่บนเครื่อง</p><h2 id="process-dialog-title">เลือกแอปที่จะฟัง</h2></div></div><button aria-label="ปิดหน้าต่างเลือกแอป" onClick={onClose}><X /></button></header>
-      <div className="process-dialog-search"><Search /><input aria-label="ค้นหาแอปที่จะฟัง" placeholder="ค้นหาชื่อแอป หรือชื่อไฟล์ .exe" ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} /><button aria-label="รีเฟรชรายการแอป" disabled={loading} onClick={onRefresh}><RefreshCw className={loading ? "animate-spin" : ""} /></button></div>
+      <div className="process-dialog-hint" id="process-dialog-hint"><Info aria-hidden="true" /><div><strong>เปิดเกมหรือแอปก่อน แล้วกลับมาเลือกที่นี่</strong><p>แสดงเฉพาะแอปที่กำลังเปิดอยู่ ไอคอนบน Desktop อย่างเดียวยังไม่ปรากฏในรายการ</p></div></div>
+      <div className="process-dialog-search"><Search /><input aria-label="ค้นหาแอปที่จะฟัง" aria-describedby="process-dialog-hint" placeholder="ค้นหาชื่อแอปที่เปิดอยู่ หรือชื่อไฟล์ .exe" ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} /><button aria-label="รีเฟรชรายการแอป" disabled={loading} onClick={onRefresh}><RefreshCw className={loading ? "animate-spin" : ""} /></button></div>
       <p className="process-dialog-status" role="status">{loading ? "กำลังตรวจหาแอป…" : choices.length + " แอป · รวม process ย่อยแล้ว"}</p>
       {(error || selectionError) && <p className="process-dialog-error" role="alert">{selectionError ?? error}</p>}
       <div className="process-dialog-list" aria-busy={loading}>
@@ -76,7 +77,7 @@ export function ProcessPickerDialog({ apps, selected, loading, error, previewMod
             {expanded === app.id && <div className="process-app-details"><p>{app.executablePath || "Windows ไม่อนุญาตให้อ่านตำแหน่งไฟล์"}</p>{app.roots.map((root) => <div key={root.pid}><span>{root.name} · PID {root.pid}</span>{multiple && <button disabled={previewMode || selecting !== undefined} onClick={() => void select(root)}>เลือก instance {root.pid}</button>}</div>)}</div>}
           </div>;
         })}
-        {!loading && choices.length === 0 && <p className="process-dialog-empty">ไม่พบแอปที่ตรงกัน ลองเปิดแอปแล้วกดรีเฟรช</p>}
+        {!loading && choices.length === 0 && <div className="process-dialog-empty"><strong>{query.trim() ? "ไม่พบแอปที่ตรงกับคำค้น" : "ยังไม่พบแอปที่เปิดอยู่"}</strong><p>เปิดเกมหรือแอปให้ถึงหน้าหลัก แล้วกดรีเฟรชรายการด้านบน</p>{query.trim() && <p>ถ้าเปิดอยู่แล้ว ลองค้นด้วยชื่อสั้น ๆ เช่น Hell หรือ Discord</p>}</div>}
       </div>
       {previewMode && <p className="process-dialog-preview">Browser Preview แสดงรายการจำลองและไม่สามารถเปลี่ยน process จริงได้</p>}
     </div>

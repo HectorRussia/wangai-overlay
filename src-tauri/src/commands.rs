@@ -187,6 +187,56 @@ pub fn open_web_companion(web: State<'_, WebCompanionManager>) -> CommandResult<
 }
 
 #[tauri::command]
+pub fn open_settings_window(app: AppHandle) -> CommandResult<()> {
+    let main = app
+        .get_webview_window("main")
+        .context("ไม่พบหน้าตั้งค่า")
+        .map_err(|e| e.to_string())?;
+    let overlay = app
+        .get_webview_window("overlay")
+        .context("ไม่พบ Overlay")
+        .map_err(|e| e.to_string())?;
+    let monitor = overlay
+        .current_monitor()
+        .map_err(|e| e.to_string())?
+        .or(main.primary_monitor().map_err(|e| e.to_string())?);
+    main.unminimize().map_err(|e| e.to_string())?;
+    if let Some(monitor) = monitor {
+        let area = monitor.work_area();
+        let size = main.outer_size().map_err(|e| e.to_string())?;
+        main.set_position(centered_settings_position(size, area.position, area.size))
+            .map_err(|e| e.to_string())?;
+    }
+    main.show().map_err(|e| e.to_string())?;
+    main.set_focus().map_err(|e| e.to_string())?;
+    overlay.hide().map_err(|e| e.to_string())
+}
+
+pub fn show_listening_overlay(app: &AppHandle) -> CommandResult<()> {
+    let overlay = app
+        .get_webview_window("overlay")
+        .context("ไม่พบ Overlay")
+        .map_err(|e| e.to_string())?;
+    overlay.show().map_err(|e| e.to_string())
+}
+
+fn centered_settings_position(
+    size: PhysicalSize<u32>,
+    origin: PhysicalPosition<i32>,
+    area: PhysicalSize<u32>,
+) -> PhysicalPosition<i32> {
+    PhysicalPosition::new(
+        origin.x + area.width.saturating_sub(size.width) as i32 / 2,
+        origin.y + area.height.saturating_sub(size.height) as i32 / 2,
+    )
+}
+
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 pub async fn select_listening_source(
     app: AppHandle,
     source: CaptureSource,
@@ -477,7 +527,19 @@ pub fn set_overlay_presentation(
         OverlayPresentation::Collapsed => (332, 52),
         OverlayPresentation::Expanded => (settings.overlay.width, settings.overlay.height),
     };
-    resize_overlay_anchored(&overlay, logical_size).map_err(|error| error.to_string())
+    resize_overlay_anchored(&overlay, logical_size).map_err(|error| error.to_string())?;
+    let collapsed = matches!(presentation, OverlayPresentation::Collapsed);
+    state
+        .overlay_collapsed
+        .store(collapsed, std::sync::atomic::Ordering::Relaxed);
+    let edit_mode = state
+        .runtime
+        .read()
+        .expect("runtime lock poisoned")
+        .overlay_edit_mode;
+    overlay
+        .set_ignore_cursor_events(!hotkeys::overlay_accepts_input(collapsed, edit_mode))
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -547,19 +609,51 @@ pub fn restore_overlay_bounds(app: &AppHandle, settings: &AppSettings) -> Comman
         .get_webview_window("overlay")
         .context("ไม่พบ overlay window")
         .map_err(|error| error.to_string())?;
-    if let (Some(x), Some(y)) = (settings.overlay.x, settings.overlay.y) {
+    overlay
+        .set_size(LogicalSize::new(332.0, 52.0))
+        .map_err(|error| error.to_string())?;
+    let monitors = overlay
+        .available_monitors()
+        .map_err(|error| error.to_string())?;
+    let saved = settings
+        .overlay
+        .x
+        .zip(settings.overlay.y)
+        .map(|(x, y)| PhysicalPosition::new(x, y));
+    let monitor = saved
+        .and_then(|position| {
+            monitors.iter().find(|monitor| {
+                let area = monitor.work_area();
+                position.x as i64 >= area.position.x as i64
+                    && position.y as i64 >= area.position.y as i64
+                    && (position.x as i64) < area.position.x as i64 + area.size.width as i64
+                    && (position.y as i64) < area.position.y as i64 + area.size.height as i64
+            })
+        })
+        .cloned()
+        .or(overlay
+            .primary_monitor()
+            .map_err(|error| error.to_string())?);
+    if let Some(monitor) = monitor {
+        let area = monitor.work_area();
+        let size = PhysicalSize::new(
+            (332.0 * monitor.scale_factor()) as u32,
+            (52.0 * monitor.scale_factor()) as u32,
+        );
+        let preferred = saved.unwrap_or(PhysicalPosition::new(
+            area.position.x + area.size.width.saturating_sub(size.width + 24) as i32,
+            area.position.y + 24,
+        ));
+        let position = anchored_overlay_position(preferred, size, size, area.position, area.size);
         overlay
-            .set_position(PhysicalPosition::new(x, y))
+            .set_position(position)
             .map_err(|error| error.to_string())?;
     }
     overlay
-        .set_size(LogicalSize::new(
-            settings.overlay.width as f64,
-            settings.overlay.height as f64,
-        ))
+        .set_resizable(false)
         .map_err(|error| error.to_string())?;
     overlay
-        .set_ignore_cursor_events(true)
+        .set_ignore_cursor_events(false)
         .map_err(|error| error.to_string())?;
     Ok(())
 }
@@ -637,6 +731,47 @@ fn anchored_overlay_position(
 mod overlay_geometry_tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn settings_center_on_the_overlay_monitor_including_negative_coordinates() {
+        assert_eq!(
+            centered_settings_position(
+                PhysicalSize::new(1180, 780),
+                PhysicalPosition::new(-1920, 0),
+                PhysicalSize::new(1920, 1040)
+            ),
+            PhysicalPosition::new(-1550, 130)
+        );
+        assert_eq!(
+            centered_settings_position(
+                PhysicalSize::new(1180, 780),
+                PhysicalPosition::new(0, 0),
+                PhysicalSize::new(980, 660)
+            ),
+            PhysicalPosition::new(0, 0)
+        );
+    }
+
+    #[test]
+    fn capsule_and_edit_mode_accept_clicks_but_locked_subtitles_do_not() {
+        assert!(hotkeys::overlay_accepts_input(true, false));
+        assert!(hotkeys::overlay_accepts_input(true, true));
+        assert!(hotkeys::overlay_accepts_input(false, true));
+        assert!(!hotkeys::overlay_accepts_input(false, false));
+    }
+
+    #[test]
+    fn startup_opens_ready_room_and_keeps_overlay_hidden() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let windows = config["app"]["windows"].as_array().unwrap();
+        let main = windows.iter().find(|w| w["label"] == "main").unwrap();
+        assert_eq!(main["visible"], true);
+        assert_eq!(main["focus"], true);
+        assert_eq!(main["url"], "index.html#/settings/overview");
+        let overlay = windows.iter().find(|w| w["label"] == "overlay").unwrap();
+        assert_eq!(overlay["visible"], false);
+    }
 
     #[test]
     fn listening_toggle_target_releases_the_runtime_lock() {

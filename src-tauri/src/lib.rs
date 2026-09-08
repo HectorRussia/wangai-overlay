@@ -51,6 +51,27 @@ pub fn run() {
             pipeline::start_auto_attach_monitor(app.handle().clone());
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let state = window.state::<AppState>();
+                    let running = {
+                        let runtime = state.runtime.read().expect("runtime lock poisoned");
+                        runtime.listening || runtime.microphone_active
+                    };
+                    if running {
+                        if commands::show_listening_overlay(window.app_handle()).is_ok() {
+                            let _ = window.hide();
+                        }
+                    } else {
+                        window.app_handle().exit(0);
+                    }
+                } else if window.label() == "overlay" {
+                    window.app_handle().exit(0);
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
             commands::list_capture_sources,
@@ -58,6 +79,8 @@ pub fn run() {
             commands::list_output_devices,
             commands::get_web_companion_info,
             commands::open_web_companion,
+            commands::open_settings_window,
+            commands::quit_app,
             commands::select_listening_source,
             commands::update_capture_mode,
             commands::update_output_device,
