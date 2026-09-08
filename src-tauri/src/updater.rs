@@ -299,6 +299,25 @@ pub async fn download_and_install_update(
 mod tests {
     use super::*;
     #[test]
+    fn development_config_initializes_updater_without_release_credentials() {
+        // Use the checked-in config, not the signed-release fixture below: dev
+        // must start before an owner has generated or configured signing keys.
+        let config: tauri::Config =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(config.plugins.0["updater"]["pubkey"], "");
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        context.config_mut().plugins = config.plugins;
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .build(context)
+            .expect("Updater must initialize with the checked-in development config");
+        assert!(matches!(
+            app.updater_builder().build(),
+            Err(tauri_plugin_updater::Error::EmptyEndpoints)
+        ));
+    }
+
+    #[test]
     fn only_settings_window_can_update() {
         assert!(settings_only("main").is_ok());
         for label in ["overlay", "web", ""] {

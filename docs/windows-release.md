@@ -3,6 +3,12 @@
 This repository **prepares** releases. Nothing is deployed or published by running
 the tests. Do not distribute the isolated `WANGAI Release Test` installers.
 
+The checked-in Tauri config contains an empty updater public key so the plugin can
+initialize in development. Without `WANGAI_UPDATER_PUBLIC_KEY`, update checks stay
+disabled; no test signing key is needed for `pnpm tauri dev`. Release preparation
+overrides this with the owner's public key, and release build validation still
+rejects missing or invalid keys.
+
 ## What the user does
 
 1. Download `WANGAI_0.2.0_x64-setup.exe` from
