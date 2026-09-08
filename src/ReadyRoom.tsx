@@ -1,6 +1,7 @@
 import { AudioLines, Check, ChevronRight, Cloud, Globe2, Headphones, History, LoaderCircle, LockKeyhole, MessageSquareText, Radio, Settings, ShieldCheck, TriangleAlert } from "lucide-react";
 import { advancedHref, settingsHref } from "./router";
 import type { AppSettings, RuntimeState, SubtitleItem } from "./types";
+import type { ReactNode } from "react";
 
 type Props = {
   settings: AppSettings;
@@ -13,17 +14,22 @@ type Props = {
   onOpenWebCompanion?: () => void;
   webCompanionOrigin?: string;
   webRuntime: boolean;
+  notification?: ReactNode;
 };
 type Tone = "ready" | "waiting" | "warning" | "setup";
 type Readiness = { label: string; detail: string; tone: Tone };
 
-export function ReadyRoom({ settings, runtime, history, busy, previewMode, onToggleListening, onOpenSourcePicker, onOpenWebCompanion, webCompanionOrigin, webRuntime }: Props) {
+export function ReadyRoom({ settings, runtime, history, busy, previewMode, onToggleListening, onOpenSourcePicker, onOpenWebCompanion, webCompanionOrigin, webRuntime, notification }: Props) {
   const incoming = incomingReadiness(settings, runtime);
   const groq = groqReadiness(settings, runtime);
   const configured = Boolean(settings.listeningSource) && settings.groq.configured && !runtime.budgetExhausted;
   const recent = history.find((item) => item.status === "success") ?? history[0];
   const quotaPercent = Math.min(100, settings.groq.monthlyBudgetMicrousd > 0 ? (settings.groq.estimatedSpendMicrousd / settings.groq.monthlyBudgetMicrousd) * 100 : 0);
   return <div className="ready-room-grid">
+    <div className="ready-listen-toolbar">
+      <div className="ready-notification-slot">{notification}</div>
+      <button className={`ready-listen-button ${runtime.listening ? "is-listening" : ""}`} disabled={busy === "listen" || previewMode || !configured} onClick={onToggleListening}>{busy === "listen" ? <LoaderCircle className="animate-spin" /> : runtime.listening ? <AudioLines /> : <Headphones />}<span>{runtime.listening ? "หยุดฟัง · F8" : "เริ่มฟัง · F8"}</span><small title={settings.listeningSource?.displayName}>{runtime.listening ? `กำลังฟัง ${settings.captureMode === "system_output" ? "MIXED" : settings.listeningSource?.displayName ?? "แอปที่เลือก"}` : "พร้อมแปลเสียงขาเข้า"}</small></button>
+    </div>
     <section className="ready-room-panel" aria-labelledby="ready-room-title">
       <div className="ready-room-intro"><div><p className="eyebrow">READY ROOM</p><h2 id="ready-room-title">{configured ? "พร้อมแล้ว — เลือกแอปหนึ่งตัวแล้วเริ่มฟัง" : "ตั้งค่าอีกนิด แล้วเริ่มฟังได้เลย"}</h2><p>WANGAI ฟังแอปที่คุณเลือกครั้งละหนึ่งโปรแกรม ไม่มีเสียงซ้ำจากแหล่งอื่น</p></div><span className={`ready-summary ${configured ? "is-ready" : "is-warning"}`}>{configured ? <Check /> : <TriangleAlert />}{configured ? "พร้อมใช้งาน" : "ต้องตรวจสอบ"}</span></div>
       <div className="ready-source-list">
@@ -34,7 +40,6 @@ export function ReadyRoom({ settings, runtime, history, busy, previewMode, onTog
       <section className="ready-recent" aria-labelledby="recent-title"><div className="ready-section-heading"><div><p className="eyebrow">LIVE MEMORY</p><h2 id="recent-title">บทสนทนาล่าสุด</h2></div><a href={settingsHref("history")}>ดูทั้งหมด <ChevronRight /></a></div>{recent ? <Recent item={recent} /> : <div className="ready-empty"><MessageSquareText /><div><strong>ยังไม่มีบทสนทนา</strong><span>ข้อความแรกจะปรากฏที่นี่เมื่อเริ่มฟัง</span></div></div>}</section>
     </section>
     <div className="ready-footer-actions"><a href={settingsHref("history")}><History />ประวัติ</a><a href={advancedHref("audio")}><Settings />การตั้งค่าขั้นสูง</a>{!webRuntime && onOpenWebCompanion && <button title={webCompanionOrigin} onClick={onOpenWebCompanion}><Globe2 />เปิด Web App</button>}{webRuntime && <span><Globe2 />Web Companion · เชื่อมต่อ Desktop</span>}{previewMode && <span>ข้อมูลจำลองสำหรับ Browser Preview</span>}</div>
-    <button className={`ready-listen-button ${runtime.listening ? "is-listening" : ""}`} disabled={busy === "listen" || previewMode || !configured} onClick={onToggleListening}>{busy === "listen" ? <LoaderCircle className="animate-spin" /> : runtime.listening ? <AudioLines /> : <Headphones />}<span>{runtime.listening ? "หยุดฟัง · F8" : "เริ่มฟัง · F8"}</span><small>{runtime.listening ? `กำลังฟัง ${settings.captureMode === "system_output" ? "MIXED" : settings.listeningSource?.displayName ?? "แอปที่เลือก"}` : "พร้อมแปลเสียงขาเข้า"}</small></button>
   </div>;
 }
 

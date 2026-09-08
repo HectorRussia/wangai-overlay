@@ -4,14 +4,14 @@ import { api, type WebCompanionInfo } from "./api";
 import { ProcessPickerDialog } from "./ProcessPickerDialog";
 import { ReadyRoom } from "./ReadyRoom";
 import { advancedHref, settingsHref, type AdvancedSection, type SettingsTab } from "./router";
-import { isPreviewMode, previewOutputDevices } from "./preview";
+import { isPreviewMode, previewOutputDevices, previewNotification, previewListeningBusy } from "./preview";
 import { useRunningApps } from "./useRunningApps";
 import type { AudioOutputDevice, CaptureSource, GlossaryTerm, GroqModelOption, HotkeySettings, OverlaySettings, SubtitleItem, VadSettings } from "./types";
 import { errorText, useSnapshot } from "./useSnapshot";
 
-const button = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#252731] px-4 text-xs font-bold text-white hover:border-white/20 disabled:opacity-40";
-const primary = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-bold text-[#17181d] disabled:opacity-40";
-const input = "min-h-11 w-full rounded-xl border border-white/10 bg-[#202229] px-3 text-sm text-white outline-none focus:border-[#63c48b]/60";
+const button = "settings-button inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-white/10 bg-[#252731] px-4 text-xs font-bold text-white hover:border-white/20 disabled:opacity-40";
+const primary = "settings-button inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white px-4 text-xs font-bold text-[#17181d] disabled:opacity-40";
+const input = "min-h-11 min-w-0 w-full rounded-xl border border-white/10 bg-[#202229] px-3 text-sm text-white outline-none focus:border-[#63c48b]/60";
 const isDesktop = () => "__TAURI_INTERNALS__" in window;
 const isWeb = () => !isDesktop() && !isPreviewMode();
 type Toast = { kind: "ok" | "error"; text: string };
@@ -22,8 +22,8 @@ export function SettingsApp({ activeTab, advancedSection = "audio" }: { activeTa
   const [models, setModels] = useState<GroqModelOption[]>([]);
   const [picker, setPicker] = useState(false);
   const runningApps = useRunningApps(picker);
-  const [busy, setBusy] = useState<string>();
-  const [toast, setToast] = useState<Toast>();
+  const [busy, setBusy] = useState<string | undefined>(() => previewListeningBusy() ? "listen" : undefined);
+  const [toast, setToast] = useState<Toast | undefined>(previewNotification);
   const [groqKey, setGroqKey] = useState("");
   const [vad, setVad] = useState<VadSettings>();
   const [hotkeys, setHotkeys] = useState<HotkeySettings>();
@@ -66,19 +66,20 @@ export function SettingsApp({ activeTab, advancedSection = "audio" }: { activeTa
   const { settings, runtime } = snapshot;
   const profileKey = settings.captureMode === "process_tree" ? "processTree" : "systemOutput";
   const profile = vad[profileKey];
+  const notification = toast && <div role={toast.kind === "error" ? "alert" : "status"} className={`settings-notification rounded-xl border px-4 py-3 text-sm ${toast.kind === "error" ? "border-red-400/30 bg-red-400/10 text-red-200" : "border-[#63c48b]/30 bg-[#63c48b]/10 text-[#8bf0b1]"}`}>{toast.text}</div>;
 
-  return <main className="min-h-screen bg-[#15161a] px-6 py-5 text-[#eceef2]">
+  return <main className="settings-app min-h-screen bg-[#15161a] px-6 py-5 text-[#eceef2]">
     <header className="mb-5 flex min-h-14 items-center gap-4 border-b border-white/8 pb-4">
       <strong className="text-3xl font-black tracking-tight text-white">WANGAI</strong>
       <span className="h-8 w-px bg-white/15" />
       <span className="text-sm font-bold text-[#70d99b]">{activeTab === "overview" ? "Ready Room" : activeTab === "history" ? "History" : "Advanced"}</span>
     </header>
-    {isDesktop() && <div className="mb-4 flex items-center justify-end gap-3 text-xs text-[#a9afb8]"><span>{runtime.listening || runtime.microphoneActive ? "ปิดหน้าต่างนี้เพื่อกลับไปใช้ Overlay" : "กดเริ่มฟัง · F8 เพื่อเปิด Overlay"}</span><button className={button} onClick={() => void api.quitApp().catch((error) => setToast({ kind: "error", text: errorText(error) }))}><Power className="size-4" />ออกจากโปรแกรม</button></div>}
-    {toast && <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${toast.kind === "error" ? "border-red-400/30 bg-red-400/10 text-red-200" : "border-[#63c48b]/30 bg-[#63c48b]/10 text-[#8bf0b1]"}`}>{toast.text}</div>}
-    {activeTab === "overview" && <ReadyRoom settings={settings} runtime={runtime} history={snapshot.history} busy={busy} previewMode={isPreviewMode()} onToggleListening={() => void run("listen", api.toggleListening, runtime.listening ? "หยุดฟังแล้ว" : "เริ่มฟังแล้ว")} onOpenSourcePicker={() => setPicker(true)} onOpenWebCompanion={!isWeb() ? () => void run("web", api.openWebCompanion, "เปิด Web App แล้ว") : undefined} webCompanionOrigin={webInfo?.origin} webRuntime={isWeb()} />}
+    {isDesktop() && <div className="mb-4 flex flex-wrap items-center justify-end gap-3 text-xs text-[#a9afb8]"><span>{runtime.listening || runtime.microphoneActive ? "ปิดหน้าต่างนี้เพื่อกลับไปใช้ Overlay" : "กดเริ่มฟัง · F8 เพื่อเปิด Overlay"}</span><button className={button} onClick={() => void api.quitApp().catch((error) => setToast({ kind: "error", text: errorText(error) }))}><Power className="size-4" />ออกจากโปรแกรม</button></div>}
+    {activeTab !== "overview" && notification && <div className="mb-4">{notification}</div>}
+    {activeTab === "overview" && <ReadyRoom notification={notification} settings={settings} runtime={runtime} history={snapshot.history} busy={busy} previewMode={isPreviewMode()} onToggleListening={() => void run("listen", api.toggleListening, runtime.listening ? "หยุดฟังแล้ว" : "เริ่มฟังแล้ว")} onOpenSourcePicker={() => setPicker(true)} onOpenWebCompanion={!isWeb() ? () => void run("web", api.openWebCompanion, "เปิด Web App แล้ว") : undefined} webCompanionOrigin={webInfo?.origin} webRuntime={isWeb()} />}
     {activeTab === "history" && <HistoryView history={snapshot.history} />}
     {activeTab === "advanced" && <>
-      <nav className="mb-5 flex gap-2 rounded-2xl border border-white/10 bg-[#1d1f25] p-2"><a className={button} href={advancedHref("audio")}><AudioLines />Audio</a><a className={button} href={advancedHref("ai")}><Cloud />AI & Terms</a><a className={button} href={advancedHref("controls")}><SlidersHorizontal />Controls & Overlay</a><a className={`${button} ml-auto`} href={settingsHref("overview")}>กลับ Ready Room</a></nav>
+      <nav aria-label="การตั้งค่าขั้นสูง" className="mb-5 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-[#1d1f25] p-2"><a aria-current={advancedSection === "audio" ? "page" : undefined} className={button} href={advancedHref("audio")}><AudioLines />Audio</a><a aria-current={advancedSection === "ai" ? "page" : undefined} className={button} href={advancedHref("ai")}><Cloud />AI & Terms</a><a aria-current={advancedSection === "controls" ? "page" : undefined} className={button} href={advancedHref("controls")}><SlidersHorizontal />Controls & Overlay</a><a className={`${button} ml-auto`} href={settingsHref("overview")}>กลับ Ready Room</a></nav>
       {advancedSection === "audio" && <section className="space-y-4">
         <Card title="Incoming audio diagnostics" icon={<Volume2 />} subtitle="มี capture, ring, cursor, VAD และ Groq queue เพียงชุดเดียว">
           <div className="grid gap-3 md:grid-cols-2"><Info label="แอปที่เลือก" value={settings.listeningSource?.displayName ?? "ยังไม่ได้เลือก"} /><Info label="สถานะ" value={runtime.statusMessage} /><Info label="PID ที่จับจริง" value={runtime.effectiveCapturePid?.toString() ?? "—"} /><Info label="Peak" value={runtime.audioPeakDbfs == null ? "ยังไม่มี audio frame" : `${runtime.audioPeakDbfs.toFixed(1)} dBFS`} /><Info label="VAD" value={runtime.vadActive ? "กำลังตรวจพบคำพูด" : "ยังไม่พบคำพูด"} /><Info label="Source badge" value={settings.captureMode === "system_output" ? "MIXED" : settings.listeningSource?.displayName?.toUpperCase() ?? "INCOMING"} /></div>
@@ -96,7 +97,7 @@ export function SettingsApp({ activeTab, advancedSection = "audio" }: { activeTa
       </section>}
       {advancedSection === "ai" && <section className="space-y-4">
         <Card title="Groq Key & Models" icon={<KeyRound />} subtitle={isWeb() ? "ตั้งหรือลบ API key ได้จาก Desktop เท่านั้น" : "Key อยู่ใน Windows Credential Manager"}>
-          {!isWeb() && <div className="flex gap-2"><input className={input} type="password" placeholder="gsk_..." value={groqKey} onChange={(event) => setGroqKey(event.target.value)} /><button className={primary} onClick={() => void run("key", () => api.configureGroq(groqKey), "บันทึก Groq key แล้ว")}>บันทึก Key</button><button className={button} onClick={() => void run("key", api.clearGroq, "ลบ Groq key แล้ว")}>ลบ</button></div>}
+          {!isWeb() && <div className="settings-key-row"><input aria-label="Groq API key" className={input} type="password" placeholder="gsk_..." value={groqKey} onChange={(event) => setGroqKey(event.target.value)} /><button className={primary} onClick={() => void run("key", () => api.configureGroq(groqKey), "บันทึก Groq key แล้ว")}>บันทึก Key</button><button className={button} onClick={() => void run("key", api.clearGroq, "ลบ Groq key แล้ว")}>ลบ</button></div>}
           <div className="mt-4 grid gap-3 md:grid-cols-3"><ModelSelect label="Incoming STT" value={incomingModel} models={models.filter((m) => m.kind === "speech_to_text")} onChange={setIncomingModel} /><ModelSelect label="F9 microphone STT" value={microphoneModel} models={models.filter((m) => m.kind === "speech_to_text")} onChange={setMicrophoneModel} /><ModelSelect label="Translation" value={translationModel} models={models.filter((m) => m.kind === "translation")} onChange={setTranslationModel} /></div><button className={`${primary} mt-4`} onClick={() => void run("models", () => api.updateGroqModels(incomingModel, microphoneModel, translationModel), "บันทึกโมเดลแล้ว")}>บันทึกโมเดล</button>
           <p className="mt-4 text-sm text-[#aaaeba]">ใช้ไป ${(settings.groq.estimatedSpendMicrousd / 1_000_000).toFixed(4)} / ${(settings.groq.monthlyBudgetMicrousd / 1_000_000).toFixed(2)} USD เดือนนี้</p>
         </Card>

@@ -3,6 +3,20 @@ import type { AppSnapshot, AudioOutputDevice, CaptureSource, RunningApp } from "
 export function isTauriRuntime(): boolean { return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window; }
 export function isPreviewMode(): boolean { return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1"; }
 
+// Visual-only fixtures: never affect Desktop or Web Companion state.
+export function previewNotification(): { kind: "ok" | "error"; text: string } | undefined {
+  if (!isPreviewMode()) return undefined;
+  const ui = new URLSearchParams(window.location.search).get("ui");
+  if (ui === "success") return { kind: "ok", text: "เริ่มฟังแล้ว" };
+  if (ui === "error") return { kind: "error", text: "เริ่มฟังไม่สำเร็จ กรุณาตรวจการตั้งค่าเสียง" };
+  if (ui === "long-error") return { kind: "error", text: "ไม่สามารถเชื่อมต่อแอปที่เลือกได้ กรุณาเปิดแอปแล้วลองใหม่อีกครั้ง: C:\\Applications\\" + "LongApplicationNameWithoutSpaces".repeat(8) + ".exe" };
+  return undefined;
+}
+
+export function previewListeningBusy(): boolean {
+  return isPreviewMode() && new URLSearchParams(window.location.search).get("ui") === "busy";
+}
+
 export const previewProcesses: CaptureSource[] = [
   { pid: 4242, name: "MistfallHunter-Win64-Shipping.exe", executablePath: "C:\\Games\\Mistfall Hunter\\MistfallHunter-Win64-Shipping.exe", displayName: "Mistfall Hunter", isMistfall: true },
   { pid: 7210, name: "Discord.exe", executablePath: "C:\\Users\\User\\AppData\\Local\\Discord\\Discord.exe", displayName: "Discord", isMistfall: false },
@@ -53,5 +67,12 @@ export function previewSnapshot(): AppSnapshot {
   if (state === "idle") { snapshot.runtime.listening = false; snapshot.runtime.attachedSource = undefined; snapshot.runtime.audioRmsDbfs = null; snapshot.runtime.audioPeakDbfs = null; snapshot.runtime.audioLastSeenAtMs = null; snapshot.history = []; }
   if (state === "warning") { snapshot.runtime.captureWarning = "ยังไม่ได้รับ audio frame จากแอปที่เลือก"; snapshot.runtime.audioPeakDbfs = null; }
   if (state === "setup") { snapshot.settings.listeningSource = undefined; snapshot.settings.groq.configured = false; snapshot.runtime.listening = false; snapshot.runtime.attachedSource = undefined; snapshot.runtime.audioPeakDbfs = null; snapshot.history = []; }
+  if (state === "long-text") {
+    const name = "LongApplicationNameWithoutSpaces".repeat(8);
+    snapshot.settings.listeningSource!.displayName = name;
+    snapshot.runtime.attachedSource = { ...previewProcesses[0], displayName: name };
+    snapshot.runtime.statusMessage = `กำลังฟัง ${name}`;
+    snapshot.history = snapshot.history.map((item) => ({ ...item, sourceDisplayName: name, originalText: "VeryLongTranscriptWithoutSpaces".repeat(12), translatedText: "ข้อความแปลสำหรับทดสอบการตัดบรรทัดที่ยาวมาก".repeat(12) }));
+  }
   return snapshot;
 }

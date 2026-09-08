@@ -57,4 +57,16 @@ describe("settings with nullable desktop audio diagnostics", () => {
     render(<SettingsApp activeTab="advanced" />);
     expect(await screen.findByText(peak == null ? "ยังไม่มี audio frame" : `${peak.toFixed(1)} dBFS`)).toBeInTheDocument();
   });
+
+  it("keeps success feedback and F8 separate and preserves feedback through navigation", async () => {
+    window.history.replaceState(null, "", "/?preview=1&ui=success#/settings/overview");
+    const view = render(<SettingsApp activeTab="overview" />);
+    expect(await screen.findByRole("status")).toHaveTextContent("เริ่มฟังแล้ว");
+    const stop = screen.getByRole("button", { name: /หยุดฟัง · F8/ });
+    expect(stop).not.toContainElement(screen.getByRole("status"));
+    view.rerender(<SettingsApp activeTab="advanced" advancedSection="ai" />);
+    expect(screen.getByRole("status")).toHaveTextContent("เริ่มฟังแล้ว");
+    expect(screen.getByLabelText("Groq API key")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "AI & Terms" })).toHaveAttribute("aria-current", "page");
+  });
 });
