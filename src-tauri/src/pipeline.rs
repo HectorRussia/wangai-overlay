@@ -16,6 +16,9 @@ use crate::{
 };
 
 pub fn handle_worker_event(app: AppHandle, event: WorkerEvent) {
+    if app.state::<AppState>().lifecycle.is_closing() {
+        return;
+    }
     let state = app.state::<AppState>();
     match event {
         WorkerEvent::Ready { model, device } => {
@@ -104,11 +107,14 @@ pub async fn handle_transcript_event(
     }
     let state = app.state::<AppState>();
     if transcript.kind == TranscriptKind::Partial {
+        if state.lifecycle.is_closing() {
+            return;
+        }
         state.set_partial(Some(transcript.clone()));
         let _ = app.emit("transcript", transcript);
         return;
     }
-    if state.ai_stt.generation(transcript.stream) != generation {
+    if state.lifecycle.is_closing() || state.ai_stt.generation(transcript.stream) != generation {
         return;
     }
     state.set_partial(None);
@@ -162,6 +168,7 @@ fn clear_incoming_runtime(runtime: &mut crate::models::RuntimeState) {
 
 pub fn set_listening(app: &AppHandle, enabled: bool) -> Result<bool> {
     let state = app.state::<AppState>();
+    anyhow::ensure!(!state.lifecycle.is_closing(), "กำลังปิดระบบเพื่ออัปเดต");
     if !enabled {
         state.audio.stop_incoming();
         state.worker.reset_stream(StreamKind::Incoming);
@@ -206,6 +213,7 @@ pub fn set_listening(app: &AppHandle, enabled: bool) -> Result<bool> {
 
 pub fn attach_listening_source(app: &AppHandle) -> Result<()> {
     let state = app.state::<AppState>();
+    let _operation = state.lifecycle.operation()?;
     let settings = state.settings.snapshot();
     let Some(saved) = settings.listening_source.as_ref() else {
         state.audio.stop_incoming();
@@ -304,6 +312,7 @@ pub fn attach_listening_source(app: &AppHandle) -> Result<()> {
 
 pub fn start_push_to_talk(app: &AppHandle) -> Result<()> {
     let state = app.state::<AppState>();
+    let _operation = state.lifecycle.operation()?;
     if !state.gateway.can_submit() {
         return Err(anyhow::anyhow!(state.gateway.status().message));
     }
@@ -327,6 +336,9 @@ pub fn start_push_to_talk(app: &AppHandle) -> Result<()> {
 
 pub fn stop_push_to_talk(app: &AppHandle) {
     let state = app.state::<AppState>();
+    let Ok(_operation) = state.lifecycle.operation() else {
+        return;
+    };
     state.audio.stop_microphone();
     state.ai_stt.end_microphone(app.clone());
     let runtime = state.update_runtime(|runtime| {
@@ -347,6 +359,9 @@ pub fn start_auto_attach_monitor(app: AppHandle) {
             timer.tick().await;
             let state = app.state::<AppState>();
             let runtime = state.runtime.read().expect("runtime lock poisoned").clone();
+            if state.lifecycle.is_closing() {
+                break;
+            }
             if !runtime.listening {
                 continue;
             }

@@ -19,6 +19,7 @@ use crate::{
 };
 
 pub struct AppState {
+    pub lifecycle: crate::lifecycle::Lifecycle,
     pub overlay_collapsed: AtomicBool,
     pub settings: SettingsManager,
     pub runtime: RwLock<RuntimeState>,
@@ -42,6 +43,7 @@ impl AppState {
         runtime.effective_vad_threshold = active_profile.vad_threshold;
         runtime.effective_vad_gain_db = active_profile.gain_db;
         Ok(Self {
+            lifecycle: crate::lifecycle::Lifecycle::default(),
             overlay_collapsed: AtomicBool::new(true),
             settings,
             runtime: RwLock::new(runtime),
@@ -145,7 +147,7 @@ impl AppState {
         stream: StreamKind,
         generation: u64,
     ) -> bool {
-        if self.ai_stt.generation(stream) != generation {
+        if self.lifecycle.is_closing() || self.ai_stt.generation(stream) != generation {
             self.history
                 .write()
                 .unwrap()

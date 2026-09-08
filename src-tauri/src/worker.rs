@@ -1,6 +1,5 @@
 use std::{
     io::{BufRead, BufReader, Write},
-    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         mpsc::{self, SyncSender, TrySendError},
@@ -10,6 +9,8 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
+#[cfg(debug_assertions)]
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{
@@ -36,24 +37,41 @@ pub struct WorkerManager {
 }
 
 impl WorkerManager {
+    #[cfg(feature = "release-test")]
+    pub fn test_pid(&self) -> Option<u32> {
+        self.child.lock().unwrap().as_ref().map(|child| child.id())
+    }
     pub fn start(&self, app: AppHandle, settings: &AppSettings) -> Result<()> {
-        self.stop();
+        let state = app.state::<crate::state::AppState>();
+        let _operation = state.lifecycle.operation()?;
+        self.stop()?;
         emit_status(&app, "starting", "กำลังเปิด Silero VAD worker", None);
         let vad_threshold = active_vad_threshold(settings);
 
-        let worker_path = resolve_worker_path(&app)?;
-        let python = resolve_python(&worker_path);
-        let mut command = Command::new(&python);
-        if python
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.eq_ignore_ascii_case("py.exe"))
-        {
-            command.arg("-3");
-        }
+        #[cfg(debug_assertions)]
+        let mut command = {
+            let worker_path = resolve_worker_path(&app)?;
+            let python = resolve_python(&worker_path);
+            let mut command = Command::new(&python);
+            if python
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("py.exe"))
+            {
+                command.arg("-3");
+            }
+            command.arg("-u").arg(&worker_path);
+            command
+        };
+        #[cfg(not(debug_assertions))]
+        let mut command = {
+            let path = app.path().resource_dir()?.join("worker/wangai-worker.exe");
+            if !path.is_file() {
+                return Err(anyhow!("ไม่พบ worker ที่มากับตัวติดตั้ง กรุณาติดตั้ง WANGAI ใหม่"));
+            }
+            Command::new(path)
+        };
         command
-            .arg("-u")
-            .arg(&worker_path)
             .arg("--vad-threshold")
             .arg(vad_threshold.to_string())
             .arg("--adaptive-floor")
@@ -65,7 +83,7 @@ impl WorkerManager {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        if std::env::var("GAMELINGO_MOCK_VAD").as_deref() == Ok("1") {
+        if cfg!(debug_assertions) && std::env::var("GAMELINGO_MOCK_VAD").as_deref() == Ok("1") {
             command.arg("--mock");
         }
 
@@ -75,13 +93,9 @@ impl WorkerManager {
             command.creation_flags(0x0800_0000);
         }
 
-        let mut child = command.spawn().with_context(|| {
-            format!(
-                "เปิด Python worker ไม่สำเร็จ (python={}, worker={})",
-                python.display(),
-                worker_path.display()
-            )
-        })?;
+        let mut child = command
+            .spawn()
+            .context("เปิด Silero worker ไม่สำเร็จ กรุณาตรวจไฟล์ติดตั้งและ DLL")?;
         let stdin = child
             .stdin
             .take()
@@ -148,24 +162,42 @@ impl WorkerManager {
         Ok(())
     }
 
-    pub fn stop(&self) {
+    pub fn stop(&self) -> Result<()> {
         if let Some(sender) = self
             .sender
             .write()
             .expect("worker sender lock poisoned")
             .take()
         {
-            let _ = sender.send(WorkerCommand::Shutdown);
+            let _ = sender.try_send(WorkerCommand::Shutdown);
         }
-        if let Some(mut child) = self
+        let child = self
             .child
             .lock()
             .expect("worker child lock poisoned")
-            .take()
-        {
-            let _ = child.kill();
-            let _ = child.wait();
+            .take();
+        if let Some(mut child) = child {
+            let result = (|| -> Result<()> {
+                if child.try_wait()?.is_some() {
+                    return Ok(());
+                }
+                child.kill().context("หยุด Silero worker ไม่สำเร็จ")?;
+                // Never block the UI/installer indefinitely waiting on a broken child.
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+                while std::time::Instant::now() < deadline {
+                    if child.try_wait()?.is_some() {
+                        return Ok(());
+                    }
+                    thread::sleep(std::time::Duration::from_millis(20));
+                }
+                Err(anyhow!("Silero worker ยังไม่หยุดภายในเวลาที่กำหนด"))
+            })();
+            if result.is_err() {
+                *self.child.lock().unwrap() = Some(child);
+            }
+            return result;
         }
+        Ok(())
     }
 
     pub fn send_audio(
@@ -226,7 +258,7 @@ fn adaptive_vad_floor(settings: &AppSettings, threshold: f32) -> f32 {
 impl Drop for WorkerManager {
     fn drop(&mut self) {
         if Arc::strong_count(&self.child) == 1 {
-            self.stop();
+            let _ = self.stop();
         }
     }
 }
@@ -252,6 +284,7 @@ fn write_frame(mut writer: impl Write, message: WorkerCommand) -> std::io::Resul
     writer.flush()
 }
 
+#[cfg(debug_assertions)]
 fn resolve_worker_path(app: &AppHandle) -> Result<PathBuf> {
     let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -269,6 +302,7 @@ fn resolve_worker_path(app: &AppHandle) -> Result<PathBuf> {
     }
 }
 
+#[cfg(debug_assertions)]
 fn resolve_python(worker_path: &Path) -> PathBuf {
     if let Ok(value) = std::env::var("GAMELINGO_PYTHON") {
         let path = PathBuf::from(value);

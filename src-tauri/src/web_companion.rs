@@ -415,6 +415,9 @@ mod tests {
             "update_groq_models",
             "test_groq_configuration",
             "start_overlay_drag",
+            "get_update_status",
+            "check_for_updates",
+            "download_and_install_update",
         ] {
             assert!(
                 serde_json::from_value::<WebCommand>(json!({"command":command,"args":{}})).is_err()

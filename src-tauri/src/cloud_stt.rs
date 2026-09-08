@@ -386,6 +386,9 @@ impl AiSttManager {
     }
 
     fn enqueue_job(&self, app: AppHandle, utterance: SttJob) -> bool {
+        if app.state::<AppState>().lifecycle.is_closing() {
+            return false;
+        }
         let stream = utterance.stream;
         if !app
             .state::<AppState>()
@@ -416,7 +419,9 @@ impl AiSttManager {
                 .acquire()
                 .await
                 .expect("STT semaphore closed");
-            if manager.generation(utterance.stream) != utterance.generation {
+            if app.state::<AppState>().lifecycle.is_closing()
+                || manager.generation(utterance.stream) != utterance.generation
+            {
                 drop(permit);
                 queue.queued.fetch_sub(1, Ordering::AcqRel);
                 return;

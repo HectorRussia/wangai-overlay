@@ -4,12 +4,16 @@ mod cloud_stt;
 mod commands;
 mod gateway;
 mod hotkeys;
+mod lifecycle;
 mod models;
 mod pipeline;
 mod processes;
+#[cfg(feature = "release-test")]
+mod release_test;
 mod settings;
 mod state;
 mod translator;
+mod updater;
 mod web_companion;
 mod worker;
 
@@ -20,6 +24,14 @@ use state::AppState;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(
@@ -32,6 +44,14 @@ pub fn run() {
             let state = AppState::new(settings_path)?;
             let settings = state.settings.snapshot();
             app.manage(state);
+            app.manage(updater::UpdateManager::new(
+                app.package_info().version.to_string(),
+            ));
+            let update_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                updater::check(update_handle).await;
+            });
 
             let web = web_companion::WebCompanionManager::start(app.handle().clone())?;
             app.manage(web);
@@ -50,6 +70,8 @@ pub fn run() {
                 worker::emit_status(app.handle(), "error", &error.to_string(), None);
             }
             pipeline::start_auto_attach_monitor(app.handle().clone());
+            #[cfg(feature = "release-test")]
+            release_test::start(app.handle().clone());
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -84,6 +106,9 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            updater::get_update_status,
+            updater::check_for_updates,
+            updater::download_and_install_update,
             commands::get_snapshot,
             commands::list_capture_sources,
             commands::list_running_apps,
@@ -116,13 +141,8 @@ pub fn run() {
 
     app.run(|app, event| {
         if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
-            let state = app.state::<AppState>();
             app.state::<web_companion::WebCompanionManager>().shutdown();
-            state.audio.stop_all();
-            state.ai_stt.reset_stream(models::StreamKind::Incoming);
-            state.ai_stt.reset_stream(models::StreamKind::Microphone);
-            let _ = state.settings.save();
-            state.worker.stop();
+            let _ = lifecycle::shutdown(app);
         }
     });
 }
