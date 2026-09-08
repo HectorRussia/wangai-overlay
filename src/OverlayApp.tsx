@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { AudioLines, Check, Clipboard, GripHorizontal, Headphones, Mic, Radio, Settings, TriangleAlert } from "lucide-react";
 import { api } from "./api";
 import { overlayPresentation, visibleOverlayItems, type OverlayPresentation } from "./overlayPresentation";
@@ -80,6 +80,12 @@ export function OverlayApp() {
     catch { setSettingsError("เปิดหน้าตั้งค่าไม่สำเร็จ กรุณาลองอีกครั้ง"); }
   };
 
+  const startDrag = (event: MouseEvent<HTMLElement>) => {
+    if (event.button !== 0 || !runtime.overlayEditMode || isPreviewMode()) return;
+    event.preventDefault();
+    void api.startOverlayDrag().catch(() => setSettingsError("ย้ายหน้าต่างไม่สำเร็จ กรุณาลองลากอีกครั้ง"));
+  };
+
   const settingsButton = (enabled: boolean) => <button
     className="overlay-settings-button"
     aria-label="เปิดหน้าตั้งค่า WANGAI"
@@ -106,15 +112,22 @@ export function OverlayApp() {
 
   return (
     <main className={`overlay-card ${runtime.overlayEditMode ? "is-editing" : ""}`} style={style}>
-      <header className="flex min-h-8 items-center justify-between gap-3 px-1">
+      <header
+        className={`overlay-titlebar flex min-h-8 items-center justify-between gap-3 px-1 ${runtime.overlayEditMode ? "is-draggable" : ""}`}
+        title={runtime.overlayEditMode ? `ลากแถบนี้เพื่อย้าย · กด ${settings.hotkeys.editOverlay} เพื่อล็อกตำแหน่ง` : `กด ${settings.hotkeys.editOverlay} เพื่อย้ายหน้าต่าง`}
+        onMouseDown={(event) => {
+          if ((event.target as Element).closest("button, a, input, select")) return;
+          startDrag(event);
+        }}
+      >
         <div className="flex min-w-0 items-center gap-2">
           <span className={`overlay-dot ${warning ? "is-warning" : listening || runtime.microphoneActive ? "is-active" : ""}`} />
           <span className="truncate text-[9px] font-bold tracking-[0.08em] text-[#858894]">{status}</span>
         </div>
         <div className="overlay-header-actions">{runtime.overlayEditMode ? (
-          <button className="overlay-drag" onMouseDown={() => void api.startOverlayDrag()}><GripHorizontal />ลาก · F7 เพื่อล็อก</button>
+          <button aria-label="ลากเพื่อย้าย Overlay" className="overlay-drag" onMouseDown={startDrag}><GripHorizontal />ลาก · {settings.hotkeys.editOverlay} เพื่อล็อก</button>
         ) : (
-          <span className="overlay-key"><Mic />Hold {settings.hotkeys.pushToTalk}</span>
+          <span className="overlay-key"><GripHorizontal />{settings.hotkeys.editOverlay} เพื่อย้าย · <Mic />{settings.hotkeys.pushToTalk}</span>
         )}{settingsButton(runtime.overlayEditMode)}</div>
       </header>
       {settingsError && <p role="alert" className="text-xs text-red-200">{settingsError}</p>}

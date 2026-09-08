@@ -393,6 +393,9 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
 }
 .overlay-key svg { width: 11px; height: 11px; }
 .overlay-header-actions { display: flex; flex-shrink: 0; align-items: center; gap: 6px; }
+.overlay-titlebar { flex-shrink: 0; user-select: none; }
+.overlay-titlebar.is-draggable { cursor: grab; }
+.overlay-titlebar.is-draggable:active { cursor: grabbing; }
 .overlay-settings-button { display: flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 3px; min-width: 30px; min-height: 30px; padding: 5px; border: 1px solid rgba(112,217,155,.25); border-radius: 10px; color: #8de3ac; background: rgba(112,217,155,.08); cursor: pointer; }
 .overlay-settings-button svg { width: 15px; height: 15px; }
 .overlay-settings-button small { font-size: 9px; }

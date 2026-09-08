@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   setOverlayPresentation: vi.fn(async () => undefined),
   copyLatestReply: vi.fn(async () => true),
   openSettingsWindow: vi.fn(async () => undefined),
+  startOverlayDrag: vi.fn(async () => undefined),
 }));
 
 vi.mock("./useSnapshot", () => ({
@@ -19,7 +20,7 @@ vi.mock("./api", () => ({
     setOverlayPresentation: mocks.setOverlayPresentation,
     copyLatestReply: mocks.copyLatestReply,
     openSettingsWindow: mocks.openSettingsWindow,
-    startOverlayDrag: vi.fn(async () => undefined),
+    startOverlayDrag: mocks.startOverlayDrag,
   },
 }));
 
@@ -34,6 +35,7 @@ describe("WANGAI overlay", () => {
     mocks.snapshot = snapshotFixture();
     mocks.setOverlayPresentation.mockClear();
     mocks.openSettingsWindow.mockReset();
+    mocks.startOverlayDrag.mockReset();
   });
 
   afterEach(() => {
@@ -137,5 +139,28 @@ describe("WANGAI overlay", () => {
     view.rerender(<OverlayApp />);
     fireEvent.click(screen.getByRole("button", { name: "เปิดหน้าตั้งค่า WANGAI" }));
     expect(mocks.openSettingsWindow).toHaveBeenCalledOnce();
+  });
+
+  it("drags the expanded titlebar only after unlocking, excluding controls and right clicks", () => {
+    const view = render(<OverlayApp />);
+    const header = view.container.querySelector("header")!;
+    fireEvent.mouseDown(header, { button: 0 });
+    expect(mocks.startOverlayDrag).not.toHaveBeenCalled();
+    mocks.snapshot = { ...mocks.snapshot!, runtime: { ...mocks.snapshot!.runtime, overlayEditMode: true } };
+    view.rerender(<OverlayApp />);
+    fireEvent.mouseDown(header, { button: 2 });
+    fireEvent.mouseDown(screen.getByRole("button", { name: "เปิดหน้าตั้งค่า WANGAI" }), { button: 0 });
+    expect(mocks.startOverlayDrag).not.toHaveBeenCalled();
+    fireEvent.mouseDown(header.querySelector("span")!, { button: 0 });
+    expect(mocks.startOverlayDrag).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(screen.getByRole("button", { name: "ลากเพื่อย้าย Overlay" }), { button: 0 });
+    expect(mocks.startOverlayDrag).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the configured movement shortcut in the visible hint", () => {
+    mocks.snapshot!.settings.hotkeys.editOverlay = "F6";
+    const view = render(<OverlayApp />);
+    expect(screen.getByText(/F6 เพื่อย้าย/)).toBeInTheDocument();
+    expect(view.container.querySelector("header")).toHaveAttribute("title", "กด F6 เพื่อย้ายหน้าต่าง");
   });
 });
