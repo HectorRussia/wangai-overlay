@@ -10,7 +10,7 @@ services:
     dockerfilePath: ./server/Dockerfile
     autoDeployTrigger: "off"
     healthCheckPath: /healthz
-    maxShutdownDelaySeconds: 150
+    # Free rejects maxShutdownDelaySeconds; use Render's default shutdown window.
     envVars:
       - key: BIND_ADDRESS
         value: 0.0.0.0:10000

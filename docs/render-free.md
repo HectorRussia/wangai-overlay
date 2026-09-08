@@ -11,7 +11,8 @@ Anyone who discovers the API can call it; size/concurrency bounds are not authen
 3. In Render, create a Blueprint from this repository and review `render.yaml`:
    Docker, Free, Singapore, one instance, Dockerfile `server/Dockerfile`, context `.`.
    There is no paid disk or external database. Auto-deploy is **off**; deploy manually
-   after GitHub CI passes.
+   after GitHub CI passes. Do not set `maxShutdownDelaySeconds`: Render rejects
+   this override for Free services, so the Blueprint uses the platform default.
 4. Fill the `sync: false` environment fields on Render:
 
    - `STT_API_KEY`: new provider credential.
@@ -42,8 +43,10 @@ Anyone who discovers the API can call it; size/concurrency bounds are not authen
   to run the `wangai-server usage` CLI on the host.
 - Outbound provider API traffic is subject to Render Free restrictions and may
   cause suspension. Free is a pilot choice, not an uptime/capacity promise.
-- Do not add a keep-alive bot to bypass sleep. Shutdown allowance is 150 seconds;
-  in-flight bounded work can finish and metrics can flush, but data remains ephemeral.
+- Do not add a keep-alive bot to bypass sleep. Render documents a default shutdown
+  window of 30 seconds when no override is set. The container smoke test checks
+  shutdown within that window; requests still in flight at termination may be
+  interrupted and data remains ephemeral.
 - Container runs as UID 10001. `/data` is owned by that user. No local Web Companion
   port is published: the companion remains machine-local on the user's Desktop.
 - Provider budget/billing enforcement is separate. WANGAI handles 429 cooldown,

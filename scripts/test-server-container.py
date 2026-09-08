@@ -35,8 +35,9 @@ try:
     docker('exec', name, 'test', '-w', '/data/usage.sqlite3')
     docker('exec', name, 'wangai-server', 'usage')
     started = time.monotonic()
-    docker('stop', '-t', '150', name)
-    assert time.monotonic() - started < 150
+    # Match Render's default; Free does not accept a custom shutdown window.
+    docker('stop', '-t', '30', name)
+    assert time.monotonic() - started < 30
     assert 'ci-only-no-provider-credential' not in docker('logs', name)
     assert docker('inspect', '--format', '{{.State.ExitCode}}', name) == '0'
     print('Docker: health/status, non-root SQLite, redaction and SIGTERM shutdown passed')
