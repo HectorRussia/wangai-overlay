@@ -12,7 +12,7 @@ use flexaudio::{devices, open, DeviceInfo, OutputFormat, ProcessMode, SourceKind
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{
-    cloud_stt::GroqSttManager,
+    cloud_stt::AiSttManager,
     models::{AudioOutputDevice, CaptureMode, StreamKind},
     processes,
     state::AppState,
@@ -131,7 +131,7 @@ impl AudioManager {
         app: AppHandle,
         config: IncomingCaptureConfig,
         worker: WorkerManager,
-        groq_stt: GroqSttManager,
+        ai_stt: AiSttManager,
     ) -> Result<()> {
         self.stop_incoming();
         if !processes::process_is_alive(config.selected_pid) {
@@ -146,13 +146,13 @@ impl AudioManager {
             ));
         }
         worker.reset_stream(StreamKind::Incoming);
-        groq_stt.reset_stream(StreamKind::Incoming);
+        ai_stt.reset_stream(StreamKind::Incoming);
         let handle = spawn_capture(
             app,
             StreamKind::Incoming,
             Some(config),
             Some(worker),
-            groq_stt,
+            ai_stt,
         )?;
         *self
             .incoming
@@ -172,7 +172,7 @@ impl AudioManager {
         }
     }
 
-    pub fn start_microphone(&self, app: AppHandle, groq_stt: GroqSttManager) -> Result<()> {
+    pub fn start_microphone(&self, app: AppHandle, ai_stt: AiSttManager) -> Result<()> {
         let mut guard = self.microphone.lock().expect("mic capture lock poisoned");
         if guard.is_some() {
             return Ok(());
@@ -182,7 +182,7 @@ impl AudioManager {
             StreamKind::Microphone,
             None,
             None,
-            groq_stt,
+            ai_stt,
         )?);
         Ok(())
     }
@@ -209,7 +209,7 @@ fn spawn_capture(
     stream_kind: StreamKind,
     incoming_config: Option<IncomingCaptureConfig>,
     worker: Option<WorkerManager>,
-    groq_stt: GroqSttManager,
+    ai_stt: AiSttManager,
 ) -> Result<CaptureHandle> {
     let stop = Arc::new(AtomicBool::new(false));
     let thread_stop = stop.clone();
@@ -283,7 +283,7 @@ fn spawn_capture(
                             &mut meter_samples,
                         );
                     }
-                    let span = groq_stt.ingest_audio(stream_kind, &mono_data);
+                    let span = ai_stt.ingest_audio(stream_kind, &mono_data);
                     if let Some(worker) = worker.as_ref() {
                         let samples = incoming_config
                             .as_ref()
@@ -346,7 +346,7 @@ fn spawn_capture(
                     && last_cloud_scan_check.elapsed() >= Duration::from_millis(250)
                 {
                     last_cloud_scan_check = Instant::now();
-                    groq_stt.maybe_enqueue_auto_scan(app.clone());
+                    ai_stt.maybe_enqueue_auto_scan(app.clone());
                 }
                 if !had_audio {
                     thread::sleep(Duration::from_millis(5));

@@ -29,7 +29,7 @@ export function OverlayApp() {
 
   const presentation = snapshot
     ? overlayPresentation({
-        hasPartial: Boolean(snapshot.partial) || snapshot.runtime.groqStatus === "กำลังฟัง…",
+        hasPartial: Boolean(snapshot.partial) || snapshot.runtime.aiStatus === "กำลังฟัง…",
         visibleItems: visible.length,
         microphoneActive: snapshot.runtime.microphoneActive,
         editMode: snapshot.runtime.overlayEditMode,
@@ -58,9 +58,9 @@ export function OverlayApp() {
     "--overlay-scale": settings.overlay.fontScale,
   } as CSSProperties;
   const listening = runtime.listening && Boolean(runtime.attachedSource);
-  const setupNeeded = !settings.groq.configured || !settings.listeningSource;
-  const hearingGameSpeech = runtime.groqStatus === "กำลังฟัง…" && !runtime.microphoneActive;
-  const warning = Boolean(runtime.lastError) || runtime.budgetExhausted || (runtime.listening && !runtime.attachedSource);
+  const setupNeeded = !settings.listeningSource;
+  const hearingGameSpeech = runtime.aiStatus === "กำลังฟัง…" && !runtime.microphoneActive;
+  const warning = Boolean(runtime.lastError) || ["offline", "degraded"].includes(runtime.aiService.state) || (runtime.listening && !runtime.attachedSource);
   const status = runtime.microphoneActive
     ? "กำลังฟังภาษาไทย"
     : runtime.attachedSource

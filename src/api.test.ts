@@ -4,6 +4,12 @@ import { api } from "./api";
 describe("Web Companion single-source transport", () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it("has no client key, model or budget management interface", () => {
+    for (const command of ["configureGroq", "clearGroq", "testGroq", "getGroqModelCatalog", "updateGroqModels"]) {
+      expect(command in api).toBe(false);
+    }
+  });
+
   it("fetches grouped app discovery from the authenticated apps endpoint", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response("[]", { status: 200 }));
     vi.stubGlobal("fetch", fetch);

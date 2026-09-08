@@ -2,13 +2,10 @@ use crate::{
     audio, hotkeys,
     models::{
         AppSettings, AppSnapshot, AudioOutputDevice, CaptureMode, CaptureSource, GlossaryTerm,
-        GroqModelOption, HotkeySettings, OverlayPresentation, OverlaySettings, StreamKind,
-        VadSettings,
+        HotkeySettings, OverlayPresentation, OverlaySettings, StreamKind, VadSettings,
     },
     pipeline, processes,
-    settings::{clear_groq_key, groq_model_catalog, set_groq_key},
     state::AppState,
-    translator::Translator,
     web_companion::{WebCommand, WebCompanionInfo, WebCompanionManager},
 };
 use anyhow::Context;
@@ -50,7 +47,7 @@ async fn apply_listening_state(app: AppHandle, enabled: bool) -> CommandResult<b
 
 fn reattach_if_listening(app: &AppHandle, state: &AppState) -> CommandResult<()> {
     if runtime_is_listening(state) {
-        state.groq_stt.reset_stream(StreamKind::Incoming);
+        state.ai_stt.reset_stream(StreamKind::Incoming);
         pipeline::attach_listening_source(app).map_err(|error| error.to_string())?;
     }
     Ok(())
@@ -90,21 +87,10 @@ pub async fn dispatch_web_command(
         }
         WebCommand::ProbeRecentAudio => {
             state
-                .groq_stt
+                .ai_stt
                 .probe_recent_audio(app.clone())
                 .map_err(|error| error.to_string())?;
             serde_json::Value::Null
-        }
-        WebCommand::UpdateGroqModels {
-            incoming_stt_model,
-            microphone_stt_model,
-            translation_model,
-        } => {
-            let settings = state
-                .settings
-                .update_groq_models(incoming_stt_model, microphone_stt_model, translation_model)
-                .map_err(|error| error.to_string())?;
-            serde_json::to_value(settings).map_err(|error| error.to_string())?
         }
         WebCommand::UpdateHotkeys { hotkeys: next } => {
             let old = state.settings.snapshot().hotkeys;
@@ -348,88 +334,8 @@ pub async fn set_listening(app: AppHandle, enabled: bool) -> CommandResult<bool>
 #[tauri::command]
 pub fn probe_recent_audio(app: AppHandle, state: State<'_, AppState>) -> CommandResult<()> {
     state
-        .groq_stt
+        .ai_stt
         .probe_recent_audio(app)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn configure_groq(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    key: String,
-) -> CommandResult<AppSettings> {
-    set_groq_key(&key).map_err(|error| error.to_string())?;
-    let settings = state
-        .settings
-        .update(|settings| {
-            settings.groq.configured = true;
-            Ok(())
-        })
-        .map_err(|error| error.to_string())?;
-    let runtime = state.update_runtime(|runtime| {
-        runtime.groq_status = "Groq พร้อมใช้งาน".into();
-        runtime.last_error = None;
-    });
-    let _ = app.emit("runtime-state", runtime);
-    Ok(settings)
-}
-
-#[tauri::command]
-pub fn clear_groq_credentials(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> CommandResult<AppSettings> {
-    clear_groq_key().map_err(|error| error.to_string())?;
-    state.groq_stt.reset_stream(StreamKind::Incoming);
-    state.groq_stt.reset_stream(StreamKind::Microphone);
-    let settings = state
-        .settings
-        .update(|settings| {
-            settings.groq.configured = false;
-            Ok(())
-        })
-        .map_err(|error| error.to_string())?;
-    let runtime = state.update_runtime(|runtime| {
-        runtime.groq_stt_busy = false;
-        runtime.groq_status = "ยังไม่ได้ตั้งค่า Groq".into();
-    });
-    let _ = app.emit("runtime-state", runtime);
-    Ok(settings)
-}
-
-#[tauri::command]
-pub async fn test_groq_configuration(state: State<'_, AppState>) -> CommandResult<String> {
-    let result = state
-        .translator
-        .translate(
-            &state.settings,
-            "groq-test",
-            "Enemy on the left",
-            "en",
-            "th",
-        )
-        .await;
-    result
-        .translated_text
-        .ok_or_else(|| result.message.unwrap_or_else(|| "Groq test ล้มเหลว".into()))
-}
-
-#[tauri::command]
-pub fn get_groq_model_catalog() -> Vec<GroqModelOption> {
-    groq_model_catalog()
-}
-
-#[tauri::command]
-pub fn update_groq_models(
-    state: State<'_, AppState>,
-    incoming_stt_model: String,
-    microphone_stt_model: String,
-    translation_model: String,
-) -> CommandResult<AppSettings> {
-    state
-        .settings
-        .update_groq_models(incoming_stt_model, microphone_stt_model, translation_model)
         .map_err(|error| error.to_string())
 }
 
@@ -470,7 +376,7 @@ fn update_vad_inner(
         .settings
         .update_vad(vad)
         .map_err(|error| error.to_string())?;
-    state.groq_stt.configure_incoming_buffer(
+    state.ai_stt.configure_incoming_buffer(
         settings.vad.pre_roll_ms,
         settings.vad.silence_ms,
         settings.vad.max_utterance_ms,

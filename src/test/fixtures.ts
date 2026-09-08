@@ -3,7 +3,7 @@ import type { AppSnapshot } from "../types";
 export function snapshotFixture(now = Date.now()): AppSnapshot {
   return {
     settings: {
-      schemaVersion: 13,
+      schemaVersion: 14,
       listeningSource: {
         executablePath: "C:\\Games\\MistfallHunter-Win64-Shipping.exe",
         executableName: "MistfallHunter-Win64-Shipping.exe",
@@ -35,19 +35,7 @@ export function snapshotFixture(now = Date.now()): AppSnapshot {
         preRollMs: 200,
         maxUtteranceMs: 12000,
       },
-      groq: {
-        configured: true,
-        incomingSttModel: "whisper-large-v3",
-        microphoneSttModel: "whisper-large-v3-turbo",
-        translationModel: "openai/gpt-oss-20b",
-        monthlyBudgetMicrousd: 2_000_000,
-        usageMonth: "2026-08",
-        actualAudioMillis: 60_000,
-        billedAudioMillis: 70_000,
-        promptTokens: 120,
-        completionTokens: 40,
-        estimatedSpendMicrousd: 5_000,
-      },
+      installationId: "00000000-0000-4000-8000-000000000001",
       glossary: [{ source: "Mistfall", target: "Mistfall" }],
     },
     runtime: {
@@ -56,9 +44,9 @@ export function snapshotFixture(now = Date.now()): AppSnapshot {
       overlayEditMode: false,
       workerReady: true,
       workerModel: "silero-vad",
-      groqSttBusy: false,
-      groqStatus: "Groq พร้อมใช้งาน",
-      budgetExhausted: false,
+      aiSttBusy: false,
+      aiStatus: "บริการ AI พร้อมใช้งาน",
+      aiService: { state: "ready", message: "บริการ AI พร้อมใช้งาน", incomingModel: "whisper-large-v3", microphoneModel: "whisper-large-v3-turbo", translationModel: "server-configured-model", retryAfterMs: null },
       attachedSource: {
         pid: 4242,
         name: "MistfallHunter-Win64-Shipping.exe",

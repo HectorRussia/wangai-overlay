@@ -1,32 +1,14 @@
-use std::{
-    fs,
-    path::PathBuf,
-    sync::{Mutex, RwLock},
-    time::{Duration, Instant},
-};
+use std::{fs, path::PathBuf, sync::RwLock};
 
 use anyhow::{anyhow, Context, Result};
 
 use crate::models::{
-    AppSettings, CaptureMode, GroqModelKind, GroqModelOption, HotkeySettings, OverlaySettings,
-    VadProfile, VadSettings,
+    AppSettings, CaptureMode, HotkeySettings, OverlaySettings, VadProfile, VadSettings,
 };
-
-const KEYRING_SERVICE: &str = "GameLingo";
-const GROQ_KEYRING_USER: &str = "groq-api-key";
-const MONTHLY_BUDGET_MICROUSD: u64 = 2_000_000;
-const MINIMUM_BILLED_AUDIO_MS: u64 = 10_000;
-
-pub const STT_TURBO_MODEL: &str = "whisper-large-v3-turbo";
-pub const STT_ACCURATE_MODEL: &str = "whisper-large-v3";
-pub const TRANSLATION_FAST_MODEL: &str = "openai/gpt-oss-20b";
-pub const TRANSLATION_ACCURATE_MODEL: &str = "openai/gpt-oss-120b";
 
 pub struct SettingsManager {
     path: PathBuf,
     inner: RwLock<AppSettings>,
-    pending_microusd: Mutex<u64>,
-    last_usage_save: Mutex<Instant>,
 }
 
 impl SettingsManager {
@@ -36,6 +18,17 @@ impl SettingsManager {
                 .with_context(|| format!("อ่าน settings ไม่ได้: {}", path.display()))?;
             let mut value = serde_json::from_str::<serde_json::Value>(&data)
                 .with_context(|| format!("settings ไม่ถูกต้อง: {}", path.display()))?;
+            if value
+                .get("schemaVersion")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0)
+                < 14
+            {
+                let backup = path.with_extension("pre-v14.json");
+                if !backup.exists() {
+                    fs::copy(&path, &backup).context("สำรอง settings ก่อน migration ไม่สำเร็จ")?;
+                }
+            }
             migrate_serialized_settings(&mut value);
             serde_json::from_value::<AppSettings>(value)
                 .with_context(|| format!("settings ไม่ถูกต้อง: {}", path.display()))?
@@ -43,15 +36,11 @@ impl SettingsManager {
             AppSettings::default()
         };
 
-        reset_usage_month(&mut settings);
-        settings.groq.configured = groq_key().is_ok_and(|value| !value.trim().is_empty());
         normalize(&mut settings)?;
 
         let manager = Self {
             path,
             inner: RwLock::new(settings),
-            pending_microusd: Mutex::new(0),
-            last_usage_save: Mutex::new(Instant::now() - Duration::from_secs(2)),
         };
         manager.save()?;
         Ok(manager)
@@ -67,7 +56,6 @@ impl SettingsManager {
     {
         let mut guard = self.inner.write().expect("settings lock poisoned");
         let mut candidate = guard.clone();
-        reset_usage_month(&mut candidate);
         update(&mut candidate)?;
         normalize(&mut candidate)?;
         self.save_value(&candidate)?;
@@ -142,212 +130,6 @@ impl SettingsManager {
             Ok(())
         })
     }
-
-    pub fn update_groq_models(
-        &self,
-        incoming_stt_model: String,
-        microphone_stt_model: String,
-        translation_model: String,
-    ) -> Result<AppSettings> {
-        validate_stt_model(&incoming_stt_model)?;
-        validate_stt_model(&microphone_stt_model)?;
-        validate_translation_model(&translation_model)?;
-        self.update(|settings| {
-            settings.groq.incoming_stt_model = incoming_stt_model;
-            settings.groq.microphone_stt_model = microphone_stt_model;
-            settings.groq.translation_model = translation_model;
-            Ok(())
-        })
-    }
-
-    pub fn reserve_audio_request(&self, actual_millis: u64, model: &str) -> Result<AppSettings> {
-        validate_stt_model(model)?;
-        let billed_millis = actual_millis.max(MINIMUM_BILLED_AUDIO_MS);
-        let cost = audio_cost_microusd(model, billed_millis)?;
-        let mut guard = self.inner.write().expect("settings lock poisoned");
-        if reset_usage_month(&mut guard) {
-            *self.pending_microusd.lock().expect("budget lock poisoned") = 0;
-        }
-        let pending = *self.pending_microusd.lock().expect("budget lock poisoned");
-        if guard
-            .groq
-            .estimated_spend_microusd
-            .saturating_add(pending)
-            .saturating_add(cost)
-            > guard.groq.monthly_budget_microusd
-        {
-            return Err(anyhow!("ถึงงบ Groq รายเดือนแล้ว"));
-        }
-        guard.groq.actual_audio_millis =
-            guard.groq.actual_audio_millis.saturating_add(actual_millis);
-        guard.groq.billed_audio_millis =
-            guard.groq.billed_audio_millis.saturating_add(billed_millis);
-        guard.groq.estimated_spend_microusd =
-            guard.groq.estimated_spend_microusd.saturating_add(cost);
-        self.save_usage_if_due(&guard)?;
-        Ok(guard.clone())
-    }
-
-    pub fn reserve_translation(
-        &self,
-        model: &str,
-        prompt_tokens: u64,
-        completion_tokens: u64,
-    ) -> Result<u64> {
-        validate_translation_model(model)?;
-        let mut guard = self.inner.write().expect("settings lock poisoned");
-        if reset_usage_month(&mut guard) {
-            *self.pending_microusd.lock().expect("budget lock poisoned") = 0;
-        }
-        let reserve = translation_cost_microusd(model, prompt_tokens, completion_tokens)?;
-        let mut pending = self.pending_microusd.lock().expect("budget lock poisoned");
-        if guard
-            .groq
-            .estimated_spend_microusd
-            .saturating_add(*pending)
-            .saturating_add(reserve)
-            > guard.groq.monthly_budget_microusd
-        {
-            return Err(anyhow!("ถึงงบ Groq รายเดือนแล้ว"));
-        }
-        *pending = pending.saturating_add(reserve);
-        Ok(reserve)
-    }
-
-    pub fn complete_translation(
-        &self,
-        reservation_microusd: u64,
-        model: &str,
-        prompt_tokens: u64,
-        completion_tokens: u64,
-    ) -> Result<AppSettings> {
-        let actual_cost = translation_cost_microusd(model, prompt_tokens, completion_tokens)?;
-        let mut guard = self.inner.write().expect("settings lock poisoned");
-        let mut pending = self.pending_microusd.lock().expect("budget lock poisoned");
-        *pending = pending.saturating_sub(reservation_microusd);
-        guard.groq.prompt_tokens = guard.groq.prompt_tokens.saturating_add(prompt_tokens);
-        guard.groq.completion_tokens = guard
-            .groq
-            .completion_tokens
-            .saturating_add(completion_tokens);
-        guard.groq.estimated_spend_microusd = guard
-            .groq
-            .estimated_spend_microusd
-            .saturating_add(actual_cost);
-        self.save_value(&guard)?;
-        Ok(guard.clone())
-    }
-
-    pub fn cancel_translation(&self, reservation_microusd: u64) {
-        let mut pending = self.pending_microusd.lock().expect("budget lock poisoned");
-        *pending = pending.saturating_sub(reservation_microusd);
-    }
-
-    pub fn budget_exhausted(&self) -> bool {
-        let mut settings = self.inner.write().expect("settings lock poisoned");
-        if reset_usage_month(&mut settings) {
-            *self.pending_microusd.lock().expect("budget lock poisoned") = 0;
-            let _ = self.save_value(&settings);
-        }
-        let pending = *self.pending_microusd.lock().expect("budget lock poisoned");
-        settings
-            .groq
-            .estimated_spend_microusd
-            .saturating_add(pending)
-            >= settings.groq.monthly_budget_microusd
-    }
-
-    fn save_usage_if_due(&self, settings: &AppSettings) -> Result<()> {
-        let mut last_save = self
-            .last_usage_save
-            .lock()
-            .expect("usage save lock poisoned");
-        if last_save.elapsed() >= Duration::from_secs(1) {
-            self.save_value(settings)?;
-            *last_save = Instant::now();
-        }
-        Ok(())
-    }
-}
-
-pub fn set_groq_key(key: &str) -> Result<()> {
-    if key.trim().is_empty() {
-        return Err(anyhow!("Groq API key ว่าง"));
-    }
-    let entry = keyring::Entry::new(KEYRING_SERVICE, GROQ_KEYRING_USER)?;
-    entry
-        .set_password(key.trim())
-        .context("บันทึก Groq API key ใน Windows Credential Manager ไม่สำเร็จ")
-}
-
-pub fn groq_key() -> Result<String> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, GROQ_KEYRING_USER)?;
-    entry.get_password().context("ยังไม่ได้ตั้ง Groq API key")
-}
-
-pub fn clear_groq_key() -> Result<()> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, GROQ_KEYRING_USER)?;
-    match entry.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(error.into()),
-    }
-}
-
-pub fn groq_model_catalog() -> Vec<GroqModelOption> {
-    vec![
-        GroqModelOption {
-            id: STT_TURBO_MODEL.into(),
-            label: "Whisper Large V3 Turbo".into(),
-            description: "เร็วและประหยัด เหมาะกับการเล่นเกม".into(),
-            kind: GroqModelKind::SpeechToText,
-            input_microusd_per_million: 0,
-            output_microusd_per_million: 0,
-            audio_microusd_per_hour: 40_000,
-        },
-        GroqModelOption {
-            id: STT_ACCURATE_MODEL.into(),
-            label: "Whisper Large V3".into(),
-            description: "แม่นกว่าเมื่อมีสำเนียงหรือเสียงเกมรบกวน".into(),
-            kind: GroqModelKind::SpeechToText,
-            input_microusd_per_million: 0,
-            output_microusd_per_million: 0,
-            audio_microusd_per_hour: 111_000,
-        },
-        GroqModelOption {
-            id: TRANSLATION_FAST_MODEL.into(),
-            label: "GPT-OSS 20B".into(),
-            description: "เร็วและประหยัดสำหรับคำแปลสั้นในเกม".into(),
-            kind: GroqModelKind::Translation,
-            input_microusd_per_million: 75_000,
-            output_microusd_per_million: 300_000,
-            audio_microusd_per_hour: 0,
-        },
-        GroqModelOption {
-            id: TRANSLATION_ACCURATE_MODEL.into(),
-            label: "GPT-OSS 120B".into(),
-            description: "เน้นคุณภาพภาษาไทยและบริบทที่ซับซ้อน".into(),
-            kind: GroqModelKind::Translation,
-            input_microusd_per_million: 150_000,
-            output_microusd_per_million: 600_000,
-            audio_microusd_per_hour: 0,
-        },
-    ]
-}
-
-pub fn validate_stt_model(model: &str) -> Result<()> {
-    if matches!(model, STT_TURBO_MODEL | STT_ACCURATE_MODEL) {
-        Ok(())
-    } else {
-        Err(anyhow!("ไม่รองรับ Groq STT model: {model}"))
-    }
-}
-
-pub fn validate_translation_model(model: &str) -> Result<()> {
-    if matches!(model, TRANSLATION_FAST_MODEL | TRANSLATION_ACCURATE_MODEL) {
-        Ok(())
-    } else {
-        Err(anyhow!("ไม่รองรับ Groq translation model: {model}"))
-    }
 }
 
 fn normalize(settings: &mut AppSettings) -> Result<()> {
@@ -365,7 +147,10 @@ fn normalize(settings: &mut AppSettings) -> Result<()> {
     if settings.schema_version < 10 && settings.overlay.max_items == 3 {
         settings.overlay.max_items = 4;
     }
-    settings.schema_version = 13;
+    settings.schema_version = 14;
+    if uuid::Uuid::parse_str(&settings.installation_id).is_err() {
+        settings.installation_id = uuid::Uuid::new_v4().to_string();
+    }
     settings.overlay.opacity = settings.overlay.opacity.clamp(0.2, 1.0);
     settings.overlay.font_scale = settings.overlay.font_scale.clamp(0.7, 1.8);
     settings.overlay.fade_seconds = settings.overlay.fade_seconds.clamp(2, 30);
@@ -382,10 +167,6 @@ fn normalize(settings: &mut AppSettings) -> Result<()> {
     settings.vad.silence_ms = settings.vad.silence_ms.clamp(250, 2_000);
     settings.vad.pre_roll_ms = settings.vad.pre_roll_ms.clamp(0, 1_000);
     settings.vad.max_utterance_ms = settings.vad.max_utterance_ms.clamp(3_000, 30_000);
-    settings.groq.monthly_budget_microusd = MONTHLY_BUDGET_MICROUSD;
-    validate_stt_model(&settings.groq.incoming_stt_model)?;
-    validate_stt_model(&settings.groq.microphone_stt_model)?;
-    validate_translation_model(&settings.groq.translation_model)?;
     settings
         .glossary
         .retain(|term| !term.source.trim().is_empty());
@@ -540,67 +321,6 @@ fn migrate_serialized_settings(value: &mut serde_json::Value) {
             }
         }
     }
-
-    if let Some(groq) = value
-        .get_mut("groq")
-        .and_then(serde_json::Value::as_object_mut)
-    {
-        let incoming = groq
-            .get("gameSttModel")
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!(STT_ACCURATE_MODEL));
-        groq.insert("incomingSttModel".into(), incoming);
-    }
-}
-
-fn reset_usage_month(settings: &mut AppSettings) -> bool {
-    let month = chrono::Local::now().format("%Y-%m").to_string();
-    if settings.groq.usage_month != month {
-        settings.groq.usage_month = month;
-        settings.groq.actual_audio_millis = 0;
-        settings.groq.billed_audio_millis = 0;
-        settings.groq.prompt_tokens = 0;
-        settings.groq.completion_tokens = 0;
-        settings.groq.estimated_spend_microusd = 0;
-        true
-    } else {
-        false
-    }
-}
-
-pub fn audio_cost_microusd(model: &str, billed_millis: u64) -> Result<u64> {
-    let rate = match model {
-        STT_TURBO_MODEL => 40_000_u64,
-        STT_ACCURATE_MODEL => 111_000_u64,
-        _ => return Err(anyhow!("ไม่รองรับ Groq STT model: {model}")),
-    };
-    Ok(div_ceil(billed_millis as u128 * rate as u128, 3_600_000))
-}
-
-pub fn translation_cost_microusd(
-    model: &str,
-    prompt_tokens: u64,
-    completion_tokens: u64,
-) -> Result<u64> {
-    let (input_rate, output_rate) = match model {
-        TRANSLATION_FAST_MODEL => (75_000_u64, 300_000_u64),
-        TRANSLATION_ACCURATE_MODEL => (150_000_u64, 600_000_u64),
-        _ => return Err(anyhow!("ไม่รองรับ Groq translation model: {model}")),
-    };
-    Ok(
-        div_ceil(prompt_tokens as u128 * input_rate as u128, 1_000_000).saturating_add(div_ceil(
-            completion_tokens as u128 * output_rate as u128,
-            1_000_000,
-        )),
-    )
-}
-
-fn div_ceil(numerator: u128, denominator: u128) -> u64 {
-    numerator
-        .saturating_add(denominator - 1)
-        .checked_div(denominator)
-        .unwrap_or(0)
-        .min(u64::MAX as u128) as u64
 }
 
 #[cfg(test)]
@@ -693,42 +413,8 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.schema_version, 14);
         assert!(!migrated.auto_attach);
-        assert_eq!(migrated.groq.incoming_stt_model, STT_ACCURATE_MODEL);
-        assert_eq!(migrated.groq.microphone_stt_model, STT_TURBO_MODEL);
-        assert_eq!(migrated.groq.translation_model, TRANSLATION_FAST_MODEL);
-        assert_eq!(migrated.groq.estimated_spend_microusd, 0);
-    }
-
-    #[test]
-    fn migrates_v4_shared_stt_model_to_stream_defaults_and_keeps_usage() {
-        let temp = tempfile::tempdir().expect("tempdir");
-        let path = temp.path().join("settings.json");
-        let mut value = serde_json::to_value(AppSettings::default()).expect("serialize");
-        let object = value.as_object_mut().expect("object");
-        object.insert("schemaVersion".into(), 4.into());
-        let groq = object
-            .get_mut("groq")
-            .and_then(serde_json::Value::as_object_mut)
-            .expect("groq");
-        groq.remove("gameSttModel");
-        groq.remove("microphoneSttModel");
-        groq.insert("sttModel".into(), STT_TURBO_MODEL.into());
-        groq.insert("translationModel".into(), TRANSLATION_ACCURATE_MODEL.into());
-        groq.insert("actualAudioMillis".into(), 12_345.into());
-        groq.insert("billedAudioMillis".into(), 20_000.into());
-        groq.insert("estimatedSpendMicrousd".into(), 42_000.into());
-        fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
-
-        let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
-        assert_eq!(migrated.groq.incoming_stt_model, STT_ACCURATE_MODEL);
-        assert_eq!(migrated.groq.microphone_stt_model, STT_TURBO_MODEL);
-        assert_eq!(migrated.groq.translation_model, TRANSLATION_ACCURATE_MODEL);
-        assert_eq!(migrated.groq.actual_audio_millis, 12_345);
-        assert_eq!(migrated.groq.billed_audio_millis, 20_000);
-        assert_eq!(migrated.groq.estimated_spend_microusd, 42_000);
     }
 
     #[test]
@@ -748,7 +434,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.schema_version, 14);
         assert_eq!(migrated.capture_mode, CaptureMode::ProcessTree);
         assert_eq!(migrated.vad.process_tree.gain_db, 0.0);
         assert_eq!(migrated.vad.process_tree.vad_threshold, 0.2);
@@ -774,7 +460,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.schema_version, 14);
         assert_eq!(migrated.vad.process_tree.vad_threshold, 0.42);
         assert_eq!(migrated.vad.process_tree.gain_db, 4.0);
         assert_eq!(migrated.vad.system_output.vad_threshold, 0.35);
@@ -809,7 +495,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.schema_version, 14);
         assert_eq!(migrated.output_device_id, None);
     }
 
@@ -837,7 +523,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let manager = SettingsManager::load(path.clone()).expect("migrate");
-        assert_eq!(manager.snapshot().schema_version, 13);
+        assert_eq!(manager.snapshot().schema_version, 14);
         assert!(!manager.snapshot().rescue_scan_enabled);
         manager.update_rescue_scan(true).expect("enable cloud scan");
 
@@ -860,7 +546,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.schema_version, 14);
         assert_eq!(migrated.overlay.width, 420);
         assert_eq!(migrated.overlay.height, 236);
         assert_eq!(migrated.overlay.x, Some(320));
@@ -882,7 +568,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.schema_version, 14);
         assert_eq!(migrated.overlay.max_items, 4);
     }
 
@@ -906,7 +592,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.schema_version, 14);
         assert_eq!(migrated.capture_mode, CaptureMode::ProcessTree);
         assert_eq!(
             migrated.listening_source.unwrap().display_name,
@@ -939,7 +625,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.schema_version, 14);
         assert_eq!(
             migrated.listening_source.unwrap().display_name,
             "Google Chrome"
@@ -949,100 +635,41 @@ mod tests {
     }
 
     #[test]
-    fn minimum_audio_billing_is_ten_seconds() {
-        let temp = tempfile::tempdir().expect("tempdir");
-        let manager = SettingsManager::load(temp.path().join("settings.json")).expect("load");
-        let settings = manager
-            .reserve_audio_request(1, STT_TURBO_MODEL)
-            .expect("reserve");
-        assert_eq!(settings.groq.actual_audio_millis, 1);
-        assert_eq!(settings.groq.billed_audio_millis, 10_000);
-        assert_eq!(
-            settings.groq.estimated_spend_microusd,
-            audio_cost_microusd(STT_TURBO_MODEL, 10_000).unwrap()
-        );
-    }
-
-    #[test]
-    fn pricing_changes_with_selected_models() {
-        assert_eq!(
-            audio_cost_microusd(STT_TURBO_MODEL, 3_600_000).unwrap(),
-            40_000
-        );
-        assert_eq!(
-            audio_cost_microusd(STT_ACCURATE_MODEL, 3_600_000).unwrap(),
-            111_000
-        );
-        assert_eq!(
-            translation_cost_microusd(TRANSLATION_FAST_MODEL, 1_000_000, 1_000_000).unwrap(),
-            375_000
-        );
-        assert_eq!(
-            translation_cost_microusd(TRANSLATION_ACCURATE_MODEL, 1_000_000, 1_000_000).unwrap(),
-            750_000
-        );
-    }
-
-    #[test]
-    fn rejects_unknown_models() {
-        let temp = tempfile::tempdir().expect("tempdir");
-        let manager = SettingsManager::load(temp.path().join("settings.json")).expect("load");
-        assert!(manager
-            .update_groq_models(
-                "custom-whisper".into(),
-                STT_TURBO_MODEL.into(),
-                TRANSLATION_FAST_MODEL.into(),
-            )
-            .is_err());
-    }
-
-    #[test]
-    fn model_price_changes_the_budget_decision() {
-        let temp = tempfile::tempdir().expect("tempdir");
-        let turbo = SettingsManager::load(temp.path().join("turbo.json")).expect("load");
-        turbo
-            .update(|settings| {
-                settings.groq.estimated_spend_microusd = 1_999_800;
-                Ok(())
-            })
-            .unwrap();
-        assert!(turbo.reserve_audio_request(1_000, STT_TURBO_MODEL).is_ok());
-
-        let accurate = SettingsManager::load(temp.path().join("accurate.json")).expect("load");
-        accurate
-            .update(|settings| {
-                settings.groq.estimated_spend_microusd = 1_999_800;
-                Ok(())
-            })
-            .unwrap();
-        assert!(accurate
-            .reserve_audio_request(1_000, STT_ACCURATE_MODEL)
-            .is_err());
-    }
-
-    #[test]
-    fn resets_groq_usage_when_month_changes() {
-        let temp = tempfile::tempdir().expect("tempdir");
+    fn v14_migration_backs_up_legacy_usage_and_never_needs_a_key() {
+        let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("settings.json");
-        let mut settings = AppSettings::default();
-        settings.groq.usage_month = "2000-01".into();
-        settings.groq.actual_audio_millis = 12_345;
-        settings.groq.billed_audio_millis = 20_000;
-        settings.groq.prompt_tokens = 100;
-        settings.groq.completion_tokens = 40;
-        settings.groq.estimated_spend_microusd = 999;
-        fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
-
-        let reset = SettingsManager::load(path).expect("load").snapshot();
+        let mut old = serde_json::to_value(AppSettings::default()).unwrap();
+        old["schemaVersion"] = 13.into();
+        old.as_object_mut().unwrap().remove("installationId");
+        old["groq"] = serde_json::json!({"configured":false,"estimatedSpendMicrousd":999999999,
+            "monthlyBudgetMicrousd":2000000,"translationModel":"removed-provider-model"});
+        old["listeningSource"] = serde_json::json!({"executablePath":"C:\\discord.exe",
+            "executableName":"discord.exe","displayName":"Discord","lastPid":321});
+        let original = serde_json::to_vec(&old).unwrap();
+        fs::write(&path, &original).unwrap();
+        let snapshot = SettingsManager::load(path.clone()).unwrap().snapshot();
+        assert_eq!(snapshot.schema_version, 14);
         assert_eq!(
-            reset.groq.usage_month,
-            chrono::Local::now().format("%Y-%m").to_string()
+            snapshot.listening_source.as_ref().unwrap().display_name,
+            "Discord"
         );
-        assert_eq!(reset.groq.actual_audio_millis, 0);
-        assert_eq!(reset.groq.billed_audio_millis, 0);
-        assert_eq!(reset.groq.prompt_tokens, 0);
-        assert_eq!(reset.groq.completion_tokens, 0);
-        assert_eq!(reset.groq.estimated_spend_microusd, 0);
+        assert_eq!(snapshot.hotkeys, AppSettings::default().hotkeys);
+        assert_eq!(snapshot.glossary, AppSettings::default().glossary);
+        assert_eq!(
+            fs::read(path.with_extension("pre-v14.json")).unwrap(),
+            original
+        );
+        assert!(uuid::Uuid::parse_str(&snapshot.installation_id).is_ok());
+        let reloaded = SettingsManager::load(path.clone()).unwrap().snapshot();
+        assert_eq!(snapshot.installation_id, reloaded.installation_id);
+        assert!(serde_json::to_value(reloaded)
+            .unwrap()
+            .get("groq")
+            .is_none());
+        assert_eq!(
+            fs::read(path.with_extension("pre-v14.json")).unwrap(),
+            original
+        );
     }
 
     #[test]

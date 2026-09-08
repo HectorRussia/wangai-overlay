@@ -2,6 +2,7 @@ mod app_metadata;
 mod audio;
 mod cloud_stt;
 mod commands;
+mod gateway;
 mod hotkeys;
 mod models;
 mod pipeline;
@@ -49,6 +50,16 @@ pub fn run() {
                 worker::emit_status(app.handle(), "error", &error.to_string(), None);
             }
             pipeline::start_auto_attach_monitor(app.handle().clone());
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    let state = handle.state::<AppState>();
+                    state.gateway.refresh_status().await;
+                    let runtime = state.update_runtime(|_| {});
+                    let _ = tauri::Emitter::emit(&handle, "runtime-state", runtime);
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                }
+            });
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -88,11 +99,6 @@ pub fn run() {
             commands::toggle_listening,
             commands::set_listening,
             commands::probe_recent_audio,
-            commands::configure_groq,
-            commands::clear_groq_credentials,
-            commands::test_groq_configuration,
-            commands::get_groq_model_catalog,
-            commands::update_groq_models,
             commands::update_hotkeys,
             commands::update_overlay_settings,
             commands::update_vad_settings,
@@ -113,8 +119,8 @@ pub fn run() {
             let state = app.state::<AppState>();
             app.state::<web_companion::WebCompanionManager>().shutdown();
             state.audio.stop_all();
-            state.groq_stt.reset_stream(models::StreamKind::Incoming);
-            state.groq_stt.reset_stream(models::StreamKind::Microphone);
+            state.ai_stt.reset_stream(models::StreamKind::Incoming);
+            state.ai_stt.reset_stream(models::StreamKind::Microphone);
             let _ = state.settings.save();
             state.worker.stop();
         }

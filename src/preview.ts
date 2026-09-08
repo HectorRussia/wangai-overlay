@@ -39,7 +39,7 @@ export function previewSnapshot(): AppSnapshot {
   const state = new URLSearchParams(window.location.search).get("state");
   const snapshot: AppSnapshot = {
     settings: {
-      schemaVersion: 13,
+      schemaVersion: 14,
       listeningSource: { executablePath: previewProcesses[0].executablePath, executableName: previewProcesses[0].name, displayName: previewProcesses[0].displayName, lastPid: previewProcesses[0].pid },
       captureMode: "process_tree",
       outputDeviceId: "Speakers (PRO)",
@@ -48,11 +48,11 @@ export function previewSnapshot(): AppSnapshot {
       hotkeys: { toggleListening: "F8", pushToTalk: "F9", copyLatest: "F10", editOverlay: "F7" },
       overlay: { opacity: 0.94, fontScale: 1, fadeSeconds: 30, maxItems: 4, width: 420, height: 236 },
       vad: { processTree: { vadThreshold: 0.5, gainDb: 0 }, systemOutput: { vadThreshold: 0.35, gainDb: 9 }, silenceMs: 500, preRollMs: 200, maxUtteranceMs: 12_000 },
-      groq: { configured: true, incomingSttModel: "whisper-large-v3", microphoneSttModel: "whisper-large-v3-turbo", translationModel: "openai/gpt-oss-20b", monthlyBudgetMicrousd: 2_000_000, usageMonth: "2026-09", actualAudioMillis: 228_000, billedAudioMillis: 240_000, promptTokens: 1_240, completionTokens: 460, estimatedSpendMicrousd: 15_600 },
+      installationId: "00000000-0000-4000-8000-000000000002",
       glossary: [{ source: "north gate", target: "ประตูเหนือ" }],
     },
     runtime: {
-      listening: true, microphoneActive: false, overlayEditMode: false, workerReady: true, workerModel: "silero-vad", groqSttBusy: false, groqStatus: "Groq พร้อมใช้งาน", budgetExhausted: false,
+      listening: true, microphoneActive: false, overlayEditMode: false, workerReady: true, workerModel: "silero-vad", aiSttBusy: false, aiStatus: "บริการ AI พร้อมใช้งาน", aiService: { state: "ready", message: "บริการ AI พร้อมใช้งาน", incomingModel: "whisper-large-v3", microphoneModel: "whisper-large-v3-turbo", translationModel: "server-configured-model", retryAfterMs: null },
       attachedSource: previewProcesses[0], effectiveCapturePid: 4100, effectiveCaptureName: "MistfallHunter.exe", effectiveOutputDeviceIsDefault: false,
       audioRmsDbfs: -31.5, audioPeakDbfs: -12.2, audioLastSeenAtMs: now, vadActive: false,
       effectiveVadThreshold: 0.5, effectiveVadGainDb: 0, effectiveVadAutoGainDb: 0, droppedAudioChunks: 0,
@@ -66,7 +66,7 @@ export function previewSnapshot(): AppSnapshot {
   if (state === "ready") { snapshot.runtime.listening = false; snapshot.runtime.statusMessage = "พร้อมเริ่มฟัง"; }
   if (state === "idle") { snapshot.runtime.listening = false; snapshot.runtime.attachedSource = undefined; snapshot.runtime.audioRmsDbfs = null; snapshot.runtime.audioPeakDbfs = null; snapshot.runtime.audioLastSeenAtMs = null; snapshot.history = []; }
   if (state === "warning") { snapshot.runtime.captureWarning = "ยังไม่ได้รับ audio frame จากแอปที่เลือก"; snapshot.runtime.audioPeakDbfs = null; }
-  if (state === "setup") { snapshot.settings.listeningSource = undefined; snapshot.settings.groq.configured = false; snapshot.runtime.listening = false; snapshot.runtime.attachedSource = undefined; snapshot.runtime.audioPeakDbfs = null; snapshot.history = []; }
+  if (state === "setup") { snapshot.settings.listeningSource = undefined; snapshot.runtime.aiService = { ...snapshot.runtime.aiService, state: "offline", message: "เชื่อมต่อบริการ AI ไม่สำเร็จ" }; snapshot.runtime.listening = false; snapshot.runtime.attachedSource = undefined; snapshot.runtime.audioPeakDbfs = null; snapshot.history = []; }
   if (state === "long-text") {
     const name = "LongApplicationNameWithoutSpaces".repeat(8);
     snapshot.settings.listeningSource!.displayName = name;

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { previewSnapshot, previewNotification, previewListeningBusy } from "./preview";
 
-describe("v13 preview fixtures", () => {
+describe("v14 preview fixtures", () => {
   beforeEach(() => window.history.replaceState(null, "", "/?preview=1&state=ready"));
   it("contains one manually selected source", () => {
     const snapshot = previewSnapshot();
-    expect(snapshot.settings.schemaVersion).toBe(13);
+    expect(snapshot.settings.schemaVersion).toBe(14);
     expect(snapshot.settings.listeningSource?.displayName).toBe("Mistfall Hunter");
     expect(snapshot.history[0].stream).toBe("incoming");
   });

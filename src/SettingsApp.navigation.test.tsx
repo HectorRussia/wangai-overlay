@@ -13,7 +13,6 @@ vi.mock("./api", () => ({
   api: {
     listRunningApps: vi.fn().mockResolvedValue([]),
     listOutputDevices: vi.fn().mockResolvedValue([]),
-    getGroqModelCatalog: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -65,8 +64,11 @@ describe("settings with nullable desktop audio diagnostics", () => {
     const stop = screen.getByRole("button", { name: /หยุดฟัง · F8/ });
     expect(stop).not.toContainElement(screen.getByRole("status"));
     view.rerender(<SettingsApp activeTab="advanced" advancedSection="ai" />);
-    expect(screen.getByRole("status")).toHaveTextContent("เริ่มฟังแล้ว");
-    expect(screen.getByLabelText("Groq API key")).toBeInTheDocument();
+    expect(screen.getByText("เริ่มฟังแล้ว")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "สถานะบริการ AI" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Groq API key")).not.toBeInTheDocument();
+    expect(screen.getByText("ใช้บริการกลาง ไม่ต้องใส่ API key หรือเลือกโมเดลเอง")).toBeInTheDocument();
+    expect(screen.getByText("server-configured-model")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "AI & Terms" })).toHaveAttribute("aria-current", "page");
   });
 });

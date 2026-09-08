@@ -8,12 +8,13 @@ use anyhow::Result;
 
 use crate::{
     audio::AudioManager,
-    cloud_stt::GroqSttManager,
+    cloud_stt::AiSttManager,
+    gateway::GatewayClient,
     models::{
         AppSnapshot, RuntimeState, StreamKind, SubtitleItem, TranscriptEvent, TranslationResult,
     },
     settings::SettingsManager,
-    translator::GroqTranslator,
+    translator::GatewayTranslator,
     worker::WorkerManager,
 };
 
@@ -25,8 +26,9 @@ pub struct AppState {
     pub partial: RwLock<Option<TranscriptEvent>>,
     pub audio: AudioManager,
     pub worker: WorkerManager,
-    pub groq_stt: GroqSttManager,
-    pub translator: GroqTranslator,
+    pub ai_stt: AiSttManager,
+    pub translator: GatewayTranslator,
+    pub gateway: GatewayClient,
 }
 
 impl AppState {
@@ -35,14 +37,10 @@ impl AppState {
         let snapshot = settings.snapshot();
         let vad = snapshot.vad.clone();
         let mut runtime = RuntimeState::default();
-        if snapshot.groq.configured {
-            runtime.groq_status = "Groq พร้อมใช้งาน".into();
-        }
+        let gateway = GatewayClient::new(snapshot.installation_id.clone())?;
         let active_profile = snapshot.vad.active_profile(snapshot.capture_mode);
         runtime.effective_vad_threshold = active_profile.vad_threshold;
         runtime.effective_vad_gain_db = active_profile.gain_db;
-        runtime.budget_exhausted =
-            snapshot.groq.estimated_spend_microusd >= snapshot.groq.monthly_budget_microusd;
         Ok(Self {
             overlay_collapsed: AtomicBool::new(true),
             settings,
@@ -51,15 +49,20 @@ impl AppState {
             partial: RwLock::new(None),
             audio: AudioManager::default(),
             worker: WorkerManager::default(),
-            groq_stt: GroqSttManager::new(vad.pre_roll_ms, vad.silence_ms, vad.max_utterance_ms),
-            translator: GroqTranslator::default(),
+            ai_stt: AiSttManager::new(vad.pre_roll_ms, vad.silence_ms, vad.max_utterance_ms),
+            translator: GatewayTranslator(gateway.clone()),
+            gateway,
         })
     }
 
     pub fn snapshot(&self) -> AppSnapshot {
         AppSnapshot {
             settings: self.settings.snapshot(),
-            runtime: self.runtime.read().expect("runtime lock poisoned").clone(),
+            runtime: {
+                let mut runtime = self.runtime.read().expect("runtime lock poisoned").clone();
+                runtime.ai_service = self.gateway.status();
+                runtime
+            },
             history: self
                 .history
                 .read()
@@ -78,6 +81,7 @@ impl AppState {
     {
         let mut runtime = self.runtime.write().expect("runtime lock poisoned");
         update(&mut runtime);
+        runtime.ai_service = self.gateway.status();
         runtime.clone()
     }
 
@@ -134,12 +138,62 @@ impl AppState {
             .find(|item| item.stream == StreamKind::Microphone)
             .and_then(|item| item.translated_text.clone())
     }
+
+    pub fn apply_translation_for_generation(
+        &self,
+        result: &TranslationResult,
+        stream: StreamKind,
+        generation: u64,
+    ) -> bool {
+        if self.ai_stt.generation(stream) != generation {
+            self.history
+                .write()
+                .unwrap()
+                .retain(|item| item.segment_id != result.segment_id);
+            return false;
+        }
+        self.apply_translation(result).is_some()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::{TranscriptKind, TranslationStatus};
+
+    #[test]
+    fn source_switch_discards_late_translation_but_does_not_reset_microphone() {
+        let temp = tempfile::tempdir().unwrap();
+        let state = AppState::new(temp.path().join("settings.json")).unwrap();
+        let generation = state.ai_stt.generation(StreamKind::Incoming);
+        let mic_generation = state.ai_stt.generation(StreamKind::Microphone);
+        state.add_final(&TranscriptEvent {
+            segment_id: "old".into(),
+            stream: StreamKind::Incoming,
+            source_display_name: Some("OLD APP".into()),
+            language: "en".into(),
+            text: "go".into(),
+            kind: TranscriptKind::Final,
+            started_at_ms: 0,
+            ended_at_ms: 1,
+        });
+        state.ai_stt.reset_stream(StreamKind::Incoming);
+        let result = TranslationResult {
+            segment_id: "old".into(),
+            from: "en".into(),
+            to: "th".into(),
+            source_text: "go".into(),
+            translated_text: Some("ไป".into()),
+            status: TranslationStatus::Success,
+            message: None,
+        };
+        assert!(!state.apply_translation_for_generation(&result, StreamKind::Incoming, generation));
+        assert!(state.snapshot().history.is_empty());
+        assert_eq!(
+            state.ai_stt.generation(StreamKind::Microphone),
+            mic_generation
+        );
+    }
 
     #[test]
     fn history_is_bounded_and_translation_updates_item() {

@@ -4,12 +4,9 @@ use std::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc, Mutex,
     },
-    time::Duration,
 };
 
 use anyhow::{anyhow, Context, Result};
-use async_trait::async_trait;
-use reqwest::{multipart, StatusCode};
 use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Semaphore;
@@ -18,7 +15,6 @@ use uuid::Uuid;
 use crate::{
     models::{StreamKind, TranscriptEvent, TranscriptKind},
     pipeline,
-    settings::groq_key,
     state::AppState,
 };
 
@@ -31,7 +27,6 @@ const AUTO_SCAN_WINDOW_SAMPLES: usize = SAMPLE_RATE * 8;
 const AUTO_SCAN_STEP_SAMPLES: u64 = (SAMPLE_RATE * 6) as u64;
 const RECENT_INCOMING_TEXT_LIMIT: usize = 8;
 const NEAR_SILENCE_DBFS: f32 = -60.0;
-const TRANSCRIPTIONS_ENDPOINT: &str = "https://api.groq.com/openai/v1/audio/transcriptions";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AudioSpan {
@@ -40,15 +35,14 @@ pub struct AudioSpan {
 }
 
 #[derive(Clone)]
-pub struct GroqSttManager {
+pub struct AiSttManager {
     inner: Arc<Mutex<CaptureState>>,
-    provider: GroqSpeechToText,
     incoming_queue: Arc<StreamQueue>,
     microphone_queue: Arc<StreamQueue>,
     busy_jobs: Arc<AtomicUsize>,
 }
 
-impl GroqSttManager {
+impl AiSttManager {
     pub fn new(pre_roll_ms: u64, silence_ms: u64, max_utterance_ms: u64) -> Self {
         Self {
             inner: Arc::new(Mutex::new(CaptureState::new(
@@ -56,7 +50,6 @@ impl GroqSttManager {
                 silence_ms,
                 max_utterance_ms,
             ))),
-            provider: GroqSpeechToText::default(),
             incoming_queue: Arc::new(StreamQueue::default()),
             microphone_queue: Arc::new(StreamQueue::default()),
             busy_jobs: Arc::new(AtomicUsize::new(0)),
@@ -69,7 +62,10 @@ impl GroqSttManager {
         silence_ms: u64,
         max_utterance_ms: u64,
     ) {
-        let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("บริการ AI STT capture lock poisoned");
         inner.pre_roll_samples = millis_to_samples(pre_roll_ms);
         inner.incoming_ring_capacity = incoming_ring_capacity(silence_ms, max_utterance_ms);
         let cap = inner.incoming_ring_capacity;
@@ -77,7 +73,10 @@ impl GroqSttManager {
     }
 
     pub fn ingest_audio(&self, stream: StreamKind, samples: &[f32]) -> AudioSpan {
-        let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("บริการ AI STT capture lock poisoned");
         let ring_capacity = inner.incoming_ring_capacity;
         let buffer = inner.stream_mut(stream);
         let start_sample_cursor = buffer.next_sample_cursor;
@@ -121,17 +120,14 @@ impl GroqSttManager {
         sample_cursor: u64,
     ) {
         let state = app.state::<AppState>();
-        let settings = state.settings.snapshot();
-        if !settings.groq.configured {
-            report_stt_error(&app, "ตั้งค่า Groq API key ก่อนเริ่มถอดเสียง");
-            return;
-        }
-        if state.settings.budget_exhausted() {
-            report_stt_error(&app, "ถึงงบ Groq รายเดือนแล้ว");
+        if !state.gateway.can_submit() {
             return;
         }
 
-        let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("บริการ AI STT capture lock poisoned");
         let pre_roll_samples = inner.pre_roll_samples as u64;
         let buffer = inner.stream_mut(stream);
         buffer.last_vad_activity_cursor = Some(sample_cursor);
@@ -158,7 +154,7 @@ impl GroqSttManager {
                 .saturating_sub(samples_to_millis(buffered_samples) as i64),
         });
         let runtime = state.update_runtime(|runtime| {
-            runtime.groq_status = "กำลังฟัง…".into();
+            runtime.ai_status = "กำลังฟัง…".into();
             runtime.last_error = None;
         });
         let _ = app.emit("runtime-state", runtime);
@@ -176,7 +172,10 @@ impl GroqSttManager {
         sample_cursor: u64,
     ) {
         let utterance = {
-            let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+            let mut inner = self
+                .inner
+                .lock()
+                .expect("บริการ AI STT capture lock poisoned");
             let buffer = inner.stream_mut(stream);
             buffer.last_vad_activity_cursor = Some(sample_cursor);
             let Some(active) = buffer.incoming_utterance.take() else {
@@ -219,7 +218,10 @@ impl GroqSttManager {
     }
 
     fn cancel_playback_utterance(&self, app: &AppHandle, stream: StreamKind) {
-        let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("บริการ AI STT capture lock poisoned");
         inner.stream_mut(stream).incoming_utterance = None;
         drop(inner);
         report_audio_gap(app, "audio จาก VAD ไม่ต่อเนื่อง จึงยกเลิกวลีนี้");
@@ -227,7 +229,10 @@ impl GroqSttManager {
 
     pub fn start_microphone(&self, app: &AppHandle) {
         let state = app.state::<AppState>();
-        let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("บริการ AI STT capture lock poisoned");
         let buffer = inner.stream_mut(StreamKind::Microphone);
         buffer.microphone_active = true;
         buffer.microphone_samples.clear();
@@ -235,7 +240,7 @@ impl GroqSttManager {
         buffer.microphone_segment_id = Some(Uuid::new_v4().to_string());
         buffer.microphone_started_at_ms = chrono::Utc::now().timestamp_millis();
         let runtime = state.update_runtime(|runtime| {
-            runtime.groq_status = "กำลังฟังไมค์…".into();
+            runtime.ai_status = "กำลังฟังไมค์…".into();
             runtime.last_error = None;
         });
         let _ = app.emit("runtime-state", runtime);
@@ -243,7 +248,10 @@ impl GroqSttManager {
 
     pub fn end_microphone(&self, app: AppHandle) {
         let utterance = {
-            let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+            let mut inner = self
+                .inner
+                .lock()
+                .expect("บริการ AI STT capture lock poisoned");
             let buffer = inner.stream_mut(StreamKind::Microphone);
             if !buffer.microphone_active {
                 return;
@@ -284,19 +292,18 @@ impl GroqSttManager {
     pub fn probe_recent_audio(&self, app: AppHandle) -> Result<()> {
         let stream = StreamKind::Incoming;
         let state = app.state::<AppState>();
-        let settings = state.settings.snapshot();
-        if !settings.groq.configured {
-            return Err(anyhow!("ตั้งค่า Groq API key ก่อนทดสอบเสียง"));
-        }
-        if state.settings.budget_exhausted() {
-            return Err(anyhow!("ถึงงบ Groq รายเดือนแล้ว"));
+        if !state.gateway.can_submit() {
+            return Err(anyhow!(state.gateway.status().message));
         }
         if !state.runtime.read().unwrap().listening {
             return Err(anyhow!("เริ่มฟังแหล่งเสียงก่อนทดสอบเสียงย้อนหลัง"));
         }
 
         let job = {
-            let inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+            let inner = self
+                .inner
+                .lock()
+                .expect("บริการ AI STT capture lock poisoned");
             let buffer = inner.stream(stream);
             let end_cursor = buffer.next_sample_cursor;
             let available = end_cursor.saturating_sub(buffer.ring_start_cursor) as usize;
@@ -307,7 +314,6 @@ impl GroqSttManager {
             let start_cursor = end_cursor.saturating_sub(sample_count as u64);
             let samples = slice_ring(buffer, start_cursor, end_cursor)
                 .context("อ่านเสียงย้อนหลังจาก incoming buffer ไม่สำเร็จ")?;
-            let samples = normalize_pcm16_for_probe(samples);
             SttJob {
                 stream,
                 samples: automatic_scan_samples(samples),
@@ -324,7 +330,7 @@ impl GroqSttManager {
 
         let runtime = state.update_runtime(|runtime| {
             runtime.capture_warning = None;
-            runtime.status_message = "กำลังส่งเสียง 6 วินาทีล่าสุดไปตรวจด้วย Groq".into();
+            runtime.status_message = "กำลังส่งเสียง 6 วินาทีล่าสุดไปตรวจด้วย บริการ AI".into();
         });
         let _ = app.emit("runtime-state", runtime);
         self.enqueue_job(app, job);
@@ -335,21 +341,18 @@ impl GroqSttManager {
         let stream = StreamKind::Incoming;
         let state = app.state::<AppState>();
         let settings = state.settings.snapshot();
-        let budget_exhausted = state.settings.budget_exhausted();
         let runtime = state.runtime.read().unwrap();
         let enabled = settings.rescue_scan_enabled;
-        if !enabled
-            || !settings.groq.configured
-            || budget_exhausted
-            || runtime.budget_exhausted
-            || !runtime.listening
-        {
+        if !enabled || !state.gateway.can_submit() || !runtime.listening {
             return false;
         }
         drop(runtime);
 
         let job = {
-            let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+            let mut inner = self
+                .inner
+                .lock()
+                .expect("บริการ AI STT capture lock poisoned");
             let buffer = inner.stream_mut(stream);
             if buffer.last_vad_activity_cursor.is_some_and(|cursor| {
                 buffer.next_sample_cursor.saturating_sub(cursor) < AUTO_SCAN_WINDOW_SAMPLES as u64
@@ -384,6 +387,13 @@ impl GroqSttManager {
 
     fn enqueue_job(&self, app: AppHandle, utterance: SttJob) -> bool {
         let stream = utterance.stream;
+        if !app
+            .state::<AppState>()
+            .gateway
+            .accepts_started_at(utterance.started_at_ms)
+        {
+            return false;
+        }
         let automatic_cloud_scan = utterance.automatic_cloud_scan;
 
         let queue = self.queue(stream);
@@ -391,7 +401,7 @@ impl GroqSttManager {
             if automatic_cloud_scan {
                 let _ = app.emit(
                     "pipeline-status",
-                    "ข้ามรอบ Auto Cloud Scan เพราะ Groq ยังประมวลผลรอบก่อนอยู่",
+                    "ข้ามรอบ Auto Cloud Scan เพราะ บริการ AI ยังประมวลผลรอบก่อนอยู่",
                 );
             } else {
                 report_stt_error(&app, "ระบบตามเสียงไม่ทัน: คิวถอดเสียงเต็ม");
@@ -413,16 +423,16 @@ impl GroqSttManager {
             }
 
             let busy = manager.busy_jobs.fetch_add(1, Ordering::AcqRel) + 1;
-            set_stt_busy(&app, busy > 0, "กำลังส่งเสียงให้ Groq Whisper");
+            set_stt_busy(&app, busy > 0, "กำลังส่งเสียงให้ บริการ AI");
             let result = manager.process_job(&app, utterance).await;
             let remaining_busy = manager.busy_jobs.fetch_sub(1, Ordering::AcqRel) - 1;
             drop(permit);
             queue.queued.fetch_sub(1, Ordering::AcqRel);
 
             match result {
-                Ok(()) => set_stt_busy(&app, remaining_busy > 0, "Groq พร้อมใช้งาน"),
+                Ok(()) => set_stt_busy(&app, remaining_busy > 0, "บริการ AI พร้อมใช้งาน"),
                 Err(error) => {
-                    set_stt_busy(&app, remaining_busy > 0, "ถอดเสียงด้วย Groq ไม่สำเร็จ");
+                    set_stt_busy(&app, remaining_busy > 0, "ถอดเสียงด้วย บริการ AI ไม่สำเร็จ");
                     report_stt_error(&app, &error.to_string());
                 }
             }
@@ -431,7 +441,10 @@ impl GroqSttManager {
     }
 
     pub fn reset_stream(&self, stream: StreamKind) {
-        let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("บริการ AI STT capture lock poisoned");
         {
             let buffer = inner.stream_mut(stream);
             buffer.ring.clear();
@@ -454,8 +467,9 @@ impl GroqSttManager {
 
     async fn process_job(&self, app: &AppHandle, job: SttJob) -> Result<()> {
         let state = app.state::<AppState>();
-        let settings = state.settings.snapshot();
-        let model = selected_stt_model(&settings, job.stream).to_string();
+        if !state.gateway.accepts_started_at(job.started_at_ms) {
+            return Ok(());
+        }
         let language = match job.stream {
             StreamKind::Incoming => "en",
             StreamKind::Microphone => "th",
@@ -470,19 +484,17 @@ impl GroqSttManager {
             );
             return Ok(());
         }
-        let actual_millis = samples_to_millis(job.samples.len());
-
-        state
-            .settings
-            .reserve_audio_request(actual_millis, &model)
-            .context("ตรวจงบ Groq ไม่ผ่าน")?;
-        let key = groq_key()?;
-        let request = SttRequest {
-            wav: encode_wav_pcm16(&job.samples, SAMPLE_RATE as u32),
-            model,
-            language: language.into(),
-        };
-        let transcription = self.provider.transcribe(&key, request).await?;
+        let transcription: TranscriptionResponse = state
+            .gateway
+            .transcribe(
+                encode_wav_pcm16(&job.samples, SAMPLE_RATE as u32),
+                if job.stream == StreamKind::Incoming {
+                    "incoming"
+                } else {
+                    "microphone"
+                },
+            )
+            .await?;
 
         if self.generation(job.stream) != job.generation {
             return Ok(());
@@ -492,7 +504,7 @@ impl GroqSttManager {
                 report_probe_result(
                     app,
                     job.stream,
-                    "Groq ไม่พบเสียงพูดใน 6 วินาทีล่าสุด แปลว่า endpoint นี้มีเสียงเกมแต่ไม่มีเสียงเพื่อนที่ชัดเจน",
+                    "บริการ AI ไม่พบเสียงพูดใน 6 วินาทีล่าสุด แปลว่า endpoint นี้มีเสียงเกมแต่ไม่มีเสียงเพื่อนที่ชัดเจน",
                 );
             }
             let _ = app.emit(
@@ -507,17 +519,17 @@ impl GroqSttManager {
                 report_probe_result(
                     app,
                     job.stream,
-                    "Groq ได้เสียงจาก endpoint แล้ว แต่ผลถอดเสียง 6 วินาทีล่าสุดว่างเปล่า",
+                    "บริการ AI ได้เสียงจาก endpoint แล้ว แต่ผลถอดเสียง 6 วินาทีล่าสุดว่างเปล่า",
                 );
             }
-            let _ = app.emit("pipeline-status", "ข้ามผลถอดเสียงว่างจาก Groq Whisper");
+            let _ = app.emit("pipeline-status", "ข้ามผลถอดเสียงว่างจาก บริการ AI");
             return Ok(());
         }
         if job.diagnostic_probe {
             report_probe_result(
                 app,
                 job.stream,
-                &format!("Groq ได้ยินเสียงพูดจาก endpoint นี้: {text}"),
+                &format!("บริการ AI ได้ยินเสียงพูดจาก endpoint นี้: {text}"),
             );
         }
         if job.stream != StreamKind::Microphone
@@ -537,7 +549,7 @@ impl GroqSttManager {
             started_at_ms: job.started_at_ms,
             ended_at_ms,
         };
-        pipeline::handle_transcript_event(app.clone(), transcript).await;
+        pipeline::handle_transcript_event(app.clone(), transcript, job.generation).await;
         Ok(())
     }
 
@@ -548,8 +560,11 @@ impl GroqSttManager {
         }
     }
 
-    fn generation(&self, stream: StreamKind) -> u64 {
-        let inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+    pub fn generation(&self, stream: StreamKind) -> u64 {
+        let inner = self
+            .inner
+            .lock()
+            .expect("บริการ AI STT capture lock poisoned");
         inner.stream(stream).generation.load(Ordering::Relaxed)
     }
 
@@ -563,7 +578,10 @@ impl GroqSttManager {
         if normalized.is_empty() {
             return automatic_cloud_scan;
         }
-        let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("บริการ AI STT capture lock poisoned");
         let recent = match stream {
             StreamKind::Incoming => &mut inner.recent_incoming_texts,
             StreamKind::Microphone => return false,
@@ -589,50 +607,6 @@ impl GroqSttManager {
     }
 }
 
-#[async_trait]
-pub trait SpeechToText: Send + Sync {
-    async fn transcribe(&self, key: &str, request: SttRequest) -> Result<TranscriptionResponse>;
-}
-
-#[derive(Clone)]
-pub struct GroqSpeechToText {
-    client: reqwest::Client,
-    endpoint: String,
-}
-
-impl Default for GroqSpeechToText {
-    fn default() -> Self {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()
-            .expect("valid reqwest client");
-        Self {
-            client,
-            endpoint: TRANSCRIPTIONS_ENDPOINT.into(),
-        }
-    }
-}
-
-impl GroqSpeechToText {
-    #[cfg(test)]
-    fn with_endpoint(endpoint: impl Into<String>) -> Self {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()
-            .expect("valid reqwest client");
-        Self {
-            client,
-            endpoint: endpoint.into(),
-        }
-    }
-}
-
-pub struct SttRequest {
-    wav: Vec<u8>,
-    model: String,
-    language: String,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct TranscriptionResponse {
     text: String,
@@ -643,7 +617,7 @@ pub struct TranscriptionResponse {
 impl TranscriptionResponse {
     fn is_low_confidence(&self) -> bool {
         if self.segments.is_empty() {
-            return false;
+            return true;
         }
         let accepted = self.segments.iter().filter(|segment| {
             segment.no_speech_prob.unwrap_or(1.0) < 0.5
@@ -676,62 +650,6 @@ struct TranscriptionSegment {
     no_speech_prob: Option<f32>,
     #[serde(default)]
     compression_ratio: Option<f32>,
-}
-
-#[async_trait]
-impl SpeechToText for GroqSpeechToText {
-    async fn transcribe(&self, key: &str, request: SttRequest) -> Result<TranscriptionResponse> {
-        let mut last_error = None;
-        for attempt in 0..2 {
-            let file = multipart::Part::bytes(request.wav.clone())
-                .file_name("speech.wav")
-                .mime_str("audio/wav")?;
-            let form = multipart::Form::new()
-                .part("file", file)
-                .text("model", request.model.clone())
-                .text("language", request.language.clone())
-                .text("response_format", "verbose_json")
-                .text("temperature", "0");
-
-            match self
-                .client
-                .post(&self.endpoint)
-                .bearer_auth(key)
-                .multipart(form)
-                .send()
-                .await
-            {
-                Ok(response) if response.status().is_success() => {
-                    return response
-                        .json::<TranscriptionResponse>()
-                        .await
-                        .context("อ่านผล Groq Whisper ไม่สำเร็จ");
-                }
-                Ok(response) => {
-                    let status = response.status();
-                    let delay = retry_after(&response);
-                    let body = response.text().await.unwrap_or_default();
-                    let error = anyhow!(friendly_stt_error(status, &body));
-                    if attempt == 0 && retryable(status) {
-                        last_error = Some(error);
-                        tokio::time::sleep(delay).await;
-                        continue;
-                    }
-                    return Err(error);
-                }
-                Err(error) => {
-                    let error = anyhow!("เชื่อมต่อ Groq Whisper ไม่สำเร็จ: {error}");
-                    if attempt == 0 {
-                        last_error = Some(error);
-                        tokio::time::sleep(Duration::from_millis(250)).await;
-                        continue;
-                    }
-                    return Err(error);
-                }
-            }
-        }
-        Err(last_error.unwrap_or_else(|| anyhow!("Groq Whisper ไม่ตอบสนอง")))
-    }
 }
 
 struct SttJob {
@@ -839,8 +757,8 @@ struct IncomingUtterance {
 fn set_stt_busy(app: &AppHandle, busy: bool, status: &str) {
     let state = app.state::<AppState>();
     let runtime = state.update_runtime(|runtime| {
-        runtime.groq_stt_busy = busy;
-        runtime.groq_status = status.into();
+        runtime.ai_stt_busy = busy;
+        runtime.ai_status = status.into();
     });
     let _ = app.emit("runtime-state", runtime);
     let _ = app.emit("settings-updated", state.settings.snapshot());
@@ -848,19 +766,9 @@ fn set_stt_busy(app: &AppHandle, busy: bool, status: &str) {
 
 fn report_stt_error(app: &AppHandle, message: &str) {
     let state = app.state::<AppState>();
-    let is_budget = message.contains("งบ Groq");
-    let is_fatal_cloud =
-        message.contains("API key") || message.contains("ไม่มีเครดิต") || message.contains("ปฏิเสธสิทธิ์");
-    if is_fatal_cloud {
-        let _ = state.settings.update(|settings| {
-            settings.groq.configured = false;
-            Ok(())
-        });
-    }
     let runtime = state.update_runtime(|runtime| {
         runtime.last_error = Some(message.into());
-        runtime.groq_status = message.into();
-        runtime.budget_exhausted |= is_budget;
+        runtime.ai_status = message.into();
     });
     let _ = app.emit("runtime-state", runtime);
     let _ = app.emit("settings-updated", state.settings.snapshot());
@@ -871,7 +779,7 @@ fn report_audio_gap(app: &AppHandle, message: &str) {
     let state = app.state::<AppState>();
     let runtime = state.update_runtime(|runtime| {
         runtime.last_error = Some(message.into());
-        runtime.groq_status = "ข้ามวลีที่ audio ไม่ต่อเนื่อง".into();
+        runtime.ai_status = "ข้ามวลีที่ audio ไม่ต่อเนื่อง".into();
     });
     let _ = app.emit("runtime-state", runtime);
     let _ = app.emit("pipeline-status", message.to_string());
@@ -891,34 +799,6 @@ fn report_probe_result(app: &AppHandle, stream: StreamKind, message: &str) {
     let _ = app.emit("pipeline-status", message.to_string());
 }
 
-fn friendly_stt_error(status: StatusCode, body: &str) -> String {
-    match status {
-        StatusCode::UNAUTHORIZED => "Groq API key ไม่ถูกต้อง กรุณาตรวจ key ที่ console.groq.com".into(),
-        StatusCode::FORBIDDEN => "Groq ปฏิเสธสิทธิ์ กรุณาตรวจสิทธิ์ของ key และ Whisper model".into(),
-        StatusCode::PAYMENT_REQUIRED => "บัญชี Groq ไม่มีเครดิตเพียงพอ".into(),
-        StatusCode::TOO_MANY_REQUESTS => "Groq จำกัดคำขอชั่วคราว (429)".into(),
-        _ => format!("Groq Whisper ตอบ {status}: {}", truncate(body, 180)),
-    }
-}
-
-fn retry_after(response: &reqwest::Response) -> Duration {
-    response
-        .headers()
-        .get(reqwest::header::RETRY_AFTER)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<u64>().ok())
-        .map(|seconds| Duration::from_secs(seconds.min(5)))
-        .unwrap_or_else(|| Duration::from_millis(250))
-}
-
-fn retryable(status: StatusCode) -> bool {
-    status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
-}
-
-fn truncate(value: &str, max_chars: usize) -> String {
-    value.chars().take(max_chars).collect()
-}
-
 fn incoming_ring_capacity(silence_ms: u64, max_utterance_ms: u64) -> usize {
     millis_to_samples(
         max_utterance_ms
@@ -927,13 +807,6 @@ fn incoming_ring_capacity(silence_ms: u64, max_utterance_ms: u64) -> usize {
     )
     .clamp(SAMPLE_RATE * 3, SAMPLE_RATE * 35)
     .max(AUTO_SCAN_WINDOW_SAMPLES)
-}
-
-fn selected_stt_model(settings: &crate::models::AppSettings, stream: StreamKind) -> &str {
-    match stream {
-        StreamKind::Incoming => &settings.groq.incoming_stt_model,
-        StreamKind::Microphone => &settings.groq.microphone_stt_model,
-    }
 }
 
 fn source_display_name(state: &AppState, stream: StreamKind) -> Option<String> {
@@ -1086,23 +959,6 @@ fn rms_dbfs(samples: &[i16]) -> f32 {
     }
 }
 
-fn normalize_pcm16_for_probe(mut samples: Vec<i16>) -> Vec<i16> {
-    let peak = samples
-        .iter()
-        .map(|sample| sample.unsigned_abs() as f32)
-        .fold(0.0_f32, f32::max);
-    if peak <= 1.0 {
-        return samples;
-    }
-    let gain = (i16::MAX as f32 * 0.85 / peak).clamp(1.0, 24.0);
-    for sample in &mut samples {
-        *sample = (*sample as f32 * gain)
-            .clamp(i16::MIN as f32, i16::MAX as f32)
-            .round() as i16;
-    }
-    samples
-}
-
 fn automatic_scan_samples(samples: Vec<i16>) -> Vec<i16> {
     samples
 }
@@ -1147,13 +1003,6 @@ pub fn encode_wav_pcm16(samples: &[i16], sample_rate: u32) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::AppSettings;
-    use std::{
-        io::{Read, Write},
-        net::TcpListener,
-        sync::mpsc,
-        thread,
-    };
 
     #[test]
     fn converts_float_samples_to_pcm16() {
@@ -1222,7 +1071,7 @@ mod tests {
 
     #[test]
     fn automatic_scan_dedupes_overlapping_transcripts() {
-        let manager = GroqSttManager::new(200, 500, 12_000);
+        let manager = AiSttManager::new(200, 500, 12_000);
 
         assert!(!manager.should_skip_or_record_playback_text(
             StreamKind::Incoming,
@@ -1257,7 +1106,7 @@ mod tests {
 
     #[test]
     fn audio_cursor_is_monotonic_and_f9_keeps_the_full_clip() {
-        let manager = GroqSttManager::new(200, 500, 12_000);
+        let manager = AiSttManager::new(200, 500, 12_000);
         {
             let mut inner = manager.inner.lock().unwrap();
             inner.microphone.microphone_active = true;
@@ -1280,7 +1129,7 @@ mod tests {
 
     #[test]
     fn incoming_and_microphone_keep_independent_buffers_and_cursors() {
-        let manager = GroqSttManager::new(200, 500, 12_000);
+        let manager = AiSttManager::new(200, 500, 12_000);
         let incoming = manager.ingest_audio(StreamKind::Incoming, &[0.2; 1_600]);
         manager.ingest_audio(StreamKind::Microphone, &[0.3; 400]);
 
@@ -1296,39 +1145,9 @@ mod tests {
     }
 
     #[test]
-    fn defaults_use_accurate_incoming_and_fast_microphone_models() {
-        let settings = AppSettings::default();
-        assert_eq!(
-            selected_stt_model(&settings, StreamKind::Incoming),
-            "whisper-large-v3"
-        );
-        assert_eq!(
-            selected_stt_model(&settings, StreamKind::Microphone),
-            "whisper-large-v3-turbo"
-        );
-    }
-
-    #[test]
     fn microphone_silence_floor_rejects_only_near_silence() {
         assert!(rms_dbfs(&[0; 3_200]) < NEAR_SILENCE_DBFS);
         assert!(rms_dbfs(&[1_000; 3_200]) > NEAR_SILENCE_DBFS);
-    }
-
-    #[test]
-    fn diagnostic_probe_normalizes_a_copy_without_clipping() {
-        let input = vec![100_i16, -200, 50];
-        let normalized = normalize_pcm16_for_probe(input.clone());
-
-        assert_eq!(input, vec![100_i16, -200, 50]);
-        assert!(
-            normalized
-                .iter()
-                .map(|sample| sample.unsigned_abs())
-                .max()
-                .unwrap()
-                > 4_000
-        );
-        assert!(normalized.iter().all(|sample| *sample <= i16::MAX));
     }
 
     #[test]
@@ -1343,52 +1162,6 @@ mod tests {
         assert!(queue.try_enqueue());
         assert!(queue.try_enqueue());
         assert!(!queue.try_enqueue());
-    }
-
-    #[tokio::test]
-    async fn sends_wav_language_and_model_without_prompt_as_multipart() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let (sender, receiver) = mpsc::channel();
-        thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
-                .unwrap();
-            let request = read_http_request(&mut stream);
-            sender
-                .send(String::from_utf8_lossy(&request).into_owned())
-                .unwrap();
-            let body = r#"{"text":"Enemy on the left"}"#;
-            write!(
-                stream,
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            )
-            .unwrap();
-        });
-
-        let provider = GroqSpeechToText::with_endpoint(format!("http://{address}/transcribe"));
-        let transcription = provider
-            .transcribe(
-                "secret-test-key",
-                SttRequest {
-                    wav: encode_wav_pcm16(&[1, 2, 3], 16_000),
-                    model: "whisper-large-v3-turbo".into(),
-                    language: "en".into(),
-                },
-            )
-            .await
-            .unwrap();
-        assert_eq!(transcription.text, "Enemy on the left");
-        let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
-        assert!(request.contains("filename=\"speech.wav\""));
-        assert!(request.contains("whisper-large-v3-turbo"));
-        assert!(!request.contains("name=\"prompt\""));
-        assert!(!request.contains("Game voice chat"));
-        assert!(request.contains("verbose_json"));
-        assert!(request.contains("\r\n\r\nen\r\n"));
     }
 
     #[test]
@@ -1428,32 +1201,5 @@ mod tests {
             *sample = 6_000;
         }
         assert!(has_adaptive_speech_activity(&speech_like));
-    }
-
-    fn read_http_request(stream: &mut std::net::TcpStream) -> Vec<u8> {
-        let mut request = Vec::new();
-        let mut buffer = [0_u8; 4096];
-        loop {
-            let read = stream.read(&mut buffer).unwrap_or(0);
-            if read == 0 {
-                break;
-            }
-            request.extend_from_slice(&buffer[..read]);
-            if let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
-                let headers = String::from_utf8_lossy(&request[..header_end]);
-                let content_length = headers
-                    .lines()
-                    .find_map(|line| {
-                        line.to_ascii_lowercase()
-                            .strip_prefix("content-length:")
-                            .and_then(|value| value.trim().parse::<usize>().ok())
-                    })
-                    .unwrap_or(0);
-                if request.len() >= header_end + 4 + content_length {
-                    break;
-                }
-            }
-        }
-        request
     }
 }

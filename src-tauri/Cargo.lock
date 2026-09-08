@@ -1520,7 +1520,6 @@ dependencies = [
  "chrono",
  "flexaudio",
  "futures-util",
- "keyring",
  "rand 0.9.5",
  "regex",
  "reqwest 0.12.28",
@@ -1537,6 +1536,7 @@ dependencies = [
  "tokio",
  "tower-http",
  "uuid",
+ "wangai-ai-protocol",
  "windows 0.61.3",
 ]
 
@@ -2378,18 +2378,6 @@ dependencies = [
  "bitflags 2.13.1",
  "serde",
  "unicode-segmentation",
-]
-
-[[package]]
-name = "keyring"
-version = "3.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eebcc3aff044e5944a8fbaf69eb277d11986064cba30c468730e8b9909fb551c"
-dependencies = [
- "byteorder",
- "log",
- "windows-sys 0.60.2",
- "zeroize",
 ]
 
 [[package]]
@@ -5413,6 +5401,13 @@ checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
 dependencies = [
  "same-file",
  "winapi-util",
+]
+
+[[package]]
+name = "wangai-ai-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

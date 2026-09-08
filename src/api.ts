@@ -7,7 +7,6 @@ import type {
   CaptureSource,
   RunningApp,
   GlossaryTerm,
-  GroqModelOption,
   CaptureMode,
   HotkeySettings,
   OverlaySettings,
@@ -104,25 +103,6 @@ export const api = {
   probeRecentAudio: () => tauriRuntime
     ? invoke<void>("probe_recent_audio")
     : webCommand<void>("probe_recent_audio"),
-  configureGroq: (key: string) => tauriRuntime
-    ? invoke<AppSettings>("configure_groq", { key })
-    : unavailableOnWeb("การตั้งค่า Groq API key"),
-  clearGroq: () => tauriRuntime
-    ? invoke<AppSettings>("clear_groq_credentials")
-    : unavailableOnWeb("การลบ Groq API key"),
-  testGroq: () => tauriRuntime
-    ? invoke<string>("test_groq_configuration")
-    : unavailableOnWeb("การทดสอบ Groq key"),
-  getGroqModelCatalog: () => tauriRuntime
-    ? invoke<GroqModelOption[]>("get_groq_model_catalog")
-    : webJson<GroqModelOption[]>("/api/v1/models"),
-  updateGroqModels: (incomingSttModel: string, microphoneSttModel: string, translationModel: string) => tauriRuntime
-    ? invoke<AppSettings>("update_groq_models", { incomingSttModel, microphoneSttModel, translationModel })
-    : webCommand<AppSettings>("update_groq_models", {
-      incoming_stt_model: incomingSttModel,
-      microphone_stt_model: microphoneSttModel,
-      translation_model: translationModel,
-    }),
   updateHotkeys: (hotkeys: HotkeySettings) => tauriRuntime
     ? invoke<AppSettings>("update_hotkeys", { hotkeys })
     : webCommand<AppSettings>("update_hotkeys", { hotkeys }),

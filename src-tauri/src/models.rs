@@ -257,60 +257,6 @@ impl Default for VadSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(default, rename_all = "camelCase")]
-pub struct GroqSettings {
-    #[serde(default)]
-    pub configured: bool,
-    pub incoming_stt_model: String,
-    pub microphone_stt_model: String,
-    pub translation_model: String,
-    pub monthly_budget_microusd: u64,
-    pub usage_month: String,
-    pub actual_audio_millis: u64,
-    pub billed_audio_millis: u64,
-    pub prompt_tokens: u64,
-    pub completion_tokens: u64,
-    pub estimated_spend_microusd: u64,
-}
-
-impl Default for GroqSettings {
-    fn default() -> Self {
-        Self {
-            configured: false,
-            incoming_stt_model: "whisper-large-v3".into(),
-            microphone_stt_model: "whisper-large-v3-turbo".into(),
-            translation_model: "openai/gpt-oss-20b".into(),
-            monthly_budget_microusd: 2_000_000,
-            usage_month: chrono::Local::now().format("%Y-%m").to_string(),
-            actual_audio_millis: 0,
-            billed_audio_millis: 0,
-            prompt_tokens: 0,
-            completion_tokens: 0,
-            estimated_spend_microusd: 0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum GroqModelKind {
-    SpeechToText,
-    Translation,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct GroqModelOption {
-    pub id: String,
-    pub label: String,
-    pub description: String,
-    pub kind: GroqModelKind,
-    pub input_microusd_per_million: u64,
-    pub output_microusd_per_million: u64,
-    pub audio_microusd_per_hour: u64,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AppSettings {
@@ -323,14 +269,14 @@ pub struct AppSettings {
     pub hotkeys: HotkeySettings,
     pub overlay: OverlaySettings,
     pub vad: VadSettings,
-    pub groq: GroqSettings,
+    pub installation_id: String,
     pub glossary: Vec<GlossaryTerm>,
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            schema_version: 13,
+            schema_version: 14,
             listening_source: None,
             capture_mode: CaptureMode::default(),
             output_device_id: None,
@@ -339,7 +285,7 @@ impl Default for AppSettings {
             hotkeys: HotkeySettings::default(),
             overlay: OverlaySettings::default(),
             vad: VadSettings::default(),
-            groq: GroqSettings::default(),
+            installation_id: uuid::Uuid::new_v4().to_string(),
             glossary: vec![
                 GlossaryTerm {
                     source: "Mistfall".into(),
@@ -370,9 +316,9 @@ pub struct RuntimeState {
     pub overlay_edit_mode: bool,
     pub worker_ready: bool,
     pub worker_model: Option<String>,
-    pub groq_stt_busy: bool,
-    pub groq_status: String,
-    pub budget_exhausted: bool,
+    pub ai_stt_busy: bool,
+    pub ai_status: String,
+    pub ai_service: wangai_ai_protocol::ServiceStatus,
     pub attached_source: Option<CaptureSource>,
     pub effective_capture_pid: Option<u32>,
     pub effective_capture_name: Option<String>,
@@ -400,9 +346,9 @@ impl Default for RuntimeState {
             overlay_edit_mode: false,
             worker_ready: false,
             worker_model: None,
-            groq_stt_busy: false,
-            groq_status: "ยังไม่ได้ตั้งค่า Groq".into(),
-            budget_exhausted: false,
+            ai_stt_busy: false,
+            ai_status: "กำลังเชื่อมต่อบริการ AI".into(),
+            ai_service: wangai_ai_protocol::ServiceStatus::default(),
             attached_source: None,
             effective_capture_pid: None,
             effective_capture_name: None,

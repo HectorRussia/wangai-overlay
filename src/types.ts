@@ -106,30 +106,13 @@ export interface VadSettings {
   maxUtteranceMs: number;
 }
 
-export interface GroqSettings {
-  configured: boolean;
-  incomingSttModel: string;
-  microphoneSttModel: string;
+export interface AiServiceStatus {
+  state: "connecting" | "connected" | "ready" | "degraded" | "offline";
+  message: string;
+  incomingModel: string;
+  microphoneModel: string;
   translationModel: string;
-  monthlyBudgetMicrousd: number;
-  usageMonth: string;
-  actualAudioMillis: number;
-  billedAudioMillis: number;
-  promptTokens: number;
-  completionTokens: number;
-  estimatedSpendMicrousd: number;
-}
-
-export type GroqModelKind = "speech_to_text" | "translation";
-
-export interface GroqModelOption {
-  id: string;
-  label: string;
-  description: string;
-  kind: GroqModelKind;
-  inputMicrousdPerMillion: number;
-  outputMicrousdPerMillion: number;
-  audioMicrousdPerHour: number;
+  retryAfterMs?: number | null;
 }
 
 export interface AppSettings {
@@ -142,7 +125,7 @@ export interface AppSettings {
   hotkeys: HotkeySettings;
   overlay: OverlaySettings;
   vad: VadSettings;
-  groq: GroqSettings;
+  installationId: string;
   glossary: GlossaryTerm[];
 }
 
@@ -152,9 +135,9 @@ export interface RuntimeState {
   overlayEditMode: boolean;
   workerReady: boolean;
   workerModel?: string;
-  groqSttBusy: boolean;
-  groqStatus: string;
-  budgetExhausted: boolean;
+  aiSttBusy: boolean;
+  aiStatus: string;
+  aiService: AiServiceStatus;
   attachedSource?: CaptureSource;
   effectiveCapturePid?: number;
   effectiveCaptureName?: string;

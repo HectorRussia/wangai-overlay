@@ -30,7 +30,7 @@ use crate::{
     models::{
         CaptureMode, CaptureSource, GlossaryTerm, HotkeySettings, OverlaySettings, VadSettings,
     },
-    processes, settings,
+    processes,
     state::AppState,
 };
 
@@ -149,7 +149,6 @@ fn router(app: &AppHandle, context: WebContext) -> Result<Router> {
         .route("/api/v1/processes", get(processes_list))
         .route("/api/v1/apps", get(apps_list))
         .route("/api/v1/output-devices", get(output_devices))
-        .route("/api/v1/models", get(models))
         .route("/api/v1/command", post(command))
         .route("/api/v1/events", get(events))
         .route("/api/{*path}", any(api_not_found));
@@ -282,13 +281,6 @@ async fn output_devices(State(context): State<WebContext>, headers: HeaderMap) -
     }
 }
 
-async fn models(State(context): State<WebContext>, headers: HeaderMap) -> Response {
-    if let Err(response) = require_session(&context, &headers) {
-        return response;
-    }
-    Json(settings::groq_model_catalog()).into_response()
-}
-
 async fn command(
     State(context): State<WebContext>,
     headers: HeaderMap,
@@ -391,42 +383,17 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
 )]
 pub enum WebCommand {
     ToggleListening,
-    SetListening {
-        enabled: bool,
-    },
-    SelectListeningSource {
-        source: CaptureSource,
-    },
-    UpdateOutputDevice {
-        device_id: Option<String>,
-    },
-    UpdateRescueScan {
-        enabled: bool,
-    },
+    SetListening { enabled: bool },
+    SelectListeningSource { source: CaptureSource },
+    UpdateOutputDevice { device_id: Option<String> },
+    UpdateRescueScan { enabled: bool },
     ProbeRecentAudio,
-    UpdateGroqModels {
-        incoming_stt_model: String,
-        microphone_stt_model: String,
-        translation_model: String,
-    },
-    UpdateHotkeys {
-        hotkeys: HotkeySettings,
-    },
-    UpdateOverlaySettings {
-        overlay: OverlaySettings,
-    },
-    UpdateVadSettings {
-        vad: VadSettings,
-    },
-    UpdateCaptureMode {
-        mode: CaptureMode,
-    },
-    UpdateGlossary {
-        glossary: Vec<GlossaryTerm>,
-    },
-    SetOverlayEditMode {
-        enabled: bool,
-    },
+    UpdateHotkeys { hotkeys: HotkeySettings },
+    UpdateOverlaySettings { overlay: OverlaySettings },
+    UpdateVadSettings { vad: VadSettings },
+    UpdateCaptureMode { mode: CaptureMode },
+    UpdateGlossary { glossary: Vec<GlossaryTerm> },
+    SetOverlayEditMode { enabled: bool },
     CopyLatestReply,
     RestartWorker,
 }
@@ -444,6 +411,15 @@ mod tests {
 
     #[test]
     fn command_allowlist_cannot_deserialize_credential_commands() {
+        for command in [
+            "update_groq_models",
+            "test_groq_configuration",
+            "start_overlay_drag",
+        ] {
+            assert!(
+                serde_json::from_value::<WebCommand>(json!({"command":command,"args":{}})).is_err()
+            );
+        }
         assert!(serde_json::from_value::<WebCommand>(json!({
             "command": "configure_groq",
             "args": { "key": "secret" }
