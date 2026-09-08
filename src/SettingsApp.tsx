@@ -3,6 +3,7 @@ import { AudioLines, Cloud, Cpu, Globe2, KeyRound, Languages, LoaderCircle, Plus
 import { api, type WebCompanionInfo } from "./api";
 import { ProcessPickerDialog } from "./ProcessPickerDialog";
 import { ReadyRoom } from "./ReadyRoom";
+import { UpdatePanel } from "./UpdatePanel";
 import { advancedHref, settingsHref, type AdvancedSection, type SettingsTab } from "./router";
 import { isPreviewMode, previewOutputDevices, previewNotification, previewListeningBusy } from "./preview";
 import { useRunningApps } from "./useRunningApps";
@@ -64,6 +65,8 @@ export function SettingsApp({ activeTab, advancedSection = "audio" }: { activeTa
       <span className="text-sm font-bold text-[#70d99b]">{activeTab === "overview" ? "Ready Room" : activeTab === "history" ? "History" : "Advanced"}</span>
     </header>
     {isDesktop() && <div className="mb-4 flex flex-wrap items-center justify-end gap-3 text-xs text-[#a9afb8]"><span>{runtime.listening || runtime.microphoneActive ? "ปิดหน้าต่างนี้เพื่อกลับไปใช้ Overlay" : "กดเริ่มฟัง · F8 เพื่อเปิด Overlay"}</span><button className={button} onClick={() => void api.quitApp().catch((error) => setToast({ kind: "error", text: errorText(error) }))}><Power className="size-4" />ออกจากโปรแกรม</button></div>}
+    {activeTab === "overview" && <UpdatePanel compact />}
+    {activeTab === "advanced" && advancedSection === "controls" && <UpdatePanel />}
     {activeTab !== "overview" && notification && <div className="mb-4">{notification}</div>}
     {activeTab === "overview" && <ReadyRoom notification={notification} settings={settings} runtime={runtime} history={snapshot.history} busy={busy} previewMode={isPreviewMode()} onToggleListening={() => void run("listen", api.toggleListening, runtime.listening ? "หยุดฟังแล้ว" : "เริ่มฟังแล้ว")} onOpenSourcePicker={() => setPicker(true)} onOpenWebCompanion={!isWeb() ? () => void run("web", api.openWebCompanion, "เปิด Web App แล้ว") : undefined} webCompanionOrigin={webInfo?.origin} webRuntime={isWeb()} />}
     {activeTab === "history" && <HistoryView history={snapshot.history} />}
