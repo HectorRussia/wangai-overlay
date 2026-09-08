@@ -1,7 +1,7 @@
-export type StreamKind = "game" | "microphone" | "voice_chat";
+export type StreamKind = "incoming" | "microphone";
 export type TranscriptKind = "partial" | "final";
 export type TranslationStatus = "pending" | "success" | "error" | "quota" | "source_only";
-export type GameCaptureMode = "process_tree" | "system_output";
+export type CaptureMode = "process_tree" | "system_output";
 
 export interface CaptureSource {
   pid: number;
@@ -9,6 +9,18 @@ export interface CaptureSource {
   executablePath: string;
   displayName: string;
   isMistfall: boolean;
+}
+
+export interface RunningApp {
+  id: string;
+  displayName: string;
+  executableName: string;
+  executablePath: string;
+  searchNames: string[];
+  processCount: number;
+  memberPids: number[];
+  hasWindow: boolean;
+  roots: CaptureSource[];
 }
 
 export interface SavedProcess {
@@ -81,30 +93,22 @@ export interface OverlaySettings {
   height: number;
 }
 
-export interface GameVadProfile {
+export interface VadProfile {
   vadThreshold: number;
   gainDb: number;
 }
 
 export interface VadSettings {
-  processTree: GameVadProfile;
-  systemOutput: GameVadProfile;
+  processTree: VadProfile;
+  systemOutput: VadProfile;
   silenceMs: number;
   preRollMs: number;
   maxUtteranceMs: number;
 }
 
-export interface VoiceChatSettings {
-  enabled: boolean;
-  autoDetect: boolean;
-  selectedProcess?: SavedProcess;
-  rescueScan: boolean;
-  vad: GameVadProfile;
-}
-
 export interface GroqSettings {
   configured: boolean;
-  gameSttModel: string;
+  incomingSttModel: string;
   microphoneSttModel: string;
   translationModel: string;
   monthlyBudgetMicrousd: number;
@@ -130,11 +134,10 @@ export interface GroqModelOption {
 
 export interface AppSettings {
   schemaVersion: number;
-  selectedProcess?: SavedProcess;
-  gameCaptureMode: GameCaptureMode;
-  gameOutputDeviceId?: string;
-  systemOutputCloudScan: boolean;
-  voiceChat: VoiceChatSettings;
+  listeningSource?: SavedProcess;
+  captureMode: CaptureMode;
+  outputDeviceId?: string;
+  rescueScanEnabled: boolean;
   autoAttach: boolean;
   hotkeys: HotkeySettings;
   overlay: OverlaySettings;
@@ -152,32 +155,21 @@ export interface RuntimeState {
   groqSttBusy: boolean;
   groqStatus: string;
   budgetExhausted: boolean;
-  attachedProcess?: CaptureSource;
+  attachedSource?: CaptureSource;
   effectiveCapturePid?: number;
   effectiveCaptureName?: string;
   effectiveOutputDeviceId?: string;
   effectiveOutputDeviceName?: string;
   effectiveOutputDeviceIsDefault: boolean;
-  gameAudioRmsDbfs?: number;
-  gameAudioPeakDbfs?: number;
-  gameAudioLastSeenAtMs?: number;
-  gameVadActive: boolean;
+  audioRmsDbfs?: number | null;
+  audioPeakDbfs?: number | null;
+  audioLastSeenAtMs?: number | null;
+  vadActive: boolean;
   effectiveVadThreshold: number;
   effectiveVadGainDb: number;
   effectiveVadAutoGainDb: number;
   droppedAudioChunks: number;
   captureWarning?: string;
-  voiceChatAttachedProcess?: CaptureSource;
-  voiceChatEffectiveCapturePid?: number;
-  voiceChatEffectiveCaptureName?: string;
-  voiceChatAudioRmsDbfs?: number;
-  voiceChatAudioPeakDbfs?: number;
-  voiceChatAudioLastSeenAtMs?: number;
-  voiceChatVadActive: boolean;
-  voiceChatVadThreshold: number;
-  voiceChatVadGainDb: number;
-  voiceChatDroppedAudioChunks: number;
-  voiceChatCaptureWarning?: string;
   statusMessage: string;
   lastError?: string;
 }

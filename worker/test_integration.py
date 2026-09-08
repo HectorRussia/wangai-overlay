@@ -20,7 +20,7 @@ def frame(kind: int, stream: int, samples=None, start_sample_cursor: int = 0) ->
 
 
 class WorkerIntegrationTests(unittest.TestCase):
-    def test_mock_game_speech_boundaries(self):
+    def test_mock_incoming_speech_boundaries(self):
         process = subprocess.Popen(
             [sys.executable, "-u", WORKER, "--mock"],
             stdin=subprocess.PIPE,
@@ -79,7 +79,7 @@ class WorkerIntegrationTests(unittest.TestCase):
                     if len(boundaries) == 2:
                         break
             self.assertEqual([event["active"] for event in boundaries], [True, False])
-            self.assertTrue(all(event["stream"] == "game" for event in boundaries))
+            self.assertTrue(all(event["stream"] == "incoming" for event in boundaries))
         finally:
             if process.stdin and process.poll() is None:
                 process.stdin.write(frame(4, 0))

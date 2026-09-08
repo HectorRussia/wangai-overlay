@@ -56,13 +56,13 @@ export function OverlayApp() {
     "--overlay-opacity": settings.overlay.opacity,
     "--overlay-scale": settings.overlay.fontScale,
   } as CSSProperties;
-  const listening = runtime.listening && Boolean(runtime.attachedProcess);
+  const listening = runtime.listening && Boolean(runtime.attachedSource);
   const hearingGameSpeech = runtime.groqStatus === "กำลังฟัง…" && !runtime.microphoneActive;
-  const warning = Boolean(runtime.lastError) || runtime.budgetExhausted || (runtime.listening && !runtime.attachedProcess);
+  const warning = Boolean(runtime.lastError) || runtime.budgetExhausted || (runtime.listening && !runtime.attachedSource);
   const status = runtime.microphoneActive
     ? "กำลังฟังภาษาไทย"
-    : runtime.attachedProcess
-      ? `กำลังฟัง ${runtime.attachedProcess.displayName}`
+    : runtime.attachedSource
+      ? `กำลังฟัง ${runtime.attachedSource.displayName}`
       : runtime.statusMessage;
 
   const copy = async () => {
@@ -144,8 +144,8 @@ export function OverlayApp() {
   );
 }
 
-function sourceBadge(stream: "game" | "voice_chat" | "microphone", displayName?: string): string {
+function sourceBadge(stream: "incoming" | "microphone", displayName?: string): string {
   if (displayName?.toUpperCase() === "MIXED") return "MIXED";
-  if (stream === "voice_chat") return displayName || "VOICE CHAT";
-  return "GAME";
+  if (stream === "microphone") return "F9 REPLY";
+  return displayName || "INCOMING";
 }

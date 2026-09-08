@@ -10,6 +10,20 @@ pub struct CaptureSource {
     pub is_mistfall: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunningApp {
+    pub id: String,
+    pub display_name: String,
+    pub executable_name: String,
+    pub executable_path: String,
+    pub search_names: Vec<String>,
+    pub process_count: usize,
+    pub member_pids: Vec<u32>,
+    pub has_window: bool,
+    pub roots: Vec<CaptureSource>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioOutputDevice {
@@ -43,14 +57,13 @@ impl From<&CaptureSource> for SavedProcess {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum StreamKind {
-    Game,
+    Incoming,
     Microphone,
-    VoiceChat,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum GameCaptureMode {
+pub enum CaptureMode {
     #[default]
     ProcessTree,
     SystemOutput,
@@ -59,9 +72,8 @@ pub enum GameCaptureMode {
 impl StreamKind {
     pub fn id(self) -> u8 {
         match self {
-            Self::Game => 1,
+            Self::Incoming => 1,
             Self::Microphone => 2,
-            Self::VoiceChat => 3,
         }
     }
 }
@@ -187,12 +199,12 @@ pub enum OverlayPresentation {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
-pub struct GameVadProfile {
+pub struct VadProfile {
     pub vad_threshold: f32,
     pub gain_db: f32,
 }
 
-impl GameVadProfile {
+impl VadProfile {
     pub fn process_tree_default() -> Self {
         Self {
             vad_threshold: 0.5,
@@ -208,7 +220,7 @@ impl GameVadProfile {
     }
 }
 
-impl Default for GameVadProfile {
+impl Default for VadProfile {
     fn default() -> Self {
         Self::process_tree_default()
     }
@@ -216,44 +228,19 @@ impl Default for GameVadProfile {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
-pub struct VoiceChatSettings {
-    pub enabled: bool,
-    pub auto_detect: bool,
-    pub selected_process: Option<SavedProcess>,
-    pub rescue_scan: bool,
-    pub vad: GameVadProfile,
-}
-
-impl Default for VoiceChatSettings {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            auto_detect: true,
-            selected_process: None,
-            rescue_scan: true,
-            vad: GameVadProfile {
-                vad_threshold: 0.35,
-                gain_db: 6.0,
-            },
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default, rename_all = "camelCase")]
 pub struct VadSettings {
-    pub process_tree: GameVadProfile,
-    pub system_output: GameVadProfile,
+    pub process_tree: VadProfile,
+    pub system_output: VadProfile,
     pub silence_ms: u64,
     pub pre_roll_ms: u64,
     pub max_utterance_ms: u64,
 }
 
 impl VadSettings {
-    pub fn active_profile(&self, mode: GameCaptureMode) -> &GameVadProfile {
+    pub fn active_profile(&self, mode: CaptureMode) -> &VadProfile {
         match mode {
-            GameCaptureMode::ProcessTree => &self.process_tree,
-            GameCaptureMode::SystemOutput => &self.system_output,
+            CaptureMode::ProcessTree => &self.process_tree,
+            CaptureMode::SystemOutput => &self.system_output,
         }
     }
 }
@@ -261,8 +248,8 @@ impl VadSettings {
 impl Default for VadSettings {
     fn default() -> Self {
         Self {
-            process_tree: GameVadProfile::process_tree_default(),
-            system_output: GameVadProfile::system_output_default(),
+            process_tree: VadProfile::process_tree_default(),
+            system_output: VadProfile::system_output_default(),
             silence_ms: 500,
             pre_roll_ms: 200,
             max_utterance_ms: 12_000,
@@ -275,7 +262,7 @@ impl Default for VadSettings {
 pub struct GroqSettings {
     #[serde(default)]
     pub configured: bool,
-    pub game_stt_model: String,
+    pub incoming_stt_model: String,
     pub microphone_stt_model: String,
     pub translation_model: String,
     pub monthly_budget_microusd: u64,
@@ -291,7 +278,7 @@ impl Default for GroqSettings {
     fn default() -> Self {
         Self {
             configured: false,
-            game_stt_model: "whisper-large-v3".into(),
+            incoming_stt_model: "whisper-large-v3".into(),
             microphone_stt_model: "whisper-large-v3-turbo".into(),
             translation_model: "openai/gpt-oss-20b".into(),
             monthly_budget_microusd: 2_000_000,
@@ -328,11 +315,10 @@ pub struct GroqModelOption {
 #[serde(default, rename_all = "camelCase")]
 pub struct AppSettings {
     pub schema_version: u32,
-    pub selected_process: Option<SavedProcess>,
-    pub game_capture_mode: GameCaptureMode,
-    pub game_output_device_id: Option<String>,
-    pub system_output_cloud_scan: bool,
-    pub voice_chat: VoiceChatSettings,
+    pub listening_source: Option<SavedProcess>,
+    pub capture_mode: CaptureMode,
+    pub output_device_id: Option<String>,
+    pub rescue_scan_enabled: bool,
     pub auto_attach: bool,
     pub hotkeys: HotkeySettings,
     pub overlay: OverlaySettings,
@@ -344,12 +330,11 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            schema_version: 11,
-            selected_process: None,
-            game_capture_mode: GameCaptureMode::default(),
-            game_output_device_id: None,
-            system_output_cloud_scan: false,
-            voice_chat: VoiceChatSettings::default(),
+            schema_version: 13,
+            listening_source: None,
+            capture_mode: CaptureMode::default(),
+            output_device_id: None,
+            rescue_scan_enabled: false,
             auto_attach: true,
             hotkeys: HotkeySettings::default(),
             overlay: OverlaySettings::default(),
@@ -388,32 +373,21 @@ pub struct RuntimeState {
     pub groq_stt_busy: bool,
     pub groq_status: String,
     pub budget_exhausted: bool,
-    pub attached_process: Option<CaptureSource>,
+    pub attached_source: Option<CaptureSource>,
     pub effective_capture_pid: Option<u32>,
     pub effective_capture_name: Option<String>,
     pub effective_output_device_id: Option<String>,
     pub effective_output_device_name: Option<String>,
     pub effective_output_device_is_default: bool,
-    pub game_audio_rms_dbfs: Option<f32>,
-    pub game_audio_peak_dbfs: Option<f32>,
-    pub game_audio_last_seen_at_ms: Option<i64>,
-    pub game_vad_active: bool,
+    pub audio_rms_dbfs: Option<f32>,
+    pub audio_peak_dbfs: Option<f32>,
+    pub audio_last_seen_at_ms: Option<i64>,
+    pub vad_active: bool,
     pub effective_vad_threshold: f32,
     pub effective_vad_gain_db: f32,
     pub effective_vad_auto_gain_db: f32,
     pub dropped_audio_chunks: u64,
     pub capture_warning: Option<String>,
-    pub voice_chat_attached_process: Option<CaptureSource>,
-    pub voice_chat_effective_capture_pid: Option<u32>,
-    pub voice_chat_effective_capture_name: Option<String>,
-    pub voice_chat_audio_rms_dbfs: Option<f32>,
-    pub voice_chat_audio_peak_dbfs: Option<f32>,
-    pub voice_chat_audio_last_seen_at_ms: Option<i64>,
-    pub voice_chat_vad_active: bool,
-    pub voice_chat_vad_threshold: f32,
-    pub voice_chat_vad_gain_db: f32,
-    pub voice_chat_dropped_audio_chunks: u64,
-    pub voice_chat_capture_warning: Option<String>,
     pub status_message: String,
     pub last_error: Option<String>,
 }
@@ -429,32 +403,21 @@ impl Default for RuntimeState {
             groq_stt_busy: false,
             groq_status: "ยังไม่ได้ตั้งค่า Groq".into(),
             budget_exhausted: false,
-            attached_process: None,
+            attached_source: None,
             effective_capture_pid: None,
             effective_capture_name: None,
             effective_output_device_id: None,
             effective_output_device_name: None,
             effective_output_device_is_default: false,
-            game_audio_rms_dbfs: None,
-            game_audio_peak_dbfs: None,
-            game_audio_last_seen_at_ms: None,
-            game_vad_active: false,
+            audio_rms_dbfs: None,
+            audio_peak_dbfs: None,
+            audio_last_seen_at_ms: None,
+            vad_active: false,
             effective_vad_threshold: 0.5,
             effective_vad_gain_db: 0.0,
             effective_vad_auto_gain_db: 0.0,
             dropped_audio_chunks: 0,
             capture_warning: None,
-            voice_chat_attached_process: None,
-            voice_chat_effective_capture_pid: None,
-            voice_chat_effective_capture_name: None,
-            voice_chat_audio_rms_dbfs: None,
-            voice_chat_audio_peak_dbfs: None,
-            voice_chat_audio_last_seen_at_ms: None,
-            voice_chat_vad_active: false,
-            voice_chat_vad_threshold: 0.35,
-            voice_chat_vad_gain_db: 6.0,
-            voice_chat_dropped_audio_chunks: 0,
-            voice_chat_capture_warning: None,
             status_message: "กำลังเตรียมระบบถอดเสียง".into(),
             last_error: None,
         }

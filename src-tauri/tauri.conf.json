@@ -53,9 +53,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../worker/**/*",
-      "../scripts/**/*"
-    ]
+    "resources": {
+      "../worker/": "worker/",
+      "../scripts/": "scripts/",
+      "../dist/": "web/"
+    }
   }
 }

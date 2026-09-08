@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { api } from "./api";
+import { api, connectWebSnapshot, isWebCompanion } from "./api";
 import { isPreviewMode, previewSnapshot } from "./preview";
 import type {
   AppSettings,
@@ -36,6 +36,24 @@ export function useSnapshot() {
   useEffect(() => {
     if (preview) return;
     void refresh();
+    if (isWebCompanion()) {
+      let cleanup: (() => void) | undefined;
+      let cancelled = false;
+      void connectWebSnapshot(
+        (next) => {
+          setSnapshot(next);
+          setLoadingError(undefined);
+        },
+        setLoadingError,
+      ).then((stop) => {
+        if (cancelled) stop();
+        else cleanup = stop;
+      }).catch((error) => setLoadingError(errorText(error)));
+      return () => {
+        cancelled = true;
+        cleanup?.();
+      };
+    }
     const cleanup: UnlistenFn[] = [];
     let cancelled = false;
     const add = async <T,>(name: string, handler: (payload: T) => void) => {

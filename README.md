@@ -1,11 +1,11 @@
 # WANGAI Realtime Translator Overlay
 
-WANGAI เป็น Windows overlay สำหรับแปลเสียงพูดในเกมแบบ realtime โดยจับ process tree ของเกมและ Discord/แอป voice chat เป็นคนละ WASAPI Application Loopback ไม่ inject DLL และไม่แตะ memory/renderer ของเกม พร้อม System Output fallback แบบ `MIXED` สำหรับเกมที่แยก voice chat ไว้นอก process tree
+WANGAI เป็น Windows overlay สำหรับแปลเสียงพูดแบบ realtime ผู้ใช้เลือกแอปที่จะฟังครั้งละหนึ่งโปรแกรม เช่น Mistfall, Discord หรือ Chrome ผ่าน WASAPI Application Loopback โดยไม่ inject DLL และไม่แตะ memory/renderer พร้อม Local Web Companion ที่ควบคุม Desktop engine จาก browser บนเครื่องเดียวกัน
 
 - เสียงเกมอังกฤษ: แสดงสถานะกำลังฟัง แล้วแสดง English final + คำแปลไทยเมื่อจบวลี
 - กด `F9` ค้างแล้วพูดไทย: ถอดเสียงและแปลเป็นอังกฤษ พร้อมปุ่ม Copy / `F10`
-- Silero VAD แยก state/cursor สำหรับ GAME และ VOICE CHAT ส่วน F9 ใช้จังหวะกด/ปล่อยเป็นขอบเขตวลี แล้วส่งเฉพาะวลีที่จบแล้วไป Groq Whisper
-- Overlay รวมข้อความตามเวลาและติดป้าย `GAME`, `DISCORD` หรือ `MIXED`; Rescue Scan ใช้ PCM ต้นฉบับและกรอง activity/confidence ก่อนยอมรับผล
+- ระบบมี audio stream จริงเพียง `INCOMING` และ `MICROPHONE`; F9 ใช้จังหวะกด/ปล่อยเป็นขอบเขตวลี แล้วส่งเฉพาะวลีที่จบแล้วไป Groq Whisper
+- Overlay ติดป้ายตามแอปที่เลือก เช่น `MISTFALL`, `DISCORD`, `CHROME` หรือ `MIXED`; Rescue Scan ใช้ PCM ต้นฉบับและกรอง activity/confidence ก่อนยอมรับผล
 - ส่งเฉพาะ final transcript ไป Groq Chat Completions เพื่อแปลภาษา และไม่บันทึกไฟล์เสียง
 - รองรับ Borderless และ Windowed; ไม่รองรับ Exclusive Fullscreen
 
@@ -13,13 +13,17 @@ WANGAI เป็น Windows overlay สำหรับแปลเสียง�
 
 ```text
 React/TypeScript UI
-       ↕ typed Tauri events/commands
+       ↕ Tauri commands หรือ loopback REST/WebSocket
+Axum Local Web Companion · 127.0.0.1 · session cookie
+       ↕
 Rust: process picker · WASAPI · hotkeys · secrets · Groq Whisper/translation · budget
        ↕ framed binary stdin / JSONL stdout
 Python 3.12: Silero VAD only
 ```
 
-Rust downmix/resample เป็น PCM mono 16 kHz และส่งเสียงเกมพร้อม sample cursor ให้ Python ผ่าน stdin โดยไม่มี local TCP port เมื่อ VAD จบวลี Rust จะตัดช่วงเสียงตาม cursor แล้วสร้าง WAV ในหน่วยความจำเพื่อส่งไป Groq ผ่าน HTTPS ส่วน Groq key อยู่ใน Windows Credential Manager และไม่เข้าสู่ React/Python
+Rust downmix/resample เป็น PCM mono 16 kHz และส่งเสียงพร้อม sample cursor ให้ Python ผ่าน stdin เมื่อ VAD จบวลี Rust จะตัดช่วงเสียงตาม cursor แล้วสร้าง WAV ในหน่วยความจำเพื่อส่งไป Groq ผ่าน HTTPS ส่วน Groq key อยู่ใน Windows Credential Manager และไม่เข้าสู่ React/Python/REST/WebSocket
+
+Local Web Companion bind เฉพาะ `127.0.0.1`; production ขอ port ว่างจาก Windows ทุกครั้งและคืน port เมื่อ Desktop ปิด ปุ่ม **เปิด Web App** แลก token ใน URL fragment เป็น `HttpOnly`/`SameSite=Strict` cookie หน้าเว็บตั้งหรือลบ Groq API key ไม่ได้และใช้งานไม่ได้เมื่อ Desktop engine ปิด
 
 ## ติดตั้งสำหรับพัฒนา
 
@@ -47,29 +51,39 @@ pnpm tauri dev
 1. สร้าง API key และตรวจสิทธิ์ใช้งานที่ [Groq Console](https://console.groq.com/keys)
 2. เปิด WANGAI แล้วใส่ Groq API key ในหน้า **Groq Whisper + Translation**
 3. กด **ทดสอบคำแปล** ก่อนเริ่มฟังเกม
-4. เลือก Whisper สำหรับเกม, Whisper สำหรับ F9 และ translation model แยกกันได้ โดยมีผลกับคำขอถัดไปทันที ค่าแนะนำคือ Large V3 สำหรับเกมและ Turbo สำหรับ F9
+4. เลือก Whisper สำหรับเสียงขาเข้า, Whisper สำหรับ F9 และ translation model แยกกันได้ โดยมีผลกับคำขอถัดไปทันที ค่าแนะนำคือ Large V3 สำหรับเสียงขาเข้าและ Turbo สำหรับ F9
 
 แอปมี hard limit ภายใน `$2/เดือน` ครอบคลุมทั้ง Whisper STT และ token การแปล โดยคิดตามโมเดลที่ใช้และขั้นต่ำเสียง 10 วินาทีต่อคำขอ แอปจะหยุดส่งเสียงและข้อความใหม่เมื่อถึงเพดาน ไม่มี local Whisper fallback ยอดใน Groq Billing เป็นยอดจริงและอาจต่างจากค่าประมาณหากราคาเปลี่ยน
 
 ## วิธีใช้กับ Mistfall Hunter
 
 1. ตั้งเกมเป็น Borderless หรือ Windowed
-2. เปิดเกม แล้วกดรีเฟรชใน **เลือกเกมที่จะฟัง**
-3. เลือก `Mistfall Hunter` (`MistfallHunter-Win64-Shipping.exe`) ซึ่งจะถูกเรียงเป็นอันดับแรก
+2. เปิดเกม แล้วกดรีเฟรชใน **แหล่งเสียงที่ฟัง**
+3. เลือก `Mistfall Hunter` ซึ่งรวม process root/Shipping เป็นแอปเดียว แล้วระบบจะจับจาก root ของเกม
 4. กด `F8` เริ่มฟัง หน้า Audio จะแสดง PID ที่เลือก, process root ที่จับจริง และระดับเสียง dBFS
-5. ใน **Voice chat diagnostics** ให้เปิด Auto-detect เพื่อหา Discord Stable/PTB/Canary หรือเลือก process อื่นเอง GAME และ DISCORD จะมี meter, PID, VAD และ queue แยกกัน
-6. หาก Process Tree ไม่ได้รับ voice chat ภายในเกม ให้เปิด **System Output fallback** หลังอ่านคำเตือนว่าอาจรวมเสียง Discord/browser/การแจ้งเตือน โหมดนี้หยุดสาย Discord แยกเพื่อป้องกันข้อความซ้ำ และติดป้ายผลเป็น `MIXED`
-7. ใน **Mistfall output device** เลือก Speakers, หูฟัง หรือจอที่ได้ยินเสียง Mistfall อยู่จริง หรือเลือก `Windows default` เพื่อให้ตามอุปกรณ์หลักของ Windows การเปลี่ยน endpoint จะ restart เฉพาะ game capture
-8. หน้า Game audio diagnostics จะแสดงชื่อ endpoint ที่จับจริง หากไม่มี frame ภายใน 3 วินาทีให้ลอง endpoint อื่น ถ้าอุปกรณ์ที่บันทึกไว้ถูกถอด แอปจะหยุด capture และไม่ fallback ไปอุปกรณ์อื่นเอง
+5. หาก Process Tree ไม่ได้รับ voice chat ภายในเกม ให้เปิด **System Output fallback** หลังอ่านคำเตือนว่าอาจรวมเสียง Discord/browser/การแจ้งเตือน และติดป้ายผลเป็น `MIXED`
+6. ใน **Output endpoint** เลือก Speakers, หูฟัง หรือจอที่ได้ยินเสียงแอปอยู่จริง หรือเลือก `Windows default` เพื่อให้ตามอุปกรณ์หลักของ Windows
+7. หน้า Incoming audio diagnostics จะแสดงชื่อ endpoint ที่จับจริง หากไม่มี frame ภายใน 3 วินาทีให้ลอง endpoint อื่น ถ้าอุปกรณ์ที่บันทึกไว้ถูกถอด แอปจะหยุด capture และไม่ fallback ไปอุปกรณ์อื่นเอง
    หาก meter ขึ้นแต่ Silero ไม่พบคำพูด ให้กด **ตรวจเสียง 6 วิล่าสุดด้วย Groq** ทันทีหลังเพื่อนพูด เพื่อแยกว่า endpoint มีเสียงเพื่อนจริงหรือมีเพียงเสียงเกม การทดสอบนี้ข้าม VAD และถูกคิดขั้นต่ำ 10 วินาทีหนึ่งครั้ง
-9. Process Tree, System Output และ Voice Chat จำค่า VAD แยกกัน ทั้ง manual gain และ auto-level เปลี่ยนเฉพาะสำเนาที่ส่ง Silero ไม่เปลี่ยน PCM ต้นฉบับที่ส่ง Groq
-10. เกมปิดแล้วแอปจะรอและ auto-attach เมื่อ process เดิมเปิดใหม่ ส่วน Discord ปิดจะหยุดเฉพาะสาย Discord กด `F7` เพื่อย้าย/ปรับขนาด overlay
+8. Process Tree และ System Output จำค่า VAD แยกกัน ทั้ง manual gain และ auto-level เปลี่ยนเฉพาะสำเนาที่ส่ง Silero ไม่เปลี่ยน PCM ต้นฉบับที่ส่ง Groq
+9. แอปที่เลือกปิดแล้ว WANGAI จะหยุดฟังและรอ auto-attach เมื่อ process เดิมเปิดใหม่ กด `F7` เพื่อย้าย/ปรับขนาด overlay
+
+## Browser Media และ Web Companion
+
+ตัวเลือกแอปตรวจ process ที่กำลังรันจริงร่วมกับข้อมูลหน้าต่างและชื่อผลิตภัณฑ์จาก Windows ไม่จำกัดรายชื่อแอป รวม process ลูกเป็นหนึ่งแถวต่อ executable และแยกโปรแกรมที่ติดตั้งคนละตำแหน่ง หากแอปเดียวมีหลาย instance อิสระ ให้ขยายเลือก instance ที่ต้องการ รายการรีเฟรชเมื่อเปิด picker และทุก 5 วินาทีระหว่างเปิดอยู่ ค้นหาได้จากชื่อผลิตภัณฑ์, ชื่อ `.exe` และ path; PID/path ดูได้ในรายละเอียด ส่วน Browser Preview ใช้ข้อมูลจำลองเท่านั้น
+
+Desktop ใช้คำสั่ง `list_running_apps`; Local Web Companion ใช้ `GET /api/v1/apps` ที่ต้องมี session ทั้งสองทางคืน `RunningApp` ชุดเดียวกัน การพบแอปในรายการไม่ได้หมายความว่าแอปนั้นกำลังส่งเสียง
+
+1. ใน Ready Room แถว **แหล่งเสียงที่ฟัง** กด **เปลี่ยน** แล้วเลือก Chrome, Edge, Firefox หรือ Brave
+2. WANGAI จับ process family ของ browser ที่เลือก แต่ browser เดียวกันอาจรวมเสียงจากทุกแท็บ ไม่รับประกันการแยกเฉพาะ YouTube tab และจะไม่ฟังเกมหรือ Discord พร้อมกัน
+3. ใน Desktop กด **เปิด Web App** เพื่อเปิด UI ชุดเดียวกัน เว็บควบคุม listening, sources, models, VAD, glossary, hotkeys และ Overlay ได้ แต่การตั้ง/ลบ API key ต้องทำใน Desktop
+4. Development ใช้ Axum ที่ `127.0.0.1:1431` และ Vite proxy `/api`; production ใช้ loopback port แบบ dynamic จึงไม่ค้างชน port เดิม
 
 Hotkeys เริ่มต้น:
 
 | ปุ่ม | การทำงาน |
 | --- | --- |
-| `F8` | เปิด/ปิดการฟังเกม |
+| `F8` | เปิด/ปิดการฟังแอปที่เลือก |
 | `F9` ค้าง | พูดภาษาไทย |
 | `F10` | Copy คำตอบอังกฤษล่าสุด |
 | `F7` | ลาก/ปรับ overlay |
@@ -88,4 +102,4 @@ python -m unittest worker\test_worker.py worker\test_integration.py
 
 ## ขอบเขต MVP
 
-GAME และ Discord แยกกันได้เมื่อทั้งคู่มี Windows process audio session ของตนเอง แต่เสียงเพื่อน/NPC/SFX ภายใน process tree เกมเดียวกันยังแยกผู้พูดไม่ได้ ส่วน System Output fallback เป็นเสียงรวมและไม่พยายามเดาต้นทางด้วย AI แอปไม่ auto-type เข้าเกม ไม่มี TTS/virtual mic, speaker identification, updater หรือ installerสำหรับแจกสาธารณะ
+WANGAI ฟังแอปขาเข้าได้ครั้งละหนึ่งโปรแกรม เสียงเพื่อน/NPC/SFX ภายใน process tree เดียวกันและหลายแท็บใน browser เดียวกันยังแยกไม่ได้ ส่วน System Output fallback เป็นเสียงรวมและไม่พยายามเดาต้นทางด้วย AI แอปไม่ auto-type เข้าเกม ไม่มี TTS/virtual mic, speaker identification, updater หรือ public cloud deployment

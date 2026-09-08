@@ -9,4 +9,5 @@ worker/__pycache__/
 .env
 .idea/
 .vscode/
-
+.playwright-cli/
+output/playwright/

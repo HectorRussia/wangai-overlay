@@ -33,11 +33,9 @@ impl AppState {
         if snapshot.groq.configured {
             runtime.groq_status = "Groq พร้อมใช้งาน".into();
         }
-        let active_profile = snapshot.vad.active_profile(snapshot.game_capture_mode);
+        let active_profile = snapshot.vad.active_profile(snapshot.capture_mode);
         runtime.effective_vad_threshold = active_profile.vad_threshold;
         runtime.effective_vad_gain_db = active_profile.gain_db;
-        runtime.voice_chat_vad_threshold = snapshot.voice_chat.vad.vad_threshold;
-        runtime.voice_chat_vad_gain_db = snapshot.voice_chat.vad.gain_db;
         runtime.budget_exhausted =
             snapshot.groq.estimated_spend_microusd >= snapshot.groq.monthly_budget_microusd;
         Ok(Self {
@@ -144,8 +142,8 @@ mod tests {
         for index in 0..105 {
             state.add_final(&TranscriptEvent {
                 segment_id: format!("s-{index}"),
-                stream: StreamKind::Game,
-                source_display_name: Some("GAME".into()),
+                stream: StreamKind::Incoming,
+                source_display_name: Some("MISTFALL".into()),
                 language: "en".into(),
                 text: format!("text {index}"),
                 kind: TranscriptKind::Final,
@@ -168,21 +166,21 @@ mod tests {
     }
 
     #[test]
-    fn history_snapshot_orders_concurrent_sources_by_spoken_time() {
+    fn history_snapshot_orders_incoming_and_microphone_by_spoken_time() {
         let temp = tempfile::tempdir().expect("tempdir");
         let state = AppState::new(temp.path().join("settings.json")).expect("state");
         for (segment_id, stream, ended_at_ms) in [
-            ("voice-late-result", StreamKind::VoiceChat, 100_i64),
-            ("game-newer", StreamKind::Game, 200_i64),
+            ("incoming-old", StreamKind::Incoming, 100_i64),
+            ("microphone-newer", StreamKind::Microphone, 200_i64),
         ] {
             state.add_final(&TranscriptEvent {
                 segment_id: segment_id.into(),
                 stream,
                 source_display_name: Some(
-                    if stream == StreamKind::VoiceChat {
+                    if stream == StreamKind::Incoming {
                         "Discord"
                     } else {
-                        "Mistfall Hunter"
+                        "F9 REPLY"
                     }
                     .into(),
                 ),
@@ -195,8 +193,8 @@ mod tests {
         }
 
         let history = state.snapshot().history;
-        assert_eq!(history[0].segment_id, "game-newer");
-        assert_eq!(history[1].segment_id, "voice-late-result");
+        assert_eq!(history[0].segment_id, "microphone-newer");
+        assert_eq!(history[1].segment_id, "incoming-old");
         assert_eq!(history[1].source_display_name.as_deref(), Some("Discord"));
     }
 }

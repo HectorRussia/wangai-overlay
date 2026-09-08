@@ -30,9 +30,8 @@ KIND_AUDIO = 1
 KIND_RESET = 2
 KIND_FINALIZE = 3
 KIND_SHUTDOWN = 4
-STREAM_GAME = 1
+STREAM_INCOMING = 1
 STREAM_MICROPHONE = 2
-STREAM_VOICE_CHAT = 3
 SAMPLE_RATE = 16_000
 VAD_FRAME_SAMPLES = 512
 
@@ -295,30 +294,19 @@ class StreamSession:
 def run(args) -> int:
     try:
         if args.mock:
-            vad_factory = lambda: EnergyVad(args.silence_ms)
-            game_vad = vad_factory()
-            voice_chat_vad = vad_factory()
+            incoming_vad = EnergyVad(args.silence_ms)
         else:
             from silero_vad import load_silero_vad
 
-            game_vad = SileroVad(
+            incoming_vad = SileroVad(
                 load_silero_vad(onnx=True),
                 args.vad_threshold,
                 args.silence_ms,
                 args.adaptive_floor,
             )
-            voice_chat_vad = SileroVad(
-                load_silero_vad(onnx=True),
-                args.voice_vad_threshold,
-                args.silence_ms,
-                args.voice_adaptive_floor,
-            )
         sessions = {
-            STREAM_GAME: StreamSession(
-                "game", args.max_utterance_ms, game_vad
-            ),
-            STREAM_VOICE_CHAT: StreamSession(
-                "voice_chat", args.max_utterance_ms, voice_chat_vad
+            STREAM_INCOMING: StreamSession(
+                "incoming", args.max_utterance_ms, incoming_vad
             ),
         }
     except Exception as exc:
@@ -345,12 +333,12 @@ def run(args) -> int:
 
 
 def self_test() -> int:
-    payload = struct.pack("<BBHQ", KIND_AUDIO, STREAM_GAME, 0, 123) + np.zeros(320, dtype="<f4").tobytes()
+    payload = struct.pack("<BBHQ", KIND_AUDIO, STREAM_INCOMING, 0, 123) + np.zeros(320, dtype="<f4").tobytes()
     frame = read_frame(io.BytesIO(struct.pack("<I", len(payload)) + payload))
     assert frame is not None and frame.kind == KIND_AUDIO
     assert frame.start_sample_cursor == 123 and frame.samples.shape == (320,)
     assert read_exact(io.BytesIO(b"abc"), 3) == b"abc"
-    print("GameLingo VAD worker protocol self-test: OK")
+    print("WANGAI VAD worker protocol self-test: OK")
     return 0
 
 
@@ -358,8 +346,6 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--vad-threshold", type=float, default=0.5)
     parser.add_argument("--adaptive-floor", type=float)
-    parser.add_argument("--voice-vad-threshold", type=float, default=0.35)
-    parser.add_argument("--voice-adaptive-floor", type=float)
     parser.add_argument("--silence-ms", type=int, default=500)
     parser.add_argument("--max-utterance-ms", type=int, default=12_000)
     parser.add_argument("--mock", action="store_true")

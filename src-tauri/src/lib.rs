@@ -1,3 +1,4 @@
+mod app_metadata;
 mod audio;
 mod cloud_stt;
 mod commands;
@@ -8,6 +9,7 @@ mod processes;
 mod settings;
 mod state;
 mod translator;
+mod web_companion;
 mod worker;
 
 use tauri::{Manager, RunEvent};
@@ -18,6 +20,7 @@ use state::AppState;
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(hotkeys::handle_shortcut)
@@ -28,6 +31,9 @@ pub fn run() {
             let state = AppState::new(settings_path)?;
             let settings = state.settings.snapshot();
             app.manage(state);
+
+            let web = web_companion::WebCompanionManager::start(app.handle().clone())?;
+            app.manage(web);
 
             commands::restore_overlay_bounds(app.handle(), &settings)
                 .map_err(anyhow::Error::msg)?;
@@ -48,16 +54,17 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
             commands::list_capture_sources,
-            commands::list_game_output_devices,
-            commands::select_capture_source,
-            commands::select_voice_chat_source,
-            commands::update_voice_chat,
-            commands::update_game_output_device,
-            commands::update_system_output_cloud_scan,
+            commands::list_running_apps,
+            commands::list_output_devices,
+            commands::get_web_companion_info,
+            commands::open_web_companion,
+            commands::select_listening_source,
+            commands::update_capture_mode,
+            commands::update_output_device,
+            commands::update_rescue_scan,
             commands::toggle_listening,
             commands::set_listening,
-            commands::probe_recent_game_audio,
-            commands::probe_recent_source_audio,
+            commands::probe_recent_audio,
             commands::configure_groq,
             commands::clear_groq_credentials,
             commands::test_groq_configuration,
@@ -66,7 +73,6 @@ pub fn run() {
             commands::update_hotkeys,
             commands::update_overlay_settings,
             commands::update_vad_settings,
-            commands::update_game_capture_mode,
             commands::update_glossary,
             commands::set_overlay_edit_mode,
             commands::set_overlay_presentation,
@@ -82,9 +88,9 @@ pub fn run() {
     app.run(|app, event| {
         if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
             let state = app.state::<AppState>();
+            app.state::<web_companion::WebCompanionManager>().shutdown();
             state.audio.stop_all();
-            state.groq_stt.reset_stream(models::StreamKind::Game);
-            state.groq_stt.reset_stream(models::StreamKind::VoiceChat);
+            state.groq_stt.reset_stream(models::StreamKind::Incoming);
             state.groq_stt.reset_stream(models::StreamKind::Microphone);
             let _ = state.settings.save();
             state.worker.stop();

@@ -8,8 +8,8 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 
 use crate::models::{
-    AppSettings, GameCaptureMode, GameVadProfile, GroqModelKind, GroqModelOption, HotkeySettings,
-    OverlaySettings, VadSettings,
+    AppSettings, CaptureMode, GroqModelKind, GroqModelOption, HotkeySettings, OverlaySettings,
+    VadProfile, VadSettings,
 };
 
 const KEYRING_SERVICE: &str = "GameLingo";
@@ -129,31 +129,31 @@ impl SettingsManager {
         })
     }
 
-    pub fn update_game_output_device(&self, device_id: Option<String>) -> Result<AppSettings> {
+    pub fn update_output_device(&self, device_id: Option<String>) -> Result<AppSettings> {
         self.update(|settings| {
-            settings.game_output_device_id = device_id;
+            settings.output_device_id = device_id;
             Ok(())
         })
     }
 
-    pub fn update_system_output_cloud_scan(&self, enabled: bool) -> Result<AppSettings> {
+    pub fn update_rescue_scan(&self, enabled: bool) -> Result<AppSettings> {
         self.update(|settings| {
-            settings.system_output_cloud_scan = enabled;
+            settings.rescue_scan_enabled = enabled;
             Ok(())
         })
     }
 
     pub fn update_groq_models(
         &self,
-        game_stt_model: String,
+        incoming_stt_model: String,
         microphone_stt_model: String,
         translation_model: String,
     ) -> Result<AppSettings> {
-        validate_stt_model(&game_stt_model)?;
+        validate_stt_model(&incoming_stt_model)?;
         validate_stt_model(&microphone_stt_model)?;
         validate_translation_model(&translation_model)?;
         self.update(|settings| {
-            settings.groq.game_stt_model = game_stt_model;
+            settings.groq.incoming_stt_model = incoming_stt_model;
             settings.groq.microphone_stt_model = microphone_stt_model;
             settings.groq.translation_model = translation_model;
             Ok(())
@@ -351,9 +351,9 @@ pub fn validate_translation_model(model: &str) -> Result<()> {
 }
 
 fn normalize(settings: &mut AppSettings) -> Result<()> {
-    if settings.schema_version < 11 && settings.game_capture_mode == GameCaptureMode::SystemOutput {
-        settings.game_capture_mode = GameCaptureMode::ProcessTree;
-        settings.system_output_cloud_scan = false;
+    if settings.schema_version < 11 && settings.capture_mode == CaptureMode::SystemOutput {
+        settings.capture_mode = CaptureMode::ProcessTree;
+        settings.rescue_scan_enabled = false;
     }
     if settings.schema_version < 3
         && settings.overlay.width == 920
@@ -365,7 +365,7 @@ fn normalize(settings: &mut AppSettings) -> Result<()> {
     if settings.schema_version < 10 && settings.overlay.max_items == 3 {
         settings.overlay.max_items = 4;
     }
-    settings.schema_version = 11;
+    settings.schema_version = 13;
     settings.overlay.opacity = settings.overlay.opacity.clamp(0.2, 1.0);
     settings.overlay.font_scale = settings.overlay.font_scale.clamp(0.7, 1.8);
     settings.overlay.fade_seconds = settings.overlay.fade_seconds.clamp(2, 30);
@@ -375,7 +375,6 @@ fn normalize(settings: &mut AppSettings) -> Result<()> {
     for profile in [
         &mut settings.vad.process_tree,
         &mut settings.vad.system_output,
-        &mut settings.voice_chat.vad,
     ] {
         profile.vad_threshold = profile.vad_threshold.clamp(0.1, 0.95);
         profile.gain_db = profile.gain_db.clamp(0.0, 18.0);
@@ -384,7 +383,7 @@ fn normalize(settings: &mut AppSettings) -> Result<()> {
     settings.vad.pre_roll_ms = settings.vad.pre_roll_ms.clamp(0, 1_000);
     settings.vad.max_utterance_ms = settings.vad.max_utterance_ms.clamp(3_000, 30_000);
     settings.groq.monthly_budget_microusd = MONTHLY_BUDGET_MICROUSD;
-    validate_stt_model(&settings.groq.game_stt_model)?;
+    validate_stt_model(&settings.groq.incoming_stt_model)?;
     validate_stt_model(&settings.groq.microphone_stt_model)?;
     validate_translation_model(&settings.groq.translation_model)?;
     settings
@@ -420,38 +419,138 @@ fn migrate_serialized_settings(value: &mut serde_json::Value) {
         .get("schemaVersion")
         .and_then(serde_json::Value::as_u64)
         .unwrap_or_default();
-    if schema_version >= 7 {
+    if schema_version < 7 {
+        if let Some(vad) = value
+            .get_mut("vad")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            let legacy_threshold = vad
+                .remove("vadThreshold")
+                .and_then(|value| value.as_f64())
+                .unwrap_or(0.5);
+            let legacy_gain = vad
+                .remove("gameVadGainDb")
+                .and_then(|value| value.as_f64())
+                .unwrap_or(0.0);
+            vad.insert(
+                "processTree".into(),
+                serde_json::json!({
+                    "vadThreshold": legacy_threshold,
+                    "gainDb": legacy_gain,
+                }),
+            );
+            vad.entry("systemOutput").or_insert_with(|| {
+                let profile = VadProfile::system_output_default();
+                serde_json::json!({
+                    "vadThreshold": profile.vad_threshold,
+                    "gainDb": profile.gain_db,
+                })
+            });
+        }
+    }
+
+    if schema_version >= 13 {
         return;
     }
-    let Some(vad) = value
-        .get_mut("vad")
-        .and_then(serde_json::Value::as_object_mut)
-    else {
-        return;
+
+    let primary = value
+        .get("selectedProcess")
+        .filter(|source| !source.is_null())
+        .cloned();
+    let browser = value
+        .pointer("/browserMedia/selectedProcess")
+        .filter(|source| !source.is_null())
+        .cloned();
+    let browser_enabled = value
+        .pointer("/browserMedia/enabled")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let voice = value
+        .pointer("/voiceChat/selectedProcess")
+        .filter(|source| !source.is_null())
+        .cloned();
+    let voice_enabled = value
+        .pointer("/voiceChat/enabled")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let (listening_source, source_origin) = if let Some(source) = primary {
+        (Some(source), "primary")
+    } else if browser_enabled && browser.is_some() {
+        (browser, "browser")
+    } else if voice_enabled && voice.is_some() {
+        (voice, "voice")
+    } else {
+        (None, "none")
     };
 
-    let legacy_threshold = vad
-        .remove("vadThreshold")
-        .and_then(|value| value.as_f64())
-        .unwrap_or(0.5);
-    let legacy_gain = vad
-        .remove("gameVadGainDb")
-        .and_then(|value| value.as_f64())
-        .unwrap_or(0.0);
-    vad.insert(
-        "processTree".into(),
-        serde_json::json!({
-            "vadThreshold": legacy_threshold,
-            "gainDb": legacy_gain,
-        }),
-    );
-    vad.entry("systemOutput").or_insert_with(|| {
-        let profile = GameVadProfile::system_output_default();
-        serde_json::json!({
-            "vadThreshold": profile.vad_threshold,
-            "gainDb": profile.gain_db,
-        })
-    });
+    let capture_mode = value
+        .get("gameCaptureMode")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!("process_tree"));
+    let output_device = value
+        .get("gameOutputDeviceId")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let mut rescue_scan = value
+        .get("systemOutputCloudScan")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    if source_origin == "voice" {
+        rescue_scan = value
+            .pointer("/voiceChat/rescueScan")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(rescue_scan);
+    }
+
+    if let Some(object) = value.as_object_mut() {
+        object.insert(
+            "listeningSource".into(),
+            listening_source.unwrap_or(serde_json::Value::Null),
+        );
+        object.insert("captureMode".into(), capture_mode);
+        object.insert("outputDeviceId".into(), output_device);
+        object.insert("rescueScanEnabled".into(), rescue_scan.into());
+    }
+
+    if source_origin == "browser" {
+        let threshold = value
+            .pointer("/browserMedia/vadThreshold")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(0.5);
+        let gain = value
+            .pointer("/browserMedia/gainDb")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(0.0);
+        if let Some(vad) = value
+            .get_mut("vad")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            vad.insert(
+                "processTree".into(),
+                serde_json::json!({ "vadThreshold": threshold, "gainDb": gain }),
+            );
+        }
+    } else if source_origin == "voice" {
+        if let Some(profile) = value.pointer("/voiceChat/vad").cloned() {
+            if let Some(vad) = value
+                .get_mut("vad")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                vad.insert("processTree".into(), profile);
+            }
+        }
+    }
+
+    if let Some(groq) = value
+        .get_mut("groq")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        let incoming = groq
+            .get("gameSttModel")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!(STT_ACCURATE_MODEL));
+        groq.insert("incomingSttModel".into(), incoming);
+    }
 }
 
 fn reset_usage_month(settings: &mut AppSettings) -> bool {
@@ -594,9 +693,9 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 11);
+        assert_eq!(migrated.schema_version, 13);
         assert!(!migrated.auto_attach);
-        assert_eq!(migrated.groq.game_stt_model, STT_ACCURATE_MODEL);
+        assert_eq!(migrated.groq.incoming_stt_model, STT_ACCURATE_MODEL);
         assert_eq!(migrated.groq.microphone_stt_model, STT_TURBO_MODEL);
         assert_eq!(migrated.groq.translation_model, TRANSLATION_FAST_MODEL);
         assert_eq!(migrated.groq.estimated_spend_microusd, 0);
@@ -623,8 +722,8 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 11);
-        assert_eq!(migrated.groq.game_stt_model, STT_ACCURATE_MODEL);
+        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.groq.incoming_stt_model, STT_ACCURATE_MODEL);
         assert_eq!(migrated.groq.microphone_stt_model, STT_TURBO_MODEL);
         assert_eq!(migrated.groq.translation_model, TRANSLATION_ACCURATE_MODEL);
         assert_eq!(migrated.groq.actual_audio_millis, 12_345);
@@ -649,8 +748,8 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 11);
-        assert_eq!(migrated.game_capture_mode, GameCaptureMode::ProcessTree);
+        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.capture_mode, CaptureMode::ProcessTree);
         assert_eq!(migrated.vad.process_tree.gain_db, 0.0);
         assert_eq!(migrated.vad.process_tree.vad_threshold, 0.2);
         assert_eq!(migrated.vad.system_output.gain_db, 9.0);
@@ -675,7 +774,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 11);
+        assert_eq!(migrated.schema_version, 13);
         assert_eq!(migrated.vad.process_tree.vad_threshold, 0.42);
         assert_eq!(migrated.vad.process_tree.gain_db, 4.0);
         assert_eq!(migrated.vad.system_output.vad_threshold, 0.35);
@@ -710,8 +809,8 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 11);
-        assert_eq!(migrated.game_output_device_id, None);
+        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.output_device_id, None);
     }
 
     #[test]
@@ -720,14 +819,11 @@ mod tests {
         let path = temp.path().join("settings.json");
         let manager = SettingsManager::load(path.clone()).expect("load");
         manager
-            .update_game_output_device(Some("Speakers (PRO)".into()))
+            .update_output_device(Some("Speakers (PRO)".into()))
             .expect("update output device");
 
         let loaded = SettingsManager::load(path).expect("reload").snapshot();
-        assert_eq!(
-            loaded.game_output_device_id.as_deref(),
-            Some("Speakers (PRO)")
-        );
+        assert_eq!(loaded.output_device_id.as_deref(), Some("Speakers (PRO)"));
     }
 
     #[test]
@@ -741,14 +837,12 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let manager = SettingsManager::load(path.clone()).expect("migrate");
-        assert_eq!(manager.snapshot().schema_version, 11);
-        assert!(!manager.snapshot().system_output_cloud_scan);
-        manager
-            .update_system_output_cloud_scan(true)
-            .expect("enable cloud scan");
+        assert_eq!(manager.snapshot().schema_version, 13);
+        assert!(!manager.snapshot().rescue_scan_enabled);
+        manager.update_rescue_scan(true).expect("enable cloud scan");
 
         let loaded = SettingsManager::load(path).expect("reload").snapshot();
-        assert!(loaded.system_output_cloud_scan);
+        assert!(loaded.rescue_scan_enabled);
     }
 
     #[test]
@@ -766,7 +860,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 11);
+        assert_eq!(migrated.schema_version, 13);
         assert_eq!(migrated.overlay.width, 420);
         assert_eq!(migrated.overlay.height, 236);
         assert_eq!(migrated.overlay.x, Some(320));
@@ -788,31 +882,70 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 11);
+        assert_eq!(migrated.schema_version, 13);
         assert_eq!(migrated.overlay.max_items, 4);
     }
 
     #[test]
-    fn migrates_v10_to_isolated_processes_and_enables_voice_chat_defaults() {
+    fn migrates_v12_primary_process_to_single_listening_source() {
         let temp = tempfile::tempdir().expect("tempdir");
         let path = temp.path().join("settings.json");
         let mut value = serde_json::to_value(AppSettings::default()).expect("serialize");
         let object = value.as_object_mut().expect("object");
-        object.insert("schemaVersion".into(), 10.into());
-        object.insert("gameCaptureMode".into(), "system_output".into());
-        object.insert("systemOutputCloudScan".into(), true.into());
-        object.remove("voiceChat");
+        object.insert("schemaVersion".into(), 12.into());
+        object.remove("listeningSource");
+        object.insert(
+            "selectedProcess".into(),
+            serde_json::json!({
+                "executablePath": "C:\\Games\\MistfallHunter.exe",
+                "executableName": "MistfallHunter.exe",
+                "displayName": "Mistfall Hunter",
+                "lastPid": 42
+            }),
+        );
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 11);
-        assert_eq!(migrated.game_capture_mode, GameCaptureMode::ProcessTree);
-        assert!(!migrated.system_output_cloud_scan);
-        assert!(migrated.voice_chat.enabled);
-        assert!(migrated.voice_chat.auto_detect);
-        assert!(migrated.voice_chat.rescue_scan);
-        assert_eq!(migrated.voice_chat.vad.vad_threshold, 0.35);
-        assert_eq!(migrated.voice_chat.vad.gain_db, 6.0);
+        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(migrated.capture_mode, CaptureMode::ProcessTree);
+        assert_eq!(
+            migrated.listening_source.unwrap().display_name,
+            "Mistfall Hunter"
+        );
+    }
+
+    #[test]
+    fn migrates_v12_browser_when_primary_process_is_missing() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("settings.json");
+        let mut value = serde_json::to_value(AppSettings::default()).expect("serialize");
+        let object = value.as_object_mut().expect("object");
+        object.insert("schemaVersion".into(), 12.into());
+        object.remove("listeningSource");
+        object.insert(
+            "browserMedia".into(),
+            serde_json::json!({
+                "enabled": true,
+                "selectedProcess": {
+                    "executablePath": "C:\\Program Files\\Google\\Chrome\\chrome.exe",
+                    "executableName": "chrome.exe",
+                    "displayName": "Google Chrome",
+                    "lastPid": 99
+                },
+                "vadThreshold": 0.31,
+                "gainDb": 7.0
+            }),
+        );
+        fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+
+        let migrated = SettingsManager::load(path).expect("migrate").snapshot();
+        assert_eq!(migrated.schema_version, 13);
+        assert_eq!(
+            migrated.listening_source.unwrap().display_name,
+            "Google Chrome"
+        );
+        assert_eq!(migrated.vad.process_tree.vad_threshold, 0.31);
+        assert_eq!(migrated.vad.process_tree.gain_db, 7.0);
     }
 
     #[test]

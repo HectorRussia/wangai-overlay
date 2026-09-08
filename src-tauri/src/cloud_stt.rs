@@ -24,12 +24,12 @@ use crate::{
 
 const SAMPLE_RATE: usize = 16_000;
 const MAX_CAPTURE_SAMPLES: usize = SAMPLE_RATE * 30;
-const MIN_GAME_SAMPLES: usize = SAMPLE_RATE / 4;
+const MIN_INCOMING_SAMPLES: usize = SAMPLE_RATE / 4;
 const MIN_MICROPHONE_SAMPLES: usize = SAMPLE_RATE / 5;
-const GAME_PROBE_SAMPLES: usize = SAMPLE_RATE * 6;
+const INCOMING_PROBE_SAMPLES: usize = SAMPLE_RATE * 6;
 const AUTO_SCAN_WINDOW_SAMPLES: usize = SAMPLE_RATE * 8;
 const AUTO_SCAN_STEP_SAMPLES: u64 = (SAMPLE_RATE * 6) as u64;
-const RECENT_GAME_TEXT_LIMIT: usize = 8;
+const RECENT_INCOMING_TEXT_LIMIT: usize = 8;
 const NEAR_SILENCE_DBFS: f32 = -60.0;
 const TRANSCRIPTIONS_ENDPOINT: &str = "https://api.groq.com/openai/v1/audio/transcriptions";
 
@@ -43,8 +43,7 @@ pub struct AudioSpan {
 pub struct GroqSttManager {
     inner: Arc<Mutex<CaptureState>>,
     provider: GroqSpeechToText,
-    game_queue: Arc<StreamQueue>,
-    voice_chat_queue: Arc<StreamQueue>,
+    incoming_queue: Arc<StreamQueue>,
     microphone_queue: Arc<StreamQueue>,
     busy_jobs: Arc<AtomicUsize>,
 }
@@ -58,32 +57,35 @@ impl GroqSttManager {
                 max_utterance_ms,
             ))),
             provider: GroqSpeechToText::default(),
-            game_queue: Arc::new(StreamQueue::default()),
-            voice_chat_queue: Arc::new(StreamQueue::default()),
+            incoming_queue: Arc::new(StreamQueue::default()),
             microphone_queue: Arc::new(StreamQueue::default()),
             busy_jobs: Arc::new(AtomicUsize::new(0)),
         }
     }
 
-    pub fn configure_game_buffer(&self, pre_roll_ms: u64, silence_ms: u64, max_utterance_ms: u64) {
+    pub fn configure_incoming_buffer(
+        &self,
+        pre_roll_ms: u64,
+        silence_ms: u64,
+        max_utterance_ms: u64,
+    ) {
         let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
         inner.pre_roll_samples = millis_to_samples(pre_roll_ms);
-        inner.game_ring_capacity = game_ring_capacity(silence_ms, max_utterance_ms);
-        let cap = inner.game_ring_capacity;
-        truncate_ring(&mut inner.game, cap);
-        truncate_ring(&mut inner.voice_chat, cap);
+        inner.incoming_ring_capacity = incoming_ring_capacity(silence_ms, max_utterance_ms);
+        let cap = inner.incoming_ring_capacity;
+        truncate_ring(&mut inner.incoming, cap);
     }
 
     pub fn ingest_audio(&self, stream: StreamKind, samples: &[f32]) -> AudioSpan {
         let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
-        let ring_capacity = inner.game_ring_capacity;
+        let ring_capacity = inner.incoming_ring_capacity;
         let buffer = inner.stream_mut(stream);
         let start_sample_cursor = buffer.next_sample_cursor;
         let end_sample_cursor = start_sample_cursor.saturating_add(samples.len() as u64);
         buffer.next_sample_cursor = end_sample_cursor;
 
         match stream {
-            StreamKind::Game | StreamKind::VoiceChat => {
+            StreamKind::Incoming => {
                 buffer
                     .ring
                     .extend(samples.iter().copied().map(f32_to_pcm16));
@@ -107,12 +109,8 @@ impl GroqSttManager {
         }
     }
 
-    pub fn start_game_speech(&self, app: AppHandle, utterance_id: u64, sample_cursor: u64) {
-        self.start_playback_speech(app, StreamKind::Game, utterance_id, sample_cursor);
-    }
-
-    pub fn start_voice_chat_speech(&self, app: AppHandle, utterance_id: u64, sample_cursor: u64) {
-        self.start_playback_speech(app, StreamKind::VoiceChat, utterance_id, sample_cursor);
+    pub fn start_incoming_speech(&self, app: AppHandle, utterance_id: u64, sample_cursor: u64) {
+        self.start_playback_speech(app, StreamKind::Incoming, utterance_id, sample_cursor);
     }
 
     fn start_playback_speech(
@@ -138,7 +136,7 @@ impl GroqSttManager {
         let buffer = inner.stream_mut(stream);
         buffer.last_vad_activity_cursor = Some(sample_cursor);
         if buffer
-            .game_utterance
+            .incoming_utterance
             .as_ref()
             .is_some_and(|active| active.utterance_id == utterance_id)
         {
@@ -151,7 +149,7 @@ impl GroqSttManager {
             return;
         }
         let buffered_samples = buffer.next_sample_cursor.saturating_sub(start_cursor) as usize;
-        buffer.game_utterance = Some(GameUtterance {
+        buffer.incoming_utterance = Some(IncomingUtterance {
             utterance_id,
             start_cursor,
             segment_id: Uuid::new_v4().to_string(),
@@ -166,12 +164,8 @@ impl GroqSttManager {
         let _ = app.emit("runtime-state", runtime);
     }
 
-    pub fn end_game_speech(&self, app: AppHandle, utterance_id: u64, sample_cursor: u64) {
-        self.end_playback_speech(app, StreamKind::Game, utterance_id, sample_cursor);
-    }
-
-    pub fn end_voice_chat_speech(&self, app: AppHandle, utterance_id: u64, sample_cursor: u64) {
-        self.end_playback_speech(app, StreamKind::VoiceChat, utterance_id, sample_cursor);
+    pub fn end_incoming_speech(&self, app: AppHandle, utterance_id: u64, sample_cursor: u64) {
+        self.end_playback_speech(app, StreamKind::Incoming, utterance_id, sample_cursor);
     }
 
     fn end_playback_speech(
@@ -185,11 +179,11 @@ impl GroqSttManager {
             let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
             let buffer = inner.stream_mut(stream);
             buffer.last_vad_activity_cursor = Some(sample_cursor);
-            let Some(active) = buffer.game_utterance.take() else {
+            let Some(active) = buffer.incoming_utterance.take() else {
                 return;
             };
             if active.utterance_id != utterance_id {
-                buffer.game_utterance = Some(active);
+                buffer.incoming_utterance = Some(active);
                 return;
             }
             let end_cursor = sample_cursor.min(buffer.next_sample_cursor);
@@ -198,7 +192,7 @@ impl GroqSttManager {
                 report_audio_gap(&app, "ช่วงคำพูดหลุดออกจาก audio buffer ก่อน VAD ตอบกลับ");
                 return;
             };
-            if samples.len() < MIN_GAME_SAMPLES {
+            if samples.len() < MIN_INCOMING_SAMPLES {
                 let _ = app.emit(
                     "pipeline-status",
                     format!("ข้ามเสียง {:?} ที่สั้นกว่า 250 ms", stream),
@@ -213,23 +207,20 @@ impl GroqSttManager {
                 generation: buffer.generation.load(Ordering::Relaxed),
                 diagnostic_probe: false,
                 automatic_cloud_scan: false,
+                source_display_name: source_display_name(&app.state::<AppState>(), stream),
             }
         };
 
         self.enqueue_job(app, utterance);
     }
 
-    pub fn cancel_game_utterance(&self, app: &AppHandle) {
-        self.cancel_playback_utterance(app, StreamKind::Game);
-    }
-
-    pub fn cancel_voice_chat_utterance(&self, app: &AppHandle) {
-        self.cancel_playback_utterance(app, StreamKind::VoiceChat);
+    pub fn cancel_incoming_utterance(&self, app: &AppHandle) {
+        self.cancel_playback_utterance(app, StreamKind::Incoming);
     }
 
     fn cancel_playback_utterance(&self, app: &AppHandle, stream: StreamKind) {
         let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
-        inner.stream_mut(stream).game_utterance = None;
+        inner.stream_mut(stream).incoming_utterance = None;
         drop(inner);
         report_audio_gap(app, "audio จาก VAD ไม่ต่อเนื่อง จึงยกเลิกวลีนี้");
     }
@@ -283,30 +274,25 @@ impl GroqSttManager {
                 generation: buffer.generation.load(Ordering::Relaxed),
                 diagnostic_probe: false,
                 automatic_cloud_scan: false,
+                source_display_name: Some("F9 REPLY".into()),
             }
         };
 
         self.enqueue_job(app, utterance);
     }
 
-    pub fn probe_recent_game_audio(&self, app: AppHandle) -> Result<()> {
-        self.probe_recent_audio(app, StreamKind::Game)
-    }
-
-    pub fn probe_recent_audio(&self, app: AppHandle, stream: StreamKind) -> Result<()> {
-        if stream == StreamKind::Microphone {
-            return Err(anyhow!("การตรวจเสียงย้อนหลังรองรับเฉพาะ GAME และ VOICE CHAT"));
-        }
+    pub fn probe_recent_audio(&self, app: AppHandle) -> Result<()> {
+        let stream = StreamKind::Incoming;
         let state = app.state::<AppState>();
         let settings = state.settings.snapshot();
         if !settings.groq.configured {
-            return Err(anyhow!("ตั้งค่า Groq API key ก่อนทดสอบเสียงเกม"));
+            return Err(anyhow!("ตั้งค่า Groq API key ก่อนทดสอบเสียง"));
         }
         if state.settings.budget_exhausted() {
             return Err(anyhow!("ถึงงบ Groq รายเดือนแล้ว"));
         }
         if !state.runtime.read().unwrap().listening {
-            return Err(anyhow!("เริ่มฟังเกมก่อนทดสอบเสียงย้อนหลัง"));
+            return Err(anyhow!("เริ่มฟังแหล่งเสียงก่อนทดสอบเสียงย้อนหลัง"));
         }
 
         let job = {
@@ -317,10 +303,10 @@ impl GroqSttManager {
             if available < SAMPLE_RATE {
                 return Err(anyhow!("ยังมีเสียงใน buffer ไม่ถึง 1 วินาที กรุณารอสักครู่"));
             }
-            let sample_count = available.min(GAME_PROBE_SAMPLES);
+            let sample_count = available.min(INCOMING_PROBE_SAMPLES);
             let start_cursor = end_cursor.saturating_sub(sample_count as u64);
             let samples = slice_ring(buffer, start_cursor, end_cursor)
-                .context("อ่านเสียงย้อนหลังจาก game buffer ไม่สำเร็จ")?;
+                .context("อ่านเสียงย้อนหลังจาก incoming buffer ไม่สำเร็จ")?;
             let samples = normalize_pcm16_for_probe(samples);
             SttJob {
                 stream,
@@ -332,34 +318,26 @@ impl GroqSttManager {
                 generation: buffer.generation.load(Ordering::Relaxed),
                 diagnostic_probe: true,
                 automatic_cloud_scan: false,
+                source_display_name: source_display_name(&state, stream),
             }
         };
 
         let runtime = state.update_runtime(|runtime| {
             runtime.capture_warning = None;
-            runtime.status_message = "กำลังส่งเสียงเกม 6 วินาทีล่าสุดไปตรวจด้วย Groq".into();
+            runtime.status_message = "กำลังส่งเสียง 6 วินาทีล่าสุดไปตรวจด้วย Groq".into();
         });
         let _ = app.emit("runtime-state", runtime);
         self.enqueue_job(app, job);
         Ok(())
     }
 
-    pub fn maybe_enqueue_auto_scan(&self, app: AppHandle, stream: StreamKind) -> bool {
-        if stream == StreamKind::Microphone {
-            return false;
-        }
+    pub fn maybe_enqueue_auto_scan(&self, app: AppHandle) -> bool {
+        let stream = StreamKind::Incoming;
         let state = app.state::<AppState>();
         let settings = state.settings.snapshot();
         let budget_exhausted = state.settings.budget_exhausted();
         let runtime = state.runtime.read().unwrap();
-        let enabled = match stream {
-            StreamKind::Game => {
-                settings.game_capture_mode == crate::models::GameCaptureMode::SystemOutput
-                    && settings.system_output_cloud_scan
-            }
-            StreamKind::VoiceChat => settings.voice_chat.enabled && settings.voice_chat.rescue_scan,
-            StreamKind::Microphone => false,
-        };
+        let enabled = settings.rescue_scan_enabled;
         if !enabled
             || !settings.groq.configured
             || budget_exhausted
@@ -397,6 +375,7 @@ impl GroqSttManager {
                 generation: buffer.generation.load(Ordering::Relaxed),
                 diagnostic_probe: false,
                 automatic_cloud_scan: true,
+                source_display_name: source_display_name(&state, stream),
             }
         };
 
@@ -458,7 +437,7 @@ impl GroqSttManager {
             buffer.ring.clear();
             buffer.ring_start_cursor = 0;
             buffer.next_sample_cursor = 0;
-            buffer.game_utterance = None;
+            buffer.incoming_utterance = None;
             buffer.microphone_active = false;
             buffer.microphone_samples.clear();
             buffer.microphone_segment_id = None;
@@ -468,8 +447,7 @@ impl GroqSttManager {
             buffer.generation.fetch_add(1, Ordering::AcqRel);
         }
         match stream {
-            StreamKind::Game => inner.recent_game_texts.clear(),
-            StreamKind::VoiceChat => inner.recent_voice_chat_texts.clear(),
+            StreamKind::Incoming => inner.recent_incoming_texts.clear(),
             StreamKind::Microphone => {}
         }
     }
@@ -479,7 +457,7 @@ impl GroqSttManager {
         let settings = state.settings.snapshot();
         let model = selected_stt_model(&settings, job.stream).to_string();
         let language = match job.stream {
-            StreamKind::Game | StreamKind::VoiceChat => "en",
+            StreamKind::Incoming => "en",
             StreamKind::Microphone => "th",
         };
         if job.automatic_cloud_scan && !has_adaptive_speech_activity(&job.samples) {
@@ -513,6 +491,7 @@ impl GroqSttManager {
             if job.diagnostic_probe {
                 report_probe_result(
                     app,
+                    job.stream,
                     "Groq ไม่พบเสียงพูดใน 6 วินาทีล่าสุด แปลว่า endpoint นี้มีเสียงเกมแต่ไม่มีเสียงเพื่อนที่ชัดเจน",
                 );
             }
@@ -527,6 +506,7 @@ impl GroqSttManager {
             if job.diagnostic_probe {
                 report_probe_result(
                     app,
+                    job.stream,
                     "Groq ได้เสียงจาก endpoint แล้ว แต่ผลถอดเสียง 6 วินาทีล่าสุดว่างเปล่า",
                 );
             }
@@ -534,7 +514,11 @@ impl GroqSttManager {
             return Ok(());
         }
         if job.diagnostic_probe {
-            report_probe_result(app, &format!("Groq ได้ยินเสียงพูดจาก endpoint นี้: {text}"));
+            report_probe_result(
+                app,
+                job.stream,
+                &format!("Groq ได้ยินเสียงพูดจาก endpoint นี้: {text}"),
+            );
         }
         if job.stream != StreamKind::Microphone
             && self.should_skip_or_record_playback_text(job.stream, text, job.automatic_cloud_scan)
@@ -546,7 +530,7 @@ impl GroqSttManager {
         let transcript = TranscriptEvent {
             segment_id: job.segment_id,
             stream: job.stream,
-            source_display_name: source_display_name(&state, job.stream),
+            source_display_name: job.source_display_name,
             language: language.into(),
             text: text.into(),
             kind: TranscriptKind::Final,
@@ -559,8 +543,7 @@ impl GroqSttManager {
 
     fn queue(&self, stream: StreamKind) -> Arc<StreamQueue> {
         match stream {
-            StreamKind::Game => self.game_queue.clone(),
-            StreamKind::VoiceChat => self.voice_chat_queue.clone(),
+            StreamKind::Incoming => self.incoming_queue.clone(),
             StreamKind::Microphone => self.microphone_queue.clone(),
         }
     }
@@ -582,8 +565,7 @@ impl GroqSttManager {
         }
         let mut inner = self.inner.lock().expect("Groq STT capture lock poisoned");
         let recent = match stream {
-            StreamKind::Game => &mut inner.recent_game_texts,
-            StreamKind::VoiceChat => &mut inner.recent_voice_chat_texts,
+            StreamKind::Incoming => &mut inner.recent_incoming_texts,
             StreamKind::Microphone => return false,
         };
         let duplicate = automatic_cloud_scan
@@ -600,7 +582,7 @@ impl GroqSttManager {
             return true;
         }
         recent.push_back(normalized);
-        while recent.len() > RECENT_GAME_TEXT_LIMIT {
+        while recent.len() > RECENT_INCOMING_TEXT_LIMIT {
             recent.pop_front();
         }
         false
@@ -760,6 +742,7 @@ struct SttJob {
     generation: u64,
     diagnostic_probe: bool,
     automatic_cloud_scan: bool,
+    source_display_name: Option<String>,
 }
 
 struct StreamQueue {
@@ -798,39 +781,33 @@ impl StreamQueue {
 
 struct CaptureState {
     pre_roll_samples: usize,
-    game_ring_capacity: usize,
-    game: StreamBuffer,
-    voice_chat: StreamBuffer,
+    incoming_ring_capacity: usize,
+    incoming: StreamBuffer,
     microphone: StreamBuffer,
-    recent_game_texts: VecDeque<String>,
-    recent_voice_chat_texts: VecDeque<String>,
+    recent_incoming_texts: VecDeque<String>,
 }
 
 impl CaptureState {
     fn new(pre_roll_ms: u64, silence_ms: u64, max_utterance_ms: u64) -> Self {
         Self {
             pre_roll_samples: millis_to_samples(pre_roll_ms),
-            game_ring_capacity: game_ring_capacity(silence_ms, max_utterance_ms),
-            game: StreamBuffer::default(),
-            voice_chat: StreamBuffer::default(),
+            incoming_ring_capacity: incoming_ring_capacity(silence_ms, max_utterance_ms),
+            incoming: StreamBuffer::default(),
             microphone: StreamBuffer::default(),
-            recent_game_texts: VecDeque::new(),
-            recent_voice_chat_texts: VecDeque::new(),
+            recent_incoming_texts: VecDeque::new(),
         }
     }
 
     fn stream(&self, stream: StreamKind) -> &StreamBuffer {
         match stream {
-            StreamKind::Game => &self.game,
-            StreamKind::VoiceChat => &self.voice_chat,
+            StreamKind::Incoming => &self.incoming,
             StreamKind::Microphone => &self.microphone,
         }
     }
 
     fn stream_mut(&mut self, stream: StreamKind) -> &mut StreamBuffer {
         match stream {
-            StreamKind::Game => &mut self.game,
-            StreamKind::VoiceChat => &mut self.voice_chat,
+            StreamKind::Incoming => &mut self.incoming,
             StreamKind::Microphone => &mut self.microphone,
         }
     }
@@ -841,7 +818,7 @@ struct StreamBuffer {
     ring: VecDeque<i16>,
     ring_start_cursor: u64,
     next_sample_cursor: u64,
-    game_utterance: Option<GameUtterance>,
+    incoming_utterance: Option<IncomingUtterance>,
     microphone_active: bool,
     microphone_samples: Vec<i16>,
     microphone_segment_id: Option<String>,
@@ -852,7 +829,7 @@ struct StreamBuffer {
     generation: Arc<AtomicU64>,
 }
 
-struct GameUtterance {
+struct IncomingUtterance {
     utterance_id: u64,
     start_cursor: u64,
     segment_id: String,
@@ -901,10 +878,13 @@ fn report_audio_gap(app: &AppHandle, message: &str) {
     let _ = app.emit("capture-log", message.to_string());
 }
 
-fn report_probe_result(app: &AppHandle, message: &str) {
+fn report_probe_result(app: &AppHandle, stream: StreamKind, message: &str) {
     let state = app.state::<AppState>();
     let runtime = state.update_runtime(|runtime| {
-        runtime.capture_warning = Some(message.into());
+        match stream {
+            StreamKind::Incoming => runtime.capture_warning = Some(message.into()),
+            StreamKind::Microphone => {}
+        }
         runtime.status_message = message.into();
     });
     let _ = app.emit("runtime-state", runtime);
@@ -939,7 +919,7 @@ fn truncate(value: &str, max_chars: usize) -> String {
     value.chars().take(max_chars).collect()
 }
 
-fn game_ring_capacity(silence_ms: u64, max_utterance_ms: u64) -> usize {
+fn incoming_ring_capacity(silence_ms: u64, max_utterance_ms: u64) -> usize {
     millis_to_samples(
         max_utterance_ms
             .saturating_add(silence_ms)
@@ -951,7 +931,7 @@ fn game_ring_capacity(silence_ms: u64, max_utterance_ms: u64) -> usize {
 
 fn selected_stt_model(settings: &crate::models::AppSettings, stream: StreamKind) -> &str {
     match stream {
-        StreamKind::Game | StreamKind::VoiceChat => &settings.groq.game_stt_model,
+        StreamKind::Incoming => &settings.groq.incoming_stt_model,
         StreamKind::Microphone => &settings.groq.microphone_stt_model,
     }
 }
@@ -960,22 +940,17 @@ fn source_display_name(state: &AppState, stream: StreamKind) -> Option<String> {
     let settings = state.settings.snapshot();
     let runtime = state.runtime.read().expect("runtime lock poisoned");
     match stream {
-        StreamKind::Game
-            if settings.game_capture_mode == crate::models::GameCaptureMode::SystemOutput =>
+        StreamKind::Incoming
+            if settings.capture_mode == crate::models::CaptureMode::SystemOutput =>
         {
             Some("MIXED".into())
         }
-        StreamKind::Game => runtime
-            .attached_process
+        StreamKind::Incoming => runtime
+            .attached_source
             .as_ref()
             .map(|process| process.display_name.clone())
-            .or_else(|| Some("GAME".into())),
-        StreamKind::VoiceChat => runtime
-            .voice_chat_attached_process
-            .as_ref()
-            .map(|process| process.display_name.clone())
-            .or_else(|| Some("VOICE CHAT".into())),
-        StreamKind::Microphone => None,
+            .or_else(|| Some("INCOMING".into())),
+        StreamKind::Microphone => Some("F9 REPLY".into()),
     }
 }
 
@@ -1250,29 +1225,28 @@ mod tests {
         let manager = GroqSttManager::new(200, 500, 12_000);
 
         assert!(!manager.should_skip_or_record_playback_text(
-            StreamKind::Game,
+            StreamKind::Incoming,
             "Enemy on the left!",
             false
         ));
         assert!(manager.should_skip_or_record_playback_text(
-            StreamKind::Game,
+            StreamKind::Incoming,
             "enemy, on the left",
             true
         ));
         assert!(!manager.should_skip_or_record_playback_text(
-            StreamKind::Game,
+            StreamKind::Incoming,
             "Push the north gate",
             true
         ));
-        assert!(manager.should_skip_or_record_playback_text(StreamKind::Game, "North gate", true));
-        assert!(!manager.should_skip_or_record_playback_text(
-            StreamKind::Game,
-            "Push the north gate and wait for the healer to arrive",
+        assert!(manager.should_skip_or_record_playback_text(
+            StreamKind::Incoming,
+            "North gate",
             true
         ));
         assert!(!manager.should_skip_or_record_playback_text(
-            StreamKind::VoiceChat,
-            "Enemy on the left!",
+            StreamKind::Incoming,
+            "Push the north gate and wait for the healer to arrive",
             true
         ));
         assert_eq!(
@@ -1305,10 +1279,27 @@ mod tests {
     }
 
     #[test]
-    fn defaults_use_accurate_game_and_fast_microphone_models() {
+    fn incoming_and_microphone_keep_independent_buffers_and_cursors() {
+        let manager = GroqSttManager::new(200, 500, 12_000);
+        let incoming = manager.ingest_audio(StreamKind::Incoming, &[0.2; 1_600]);
+        manager.ingest_audio(StreamKind::Microphone, &[0.3; 400]);
+
+        assert_eq!(incoming.start_sample_cursor, 0);
+        assert_eq!(incoming.end_sample_cursor, 1_600);
+        let inner = manager.inner.lock().unwrap();
+        assert_eq!(inner.incoming.next_sample_cursor, 1_600);
+        assert_eq!(inner.microphone.next_sample_cursor, 400);
+        assert_eq!(
+            inner.incoming.ring.front().copied(),
+            Some(f32_to_pcm16(0.2))
+        );
+    }
+
+    #[test]
+    fn defaults_use_accurate_incoming_and_fast_microphone_models() {
         let settings = AppSettings::default();
         assert_eq!(
-            selected_stt_model(&settings, StreamKind::Game),
+            selected_stt_model(&settings, StreamKind::Incoming),
             "whisper-large-v3"
         );
         assert_eq!(

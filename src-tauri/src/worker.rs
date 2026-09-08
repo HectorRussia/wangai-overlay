@@ -40,7 +40,6 @@ impl WorkerManager {
         self.stop();
         emit_status(&app, "starting", "กำลังเปิด Silero VAD worker", None);
         let vad_threshold = active_vad_threshold(settings);
-        let voice_vad_threshold = settings.voice_chat.vad.vad_threshold;
 
         let worker_path = resolve_worker_path(&app)?;
         let python = resolve_python(&worker_path);
@@ -59,10 +58,6 @@ impl WorkerManager {
             .arg(vad_threshold.to_string())
             .arg("--adaptive-floor")
             .arg(adaptive_vad_floor(settings, vad_threshold).to_string())
-            .arg("--voice-vad-threshold")
-            .arg(voice_vad_threshold.to_string())
-            .arg("--voice-adaptive-floor")
-            .arg((voice_vad_threshold * 0.6).clamp(0.12, 0.25).to_string())
             .arg("--silence-ms")
             .arg(settings.vad.silence_ms.to_string())
             .arg("--max-utterance-ms")
@@ -217,14 +212,14 @@ impl WorkerManager {
 fn active_vad_threshold(settings: &AppSettings) -> f32 {
     settings
         .vad
-        .active_profile(settings.game_capture_mode)
+        .active_profile(settings.capture_mode)
         .vad_threshold
 }
 
 fn adaptive_vad_floor(settings: &AppSettings, threshold: f32) -> f32 {
-    match settings.game_capture_mode {
-        crate::models::GameCaptureMode::SystemOutput => (threshold * 0.25).clamp(0.05, 0.12),
-        crate::models::GameCaptureMode::ProcessTree => threshold,
+    match settings.capture_mode {
+        crate::models::CaptureMode::SystemOutput => (threshold * 0.25).clamp(0.05, 0.12),
+        crate::models::CaptureMode::ProcessTree => threshold,
     }
 }
 
@@ -310,12 +305,12 @@ mod tests {
         let mut data = Vec::new();
         write_frame(
             &mut data,
-            WorkerCommand::Audio(StreamKind::Game, 320, vec![0.5, -0.5]),
+            WorkerCommand::Audio(StreamKind::Incoming, 320, vec![0.5, -0.5]),
         )
         .expect("write");
         assert_eq!(u32::from_le_bytes(data[0..4].try_into().unwrap()), 20);
         assert_eq!(data[4], FRAME_AUDIO);
-        assert_eq!(data[5], StreamKind::Game.id());
+        assert_eq!(data[5], StreamKind::Incoming.id());
         assert_eq!(u64::from_le_bytes(data[8..16].try_into().unwrap()), 320);
         assert_eq!(data.len(), 24);
     }
@@ -330,33 +325,27 @@ mod tests {
     }
 
     #[test]
-    fn voice_chat_frame_has_an_independent_stream_id() {
-        let mut data = Vec::new();
-        write_frame(
-            &mut data,
-            WorkerCommand::Audio(StreamKind::VoiceChat, 1_024, vec![0.25]),
-        )
-        .expect("write");
-        assert_eq!(data[5], 3);
-        assert_eq!(u64::from_le_bytes(data[8..16].try_into().unwrap()), 1_024);
+    fn only_incoming_and_microphone_stream_ids_remain() {
+        assert_eq!(StreamKind::Incoming.id(), 1);
+        assert_eq!(StreamKind::Microphone.id(), 2);
     }
 
     #[test]
     fn system_output_uses_its_own_vad_threshold() {
         let mut settings = AppSettings::default();
         assert_eq!(active_vad_threshold(&settings), 0.5);
-        settings.game_capture_mode = crate::models::GameCaptureMode::SystemOutput;
+        settings.capture_mode = crate::models::CaptureMode::SystemOutput;
         assert_eq!(active_vad_threshold(&settings), 0.35);
     }
 
     #[test]
     fn system_output_enables_a_lower_adaptive_speech_floor() {
         let mut settings = AppSettings::default();
-        settings.game_capture_mode = crate::models::GameCaptureMode::SystemOutput;
+        settings.capture_mode = crate::models::CaptureMode::SystemOutput;
         settings.vad.system_output.vad_threshold = 0.2;
 
         assert_eq!(adaptive_vad_floor(&settings, 0.2), 0.05);
-        settings.game_capture_mode = crate::models::GameCaptureMode::ProcessTree;
+        settings.capture_mode = crate::models::CaptureMode::ProcessTree;
         assert_eq!(adaptive_vad_floor(&settings, 0.5), 0.5);
     }
 }

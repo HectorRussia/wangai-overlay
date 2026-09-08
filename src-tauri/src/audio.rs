@@ -13,7 +13,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{
     cloud_stt::GroqSttManager,
-    models::{AudioOutputDevice, GameCaptureMode, StreamKind},
+    models::{AudioOutputDevice, CaptureMode, StreamKind},
     processes,
     state::AppState,
     worker::WorkerManager,
@@ -61,17 +61,17 @@ impl VadAutoLeveler {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GameCaptureConfig {
+pub(crate) struct IncomingCaptureConfig {
     pub selected_pid: u32,
     pub effective_pid: u32,
-    pub capture_mode: GameCaptureMode,
+    pub capture_mode: CaptureMode,
     pub vad_gain_db: f32,
     pub output_device_id: Option<String>,
     pub output_device_name: Option<String>,
     pub cloud_scan_enabled: bool,
 }
 
-pub(crate) fn list_game_output_devices() -> Result<Vec<AudioOutputDevice>> {
+pub(crate) fn list_output_devices() -> Result<Vec<AudioOutputDevice>> {
     let mut outputs = map_output_devices(devices()?);
     outputs.sort_by(|left, right| {
         right
@@ -96,8 +96,8 @@ fn map_output_devices(devices: Vec<DeviceInfo>) -> Vec<AudioOutputDevice> {
         .collect()
 }
 
-pub(crate) fn resolve_game_output_device(selected_id: Option<&str>) -> Result<AudioOutputDevice> {
-    let devices = list_game_output_devices()?;
+pub(crate) fn resolve_output_device(selected_id: Option<&str>) -> Result<AudioOutputDevice> {
+    let devices = list_output_devices()?;
     match selected_id {
         Some(id) => devices
             .into_iter()
@@ -121,24 +121,23 @@ impl CaptureHandle {
 
 #[derive(Default)]
 pub struct AudioManager {
-    game: Mutex<Option<CaptureHandle>>,
-    voice_chat: Mutex<Option<CaptureHandle>>,
+    incoming: Mutex<Option<CaptureHandle>>,
     microphone: Mutex<Option<CaptureHandle>>,
 }
 
 impl AudioManager {
-    pub fn start_game(
+    pub fn start_incoming(
         &self,
         app: AppHandle,
-        config: GameCaptureConfig,
+        config: IncomingCaptureConfig,
         worker: WorkerManager,
         groq_stt: GroqSttManager,
     ) -> Result<()> {
-        self.stop_game();
+        self.stop_incoming();
         if !processes::process_is_alive(config.selected_pid) {
             return Err(anyhow!("process {} ไม่ได้ทำงานแล้ว", config.selected_pid));
         }
-        if config.capture_mode == GameCaptureMode::ProcessTree
+        if config.capture_mode == CaptureMode::ProcessTree
             && !processes::process_is_alive(config.effective_pid)
         {
             return Err(anyhow!(
@@ -146,60 +145,27 @@ impl AudioManager {
                 config.effective_pid
             ));
         }
-        worker.reset_stream(StreamKind::Game);
-        groq_stt.reset_stream(StreamKind::Game);
-        let handle = spawn_capture(app, StreamKind::Game, Some(config), Some(worker), groq_stt)?;
-        *self.game.lock().expect("game capture lock poisoned") = Some(handle);
-        Ok(())
-    }
-
-    pub fn stop_game(&self) {
-        if let Some(handle) = self.game.lock().expect("game capture lock poisoned").take() {
-            handle.stop();
-        }
-    }
-
-    pub fn start_voice_chat(
-        &self,
-        app: AppHandle,
-        config: GameCaptureConfig,
-        worker: WorkerManager,
-        groq_stt: GroqSttManager,
-    ) -> Result<()> {
-        self.stop_voice_chat();
-        if !processes::process_is_alive(config.selected_pid) {
-            return Err(anyhow!(
-                "voice chat process {} ไม่ได้ทำงานแล้ว",
-                config.selected_pid
-            ));
-        }
-        if !processes::process_is_alive(config.effective_pid) {
-            return Err(anyhow!(
-                "voice chat process root {} ไม่ได้ทำงานแล้ว",
-                config.effective_pid
-            ));
-        }
-        worker.reset_stream(StreamKind::VoiceChat);
-        groq_stt.reset_stream(StreamKind::VoiceChat);
+        worker.reset_stream(StreamKind::Incoming);
+        groq_stt.reset_stream(StreamKind::Incoming);
         let handle = spawn_capture(
             app,
-            StreamKind::VoiceChat,
+            StreamKind::Incoming,
             Some(config),
             Some(worker),
             groq_stt,
         )?;
         *self
-            .voice_chat
+            .incoming
             .lock()
-            .expect("voice chat capture lock poisoned") = Some(handle);
+            .expect("incoming capture lock poisoned") = Some(handle);
         Ok(())
     }
 
-    pub fn stop_voice_chat(&self) {
+    pub fn stop_incoming(&self) {
         if let Some(handle) = self
-            .voice_chat
+            .incoming
             .lock()
-            .expect("voice chat capture lock poisoned")
+            .expect("incoming capture lock poisoned")
             .take()
         {
             handle.stop();
@@ -233,8 +199,7 @@ impl AudioManager {
     }
 
     pub fn stop_all(&self) {
-        self.stop_game();
-        self.stop_voice_chat();
+        self.stop_incoming();
         self.stop_microphone();
     }
 }
@@ -242,7 +207,7 @@ impl AudioManager {
 fn spawn_capture(
     app: AppHandle,
     stream_kind: StreamKind,
-    game_config: Option<GameCaptureConfig>,
+    incoming_config: Option<IncomingCaptureConfig>,
     worker: Option<WorkerManager>,
     groq_stt: GroqSttManager,
 ) -> Result<CaptureHandle> {
@@ -252,8 +217,8 @@ fn spawn_capture(
         .name(format!("gamelingo-capture-{stream_kind:?}"))
         .spawn(move || {
             let (source_kind, target_pid) =
-                capture_source_config(stream_kind, game_config.as_ref());
-            let device_id = capture_device_id(stream_kind, game_config.as_ref());
+                capture_source_config(stream_kind, incoming_config.as_ref());
+            let device_id = capture_device_id(stream_kind, incoming_config.as_ref());
             let config = StreamConfig {
                 kind: source_kind,
                 device_id,
@@ -303,9 +268,7 @@ fn spawn_capture(
                 while let Some(chunk) = stream.poll_chunk() {
                     had_audio = true;
                     let mono_data = match stream_kind {
-                        StreamKind::Game | StreamKind::VoiceChat => {
-                            downmix_stereo_voice_preserving(&chunk.data)
-                        }
+                        StreamKind::Incoming => downmix_stereo_voice_preserving(&chunk.data),
                         StreamKind::Microphone => chunk.data,
                     };
                     if stream_kind != StreamKind::Microphone {
@@ -322,13 +285,13 @@ fn spawn_capture(
                     }
                     let span = groq_stt.ingest_audio(stream_kind, &mono_data);
                     if let Some(worker) = worker.as_ref() {
-                        let samples = game_config
+                        let samples = incoming_config
                             .as_ref()
                             .map(|config| {
                                 let samples = vad_leveler.process(
                                     &mono_data,
                                     config.vad_gain_db,
-                                    config.capture_mode == GameCaptureMode::SystemOutput,
+                                    config.capture_mode == CaptureMode::SystemOutput,
                                 );
                                 vad_auto_gain_db = vad_leveler.auto_gain_db;
                                 samples
@@ -346,15 +309,11 @@ fn spawn_capture(
                     && last_process_check.elapsed() >= Duration::from_secs(1)
                 {
                     last_process_check = Instant::now();
-                    if game_config
+                    if incoming_config
                         .as_ref()
                         .is_some_and(|config| !processes::process_is_alive(config.selected_pid))
                     {
-                        let reason = match stream_kind {
-                            StreamKind::Game => "game_process_exited",
-                            StreamKind::VoiceChat => "voice_chat_process_exited",
-                            StreamKind::Microphone => unreachable!(),
-                        };
+                        let reason = "listening_source_exited";
                         let _ = app.emit("capture-ended", reason);
                         break;
                     }
@@ -365,7 +324,7 @@ fn spawn_capture(
                     emit_playback_audio_diagnostics(
                         &app,
                         stream_kind,
-                        game_config.as_ref().expect("game capture config"),
+                        incoming_config.as_ref().expect("incoming capture config"),
                         capture_started,
                         last_audio_received,
                         last_audible_received,
@@ -381,13 +340,13 @@ fn spawn_capture(
                     meter_samples = 0;
                 }
                 if stream_kind != StreamKind::Microphone
-                    && game_config
+                    && incoming_config
                         .as_ref()
                         .is_some_and(|config| config.cloud_scan_enabled)
                     && last_cloud_scan_check.elapsed() >= Duration::from_millis(250)
                 {
                     last_cloud_scan_check = Instant::now();
-                    groq_stt.maybe_enqueue_auto_scan(app.clone(), stream_kind);
+                    groq_stt.maybe_enqueue_auto_scan(app.clone());
                 }
                 if !had_audio {
                     thread::sleep(Duration::from_millis(5));
@@ -417,31 +376,21 @@ fn spawn_capture(
 fn capture_failed(app: &AppHandle, stream_kind: StreamKind, message: String) {
     let state = app.state::<AppState>();
     let runtime = state.update_runtime(|runtime| {
-        if stream_kind == StreamKind::Game {
+        if stream_kind == StreamKind::Incoming {
             runtime.last_error = Some(message.clone());
             runtime.status_message = "เปิด audio capture ไม่สำเร็จ จะลองใหม่".into();
-            runtime.attached_process = None;
+            runtime.attached_source = None;
             runtime.effective_capture_pid = None;
             runtime.effective_capture_name = None;
             runtime.effective_output_device_id = None;
             runtime.effective_output_device_name = None;
             runtime.effective_output_device_is_default = false;
-            runtime.game_audio_rms_dbfs = None;
-            runtime.game_audio_peak_dbfs = None;
-            runtime.game_audio_last_seen_at_ms = None;
-            runtime.game_vad_active = false;
+            runtime.audio_rms_dbfs = None;
+            runtime.audio_peak_dbfs = None;
+            runtime.audio_last_seen_at_ms = None;
+            runtime.vad_active = false;
             runtime.effective_vad_auto_gain_db = 0.0;
             runtime.capture_warning = Some(message.clone());
-        } else if stream_kind == StreamKind::VoiceChat {
-            runtime.status_message = "Voice chat capture มีปัญหา แต่ GAME ยังทำงานต่อ".into();
-            runtime.voice_chat_attached_process = None;
-            runtime.voice_chat_effective_capture_pid = None;
-            runtime.voice_chat_effective_capture_name = None;
-            runtime.voice_chat_audio_rms_dbfs = None;
-            runtime.voice_chat_audio_peak_dbfs = None;
-            runtime.voice_chat_audio_last_seen_at_ms = None;
-            runtime.voice_chat_vad_active = false;
-            runtime.voice_chat_capture_warning = Some(message.clone());
         } else {
             runtime.last_error = Some(message.clone());
             runtime.status_message = "เปิด audio capture ไม่สำเร็จ จะลองใหม่".into();
@@ -464,18 +413,15 @@ fn accumulate_levels(samples: &[f32], sum_squares: &mut f64, peak: &mut f32, cou
 
 fn capture_source_config(
     stream_kind: StreamKind,
-    game_config: Option<&GameCaptureConfig>,
+    incoming_config: Option<&IncomingCaptureConfig>,
 ) -> (SourceKind, Option<u32>) {
-    match (stream_kind, game_config) {
-        (StreamKind::Game, Some(config))
-            if config.capture_mode == GameCaptureMode::SystemOutput =>
+    match (stream_kind, incoming_config) {
+        (StreamKind::Incoming, Some(config))
+            if config.capture_mode == CaptureMode::SystemOutput =>
         {
             (SourceKind::SystemLoopback, None)
         }
-        (StreamKind::Game, Some(config)) => {
-            (SourceKind::ProcessLoopback, Some(config.effective_pid))
-        }
-        (StreamKind::VoiceChat, Some(config)) => {
+        (StreamKind::Incoming, Some(config)) => {
             (SourceKind::ProcessLoopback, Some(config.effective_pid))
         }
         _ => (SourceKind::Mic, None),
@@ -484,11 +430,11 @@ fn capture_source_config(
 
 fn capture_device_id(
     stream_kind: StreamKind,
-    game_config: Option<&GameCaptureConfig>,
+    incoming_config: Option<&IncomingCaptureConfig>,
 ) -> Option<String> {
-    match (stream_kind, game_config) {
-        (StreamKind::Game, Some(config))
-            if config.capture_mode == GameCaptureMode::SystemOutput =>
+    match (stream_kind, incoming_config) {
+        (StreamKind::Incoming, Some(config))
+            if config.capture_mode == CaptureMode::SystemOutput =>
         {
             config.output_device_id.clone()
         }
@@ -498,7 +444,7 @@ fn capture_device_id(
 
 fn capture_output_channels(stream_kind: StreamKind) -> u16 {
     match stream_kind {
-        StreamKind::Game | StreamKind::VoiceChat => 2,
+        StreamKind::Incoming => 2,
         StreamKind::Microphone => 1,
     }
 }
@@ -557,8 +503,8 @@ fn amplitude_to_dbfs(amplitude: f32) -> f32 {
 #[allow(clippy::too_many_arguments)]
 fn emit_playback_audio_diagnostics(
     app: &AppHandle,
-    stream_kind: StreamKind,
-    config: &GameCaptureConfig,
+    _stream_kind: StreamKind,
+    config: &IncomingCaptureConfig,
     capture_started: Instant,
     last_audio_received: Option<Instant>,
     last_audible_received: Option<Instant>,
@@ -578,25 +524,17 @@ fn emit_playback_audio_diagnostics(
     let no_audible_for = last_audible_received
         .map(|last| last.elapsed())
         .unwrap_or_else(|| capture_started.elapsed());
-    let source_label = if stream_kind == StreamKind::VoiceChat {
-        "voice chat"
-    } else {
-        "เกม"
-    };
     let warning = if dropped > 0 {
         Some(format!(
-            "Silero VAD ตามเสียง {source_label} ไม่ทันและทิ้ง audio ไป {dropped} ชุด กรุณาลดภาระเครื่อง"
+            "Silero VAD ตามเสียงไม่ทันและทิ้ง audio ไป {dropped} ชุด กรุณาลดภาระเครื่อง"
         ))
     } else if no_audio_for >= Duration::from_secs(3) {
         Some(match config.capture_mode {
-            GameCaptureMode::ProcessTree if stream_kind == StreamKind::VoiceChat => {
-                "ยังไม่พบเสียงจาก process voice chat กรุณาตรวจ process ที่เลือก".into()
+            CaptureMode::ProcessTree => {
+                "ยังไม่พบเสียงจากแอปที่เลือก ลองตรวจแอปหรือเปิด System Output fallback".into()
             }
-            GameCaptureMode::ProcessTree => {
-                "ยังไม่พบเสียงจาก process เกม ลองเปิด System Output fallback".into()
-            }
-            GameCaptureMode::SystemOutput => format!(
-                "ยังไม่ได้รับ audio frame จาก {} กรุณาเลือกอุปกรณ์ที่ได้ยิน Mistfall อยู่",
+            CaptureMode::SystemOutput => format!(
+                "ยังไม่ได้รับ audio frame จาก {} กรุณาเลือกอุปกรณ์ที่ได้ยินแอปอยู่",
                 config
                     .output_device_name
                     .as_deref()
@@ -605,15 +543,12 @@ fn emit_playback_audio_diagnostics(
         })
     } else if no_audible_for >= Duration::from_secs(3) {
         Some(match config.capture_mode {
-            GameCaptureMode::ProcessTree if stream_kind == StreamKind::VoiceChat => {
-                "เสียงจาก process voice chat เป็น digital silence กรุณาตรวจ process ที่เลือก".into()
+            CaptureMode::ProcessTree => {
+                "เสียงจากแอปที่เลือกเป็น digital silence ลองเปิด System Output fallback".into()
             }
-            GameCaptureMode::ProcessTree => {
-                "เสียงจาก process เกมเป็น digital silence ลองเปิด System Output fallback".into()
-            }
-            GameCaptureMode::SystemOutput => {
+            CaptureMode::SystemOutput => {
                 format!(
-                    "{} เป็น digital silence กรุณาตรวจว่า Mistfall ใช้อุปกรณ์นี้อยู่",
+                    "{} เป็น digital silence กรุณาตรวจว่าแอปใช้อุปกรณ์นี้อยู่",
                     config
                         .output_device_name
                         .as_deref()
@@ -626,48 +561,28 @@ fn emit_playback_audio_diagnostics(
     };
     let state = app.state::<AppState>();
     let runtime = state.update_runtime(|runtime| {
-        if stream_kind == StreamKind::VoiceChat {
-            runtime.voice_chat_audio_rms_dbfs = levels.map(|value| value.0);
-            runtime.voice_chat_audio_peak_dbfs = levels.map(|value| value.1);
-            if sample_count > 0 {
-                runtime.voice_chat_audio_last_seen_at_ms =
-                    Some(chrono::Utc::now().timestamp_millis());
-            }
-            runtime.voice_chat_dropped_audio_chunks = dropped;
-            runtime.voice_chat_capture_warning = warning;
-        } else {
-            runtime.game_audio_rms_dbfs = levels.map(|value| value.0);
-            runtime.game_audio_peak_dbfs = levels.map(|value| value.1);
-            if sample_count > 0 {
-                runtime.game_audio_last_seen_at_ms = Some(chrono::Utc::now().timestamp_millis());
-            }
-            runtime.dropped_audio_chunks = dropped;
-            runtime.effective_vad_auto_gain_db = vad_auto_gain_db;
-            runtime.capture_warning = warning;
+        runtime.audio_rms_dbfs = levels.map(|value| value.0);
+        runtime.audio_peak_dbfs = levels.map(|value| value.1);
+        if sample_count > 0 {
+            runtime.audio_last_seen_at_ms = Some(chrono::Utc::now().timestamp_millis());
         }
+        runtime.dropped_audio_chunks = dropped;
+        runtime.effective_vad_auto_gain_db = vad_auto_gain_db;
+        runtime.capture_warning = warning;
     });
     let _ = app.emit("runtime-state", runtime);
 }
 
-fn clear_playback_audio_diagnostics(app: &AppHandle, stream_kind: StreamKind) {
+fn clear_playback_audio_diagnostics(app: &AppHandle, _stream_kind: StreamKind) {
     let state = app.state::<AppState>();
     let runtime = state.update_runtime(|runtime| {
-        if stream_kind == StreamKind::VoiceChat {
-            runtime.voice_chat_audio_rms_dbfs = None;
-            runtime.voice_chat_audio_peak_dbfs = None;
-            runtime.voice_chat_audio_last_seen_at_ms = None;
-            runtime.voice_chat_vad_active = false;
-            runtime.voice_chat_dropped_audio_chunks = 0;
-            runtime.voice_chat_capture_warning = None;
-        } else {
-            runtime.game_audio_rms_dbfs = None;
-            runtime.game_audio_peak_dbfs = None;
-            runtime.game_audio_last_seen_at_ms = None;
-            runtime.game_vad_active = false;
-            runtime.effective_vad_auto_gain_db = 0.0;
-            runtime.dropped_audio_chunks = 0;
-            runtime.capture_warning = None;
-        }
+        runtime.audio_rms_dbfs = None;
+        runtime.audio_peak_dbfs = None;
+        runtime.audio_last_seen_at_ms = None;
+        runtime.vad_active = false;
+        runtime.effective_vad_auto_gain_db = 0.0;
+        runtime.dropped_audio_chunks = 0;
+        runtime.capture_warning = None;
     });
     let _ = app.emit("runtime-state", runtime);
 }
@@ -727,43 +642,34 @@ mod tests {
 
     #[test]
     fn capture_mode_selects_process_or_system_loopback() {
-        let mut config = GameCaptureConfig {
+        let mut config = IncomingCaptureConfig {
             selected_pid: 10,
             effective_pid: 20,
-            capture_mode: GameCaptureMode::ProcessTree,
+            capture_mode: CaptureMode::ProcessTree,
             vad_gain_db: 0.0,
             output_device_id: Some("Speakers (PRO)".into()),
             output_device_name: Some("Speakers (PRO)".into()),
             cloud_scan_enabled: false,
         };
         assert_eq!(
-            capture_source_config(StreamKind::Game, Some(&config)),
+            capture_source_config(StreamKind::Incoming, Some(&config)),
             (SourceKind::ProcessLoopback, Some(20))
         );
-        assert_eq!(capture_device_id(StreamKind::Game, Some(&config)), None);
+        assert_eq!(capture_device_id(StreamKind::Incoming, Some(&config)), None);
+        config.capture_mode = CaptureMode::SystemOutput;
         assert_eq!(
-            capture_source_config(StreamKind::VoiceChat, Some(&config)),
-            (SourceKind::ProcessLoopback, Some(20))
-        );
-        assert_eq!(
-            capture_device_id(StreamKind::VoiceChat, Some(&config)),
-            None
-        );
-        config.capture_mode = GameCaptureMode::SystemOutput;
-        assert_eq!(
-            capture_source_config(StreamKind::Game, Some(&config)),
+            capture_source_config(StreamKind::Incoming, Some(&config)),
             (SourceKind::SystemLoopback, None)
         );
         assert_eq!(
-            capture_device_id(StreamKind::Game, Some(&config)).as_deref(),
+            capture_device_id(StreamKind::Incoming, Some(&config)).as_deref(),
             Some("Speakers (PRO)")
         );
         assert_eq!(
             capture_source_config(StreamKind::Microphone, None),
             (SourceKind::Mic, None)
         );
-        assert_eq!(capture_output_channels(StreamKind::Game), 2);
-        assert_eq!(capture_output_channels(StreamKind::VoiceChat), 2);
+        assert_eq!(capture_output_channels(StreamKind::Incoming), 2);
         assert_eq!(capture_output_channels(StreamKind::Microphone), 1);
     }
 

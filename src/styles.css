@@ -75,7 +75,7 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
 .ready-summary.is-warning { color: #e6c77f; background: rgba(219,173,82,.09); }
 
 .ready-source-list { border: 1px solid var(--line); border-radius: 17px 17px 0 0; overflow: hidden; background: rgba(255,255,255,.012); }
-.ready-source-row { display: grid; min-height: 98px; grid-template-columns: 38px 52px minmax(145px, 1.15fr) minmax(150px, .95fr) minmax(170px, 1fr) 82px; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.ready-source-row { display: grid; min-height: 82px; grid-template-columns: 38px 52px minmax(145px, 1.15fr) minmax(150px, .95fr) minmax(170px, 1fr) 82px; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,.07); }
 .ready-source-row:last-child { border-bottom: 0; }
 .ready-step { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(99,196,139,.2); border-radius: 50%; color: #75d79b; background: rgba(99,196,139,.065); font-size: .78rem; font-weight: 850; }
 .ready-source-icon { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; color: #79dda2; background: rgba(255,255,255,.035); }
@@ -139,8 +139,8 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
 .ready-listen-button.is-listening { color: #90e9b4; background: rgba(99,196,139,.12); }
 .ready-listen-button:disabled { cursor: default; }
 .ready-footer-actions { display: flex; min-height: 28px; align-items: center; justify-content: center; gap: 20px; color: #737883; }
-.ready-footer-actions a { display: inline-flex; align-items: center; gap: 6px; color: inherit; font-size: .65rem; font-weight: 700; text-decoration: none; }
-.ready-footer-actions a:hover { color: #81e0a6; }
+.ready-footer-actions a, .ready-footer-actions button { display: inline-flex; align-items: center; gap: 6px; border: 0; color: inherit; background: transparent; font-size: .65rem; font-weight: 700; text-decoration: none; }
+.ready-footer-actions a:hover, .ready-footer-actions button:hover { color: #81e0a6; }
 .ready-footer-actions svg { width: 14px; height: 14px; }
 .ready-footer-actions span { position: absolute; right: 4px; font-size: .55rem; }
 
@@ -153,7 +153,7 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
 .advanced-heading nav svg { width: 15px; height: 15px; }
 .advanced-preview-note { grid-column: 1 / -1; margin: 0; color: #b59661; font-size: .63rem; }
 .advanced-stack { display: grid; gap: 14px; }
-.advanced-source-overview { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--line); }
+.advanced-source-overview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--line); }
 .advanced-source-overview > div { display: grid; min-height: 92px; grid-template-columns: 40px minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 15px; background: var(--surface); }
 .advanced-source-overview > div > span { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; color: #77dba0; background: rgba(99,196,139,.09); }
 .advanced-source-overview svg { width: 18px; }
@@ -188,18 +188,25 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
 .process-dialog-search input { min-height: 43px; border: 0; color: #eff1f3; outline: 0; background: transparent; font-size: .74rem; }
 .process-dialog-search button { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 9px; color: #9398a3; background: transparent; }
 .process-dialog-list { display: grid; max-height: 430px; gap: 7px; overflow-y: auto; padding: 0 20px 16px; scrollbar-width: thin; }
-.process-dialog-list > button { display: grid; min-height: 64px; grid-template-columns: 38px minmax(0,1fr) auto 22px; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,.075); border-radius: 13px; padding: 9px 12px; color: #e7e9ed; background: #22252c; text-align: left; }
-.process-dialog-list > button:hover { border-color: rgba(121,221,162,.28); }
-.process-dialog-list > button.is-selected { border-color: rgba(99,196,139,.42); background: rgba(99,196,139,.075); }
+.process-app-group > button:first-child { display: grid; width: 100%; min-height: 64px; grid-template-columns: 38px minmax(0,1fr) 22px; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,.075); border-radius: 13px; padding: 9px 12px; color: #e7e9ed; background: #22252c; text-align: left; }
+.process-app-group > button:first-child:hover { border-color: rgba(121,221,162,.28); }
+.process-app-group > button:first-child.is-selected { border-color: rgba(99,196,139,.42); background: rgba(99,196,139,.075); }
 .process-choice-icon { display: grid; width: 35px; height: 35px; place-items: center; border-radius: 10px; color: #76d99e; background: rgba(99,196,139,.085); }
 .process-choice-icon svg { width: 17px; }
-.process-dialog-list > button > span:nth-child(2) { display: grid; min-width: 0; gap: 3px; }
+.process-app-group > button:first-child > span:nth-child(2) { display: grid; min-width: 0; gap: 3px; }
 .process-dialog-list strong { overflow: hidden; font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
 .process-dialog-list small { overflow: hidden; color: #7f8490; font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
 .process-dialog-list em { border-radius: 999px; padding: 5px 8px; color: #7ddfa4; background: rgba(99,196,139,.09); font-size: .55rem; font-style: normal; }
-.process-dialog-list > button > svg { width: 16px; color: #7bdda2; }
+.process-app-group > button:first-child > svg { width: 16px; color: #7bdda2; }
 .process-dialog-empty { padding: 34px 10px; color: #818691; font-size: .72rem; text-align: center; }
 .process-dialog-preview { margin: 0; border-top: 1px solid var(--line); padding: 11px 20px; color: #b59765; font-size: .61rem; }
+.process-dialog-status { padding: 0 20px 10px; color: #a5abb5; font-size: .75rem; }
+.process-dialog-error { margin: 0 20px 12px; padding: 10px; border-radius: 8px; background: #482a2a; color: #ffd1d1; font-size: .8rem; }
+.process-app-group .process-details-toggle { margin: 3px 12px 5px; color: #9ba4ad; font-size: .7rem; }
+.process-app-details { padding: 8px 12px 12px; color: #aeb6be; font-size: .75rem; overflow-wrap: anywhere; }
+.process-app-details > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; }
+.process-app-details button { border: 1px solid #456552; border-radius: 8px; padding: 6px 10px; color: #8ae1ad; }
+.process-app-group button:focus-visible { outline: 2px solid #70d99b; outline-offset: 2px; }
 
 @media (max-width: 1020px) {
   .settings-app { padding: 20px 22px; }

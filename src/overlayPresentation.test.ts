@@ -22,7 +22,7 @@ describe("overlay presentation", () => {
     const now = 1_000_000;
     const item = (segmentId: string, createdAtMs: number): SubtitleItem => ({
       segmentId,
-      stream: "game",
+      stream: "incoming",
       originalLanguage: "en",
       originalText: segmentId,
       translatedText: segmentId,

@@ -45,7 +45,7 @@ describe("WANGAI overlay", () => {
     expect(screen.getByText("Join us at the north gate.").tagName).toBe("SPAN");
     expect(screen.getByText("On my way.").tagName).toBe("STRONG");
     expect(screen.getByText("กำลังไป").tagName).toBe("SPAN");
-    expect(screen.getByText("GAME")).toBeInTheDocument();
+    expect(screen.getByText("Mistfall Hunter")).toBeInTheDocument();
     await waitFor(() => expect(mocks.setOverlayPresentation).toHaveBeenCalledWith("expanded"));
   });
 
@@ -54,7 +54,7 @@ describe("WANGAI overlay", () => {
     snapshot.history = [
       {
         segmentId: "voice-1",
-        stream: "voice_chat",
+        stream: "incoming",
         sourceDisplayName: "Discord",
         originalLanguage: "en",
         originalText: "Push now",
@@ -64,7 +64,7 @@ describe("WANGAI overlay", () => {
       },
       {
         segmentId: "mixed-1",
-        stream: "game",
+        stream: "incoming",
         sourceDisplayName: "MIXED",
         originalLanguage: "en",
         originalText: "Fallback audio",
@@ -85,7 +85,7 @@ describe("WANGAI overlay", () => {
     const snapshot = snapshotFixture();
     snapshot.history = [];
     snapshot.runtime.listening = false;
-    snapshot.runtime.attachedProcess = undefined;
+    snapshot.runtime.attachedSource = undefined;
     snapshot.runtime.statusMessage = "พร้อมใช้งาน";
     mocks.snapshot = snapshot;
 
@@ -100,7 +100,7 @@ describe("WANGAI overlay", () => {
     snapshot.history = [];
     snapshot.partial = {
       segmentId: "game-live",
-      stream: "game",
+      stream: "incoming",
       language: "en",
       text: "Enemy behind us",
       kind: "partial",
