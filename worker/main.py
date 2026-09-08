@@ -304,6 +304,12 @@ def run(args) -> int:
                 args.silence_ms,
                 args.adaptive_floor,
             )
+            # Exercise the bundled ONNX runtime and its DLLs before declaring ready.
+            incoming_vad.process(np.zeros(VAD_FRAME_SAMPLES, dtype=np.float32))
+            incoming_vad.reset()
+        if args.model_self_check:
+            emit({"type": "ready", "model": "silero-vad", "device": "cpu"})
+            return 0
         sessions = {
             STREAM_INCOMING: StreamSession(
                 "incoming", args.max_utterance_ms, incoming_vad
@@ -350,6 +356,7 @@ def parse_args():
     parser.add_argument("--max-utterance-ms", type=int, default=12_000)
     parser.add_argument("--mock", action="store_true")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--model-self-check", action="store_true")
     return parser.parse_args()
 
 

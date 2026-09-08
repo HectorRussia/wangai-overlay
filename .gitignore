@@ -7,6 +7,11 @@ ai-protocol/target/
 *.sqlite3-shm
 *.sqlite3-wal
 .venv/
+.packaging-venv/
+output/
+src-tauri/tauri.release.generated.json
+*.key
+*.key.pub
 worker/__pycache__/
 *.pyc
 *.pyo

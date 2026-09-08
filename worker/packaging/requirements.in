@@ -1,0 +1,8 @@
+# Windows x64 / Python 3.12. CPU wheels only; do not freeze the development venv.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.8.0+cpu
+torchaudio==2.8.0+cpu
+silero-vad==6.2.1
+onnxruntime==1.22.1
+numpy==2.2.6
+pyinstaller==6.16.0

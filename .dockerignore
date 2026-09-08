@@ -4,6 +4,9 @@
 **/node_modules
 .git
 .venv
+.packaging-venv
+**/*.key
+**/*.key.pub
 dist
 output
 prototype
