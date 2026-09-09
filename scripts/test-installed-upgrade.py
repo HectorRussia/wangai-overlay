@@ -65,11 +65,14 @@ try:
     subprocess.run([str(output / 'v0.2.0/WANGAI Release Test_0.2.0_x64-setup.exe'), '/S', f'/D={installed}'], check=True, timeout=240)
     exe = installed / 'gamelingo.exe'
     assert exe.is_file(), f'Installed binary missing: {exe}'
-    subprocess.Popen([str(exe), '--release-test-upgrade'], creationflags=subprocess.CREATE_NO_WINDOW)
+    subprocess.run(['node', str(root / 'scripts/check-windows-gui.mjs'), str(exe)], check=True)
+    # Do not hide a Console window in the harness: the shipped app itself must be GUI.
+    subprocess.Popen([str(exe), '--release-test-upgrade'])
     newer = reports / 'test-report-0.2.1.json'
     wait_for(lambda: newer.is_file() and newer.stat().st_mtime >= started_at, 300)
     before = json.loads((reports / 'test-report-0.2.0.json').read_text(encoding='utf-8'))
     after = json.loads(newer.read_text(encoding='utf-8'))
+    subprocess.run(['node', str(root / 'scripts/check-windows-gui.mjs'), str(exe)], check=True)
     assert before['workerReady'] and after['workerReady']
     assert before['workerPid'] != after['workerPid']
     wait_for(lambda: not alive(before['workerPid']) and not alive(before['pid']))

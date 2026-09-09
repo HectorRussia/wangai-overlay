@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { assertWindowsGuiExecutable } from './check-windows-gui.mjs';
+assertWindowsGuiExecutable('src-tauri/target/release/gamelingo.exe');
 const version = JSON.parse(fs.readFileSync('package.json')).version;
 const tag = `v${version}`;
 if (process.env.GITHUB_REF_NAME && process.env.GITHUB_REF_NAME !== tag) throw Error('Tag mismatch');

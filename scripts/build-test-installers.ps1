@@ -25,6 +25,8 @@ foreach ($testVersion in @('0.2.0', '0.2.1')) {
     Check-Exit
     pnpm tauri build --ci --features release-test --bundles nsis --config src-tauri/tauri.release.generated.json
     Check-Exit
+    node scripts/check-windows-gui.mjs src-tauri/target/release/gamelingo.exe
+    Check-Exit
     $versionOutput = New-Item -ItemType Directory -Force -Path (Join-Path $testOutput.FullName "v$testVersion")
     $installer = Get-Item -LiteralPath "src-tauri/target/release/bundle/nsis/WANGAI Release Test_${testVersion}_x64-setup.exe"
     Copy-Item -LiteralPath $installer.FullName -Destination $versionOutput.FullName
