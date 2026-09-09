@@ -1,4 +1,4 @@
-# Windows 0.2.0: installer, updates and owner checklist
+# Windows 0.2.1: installer, updates and owner checklist
 
 This repository **prepares** releases. Nothing is deployed or published by running
 the tests. Do not distribute the isolated `WANGAI Release Test` installers.
@@ -11,7 +11,7 @@ rejects missing or invalid keys.
 
 ## What the user does
 
-1. Download `WANGAI_0.2.0_x64-setup.exe` from
+1. Download `WANGAI_0.2.1_x64-setup.exe` from
    [HectorRussia/wangai-overlay Releases](https://github.com/HectorRussia/wangai-overlay/releases).
 2. Install for the current Windows user. No Python, pip, Rust or Node is needed.
    WebView2 is required; the NSIS bootstrapper installs it if absent (internet needed).
@@ -62,9 +62,9 @@ users to disable antivirus. Provide the download source and SHA256 checksums.
    AI provider keys belong **only on Render**, not in Desktop CI. No GitHub token
    is embedded in the app: this public repository supplies unauthenticated updates.
 4. Commit reviewed changes. Confirm package.json, src-tauri/Cargo.toml,
-   src-tauri/tauri.conf.json and Cargo.lock agree on `0.2.0`. Run
+   src-tauri/tauri.conf.json and Cargo.lock agree on `0.2.1`. Run
    `node scripts/prepare-release.mjs --check-version` and the full CI suite.
-5. Only when ready, create and push tag `v0.2.0`. The release workflow first runs
+5. Only when ready, create and push tag `v0.2.1`. The release workflow first runs
    tests and clean worker packaging, then builds/signs NSIS and creates a **Draft**.
    It does not publish. Do not rerun a partially completed draft job blindly: inspect
    the existing draft first; `gh release create` deliberately refuses to overwrite it.
@@ -78,6 +78,21 @@ The manifest points to version-specific tag URLs, not mutable `latest` installer
 URLs. Keep this a stable, non-prerelease channel; drafts/prereleases do not become
 the normal GitHub latest release. Before the first published release, 404 is a
 normal unpublished status and never an AI-service failure.
+
+### 0.2.1 console/search correction
+
+Keep the existing 0.2.0 draft unpublished: its main executable uses the Console
+subsystem. The 0.2.1 patch builds the release as a Windows GUI application and
+returns the app-picker list to the top when its search changes, without resetting
+scroll during automatic refresh. It does not change capture, F8/F9 or settings.
+After committing/pushing the patch and passing Verify, create a new `v0.2.1` tag;
+do not move the existing `v0.2.0` tag or replace its assets. Keep the same signing
+key and GitHub Secrets. The production installer must be built/signed by CI.
+
+Release asset preparation now checks the linked application's PE subsystem and
+rejects Console builds before creating a draft. The isolated installer QA checks
+the actually installed binary both before and after upgrading and no longer uses
+`CREATE_NO_WINDOW` when starting the main app (the worker still uses it).
 
 ## Local builds
 
@@ -154,5 +169,6 @@ signing secrets, and uploads only the result report.
 - UI at 980×660 / 1180×780 and zoom; keyboard focus, progress, Later and error states.
 - Inspect bundled files/requests/logs for credentials. Review dependency licenses.
 
-See [verification record](windows-release-verification.md) for what was actually run.
+See the [0.2.1 patch verification](windows-0.2.1-verification.md) and the
+[historical preparation record](windows-release-verification.md) for what was actually run.
 [Tauri updater documentation](https://v2.tauri.app/plugin/updater/).

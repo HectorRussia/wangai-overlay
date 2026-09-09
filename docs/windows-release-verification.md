@@ -1,5 +1,8 @@
 # Windows release preparation verification
 
+Historical record: see the [2026-09-09 console/search patch verification](windows-0.2.1-verification.md)
+for the 0.2.1 follow-up. The owner gates below describe the state on 2026-09-08.
+
 Local execution: 2026-09-08, Windows 11 x64 developer machine. This is **not** a
 clean-machine certification and no real AI provider was called during testing.
 

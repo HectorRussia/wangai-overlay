@@ -1,6 +1,6 @@
 [package]
 name = "gamelingo"
-version = "0.2.0"
+version = "0.2.1"
 description = "Near-realtime game voice translator overlay"
 authors = ["GameLingo"]
 edition = "2021"
