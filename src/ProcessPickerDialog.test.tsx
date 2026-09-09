@@ -41,6 +41,38 @@ describe("grouped running app picker", () => {
     expect(screen.getByRole("button", { name: /Discord.exe · 6 processes/ })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("returns to the top when changing or clearing a search in a long list", () => {
+    const p = props();
+    p.apps = [previewRunningApps[0], ...Array.from({ length: 50 }, (_, i) => ({
+      ...appFixture(), id: `system-${i}`, displayName: `Microsoft App ${i}`,
+      searchNames: [`Microsoft App ${i}`],
+    }))];
+    const view = render(<ProcessPickerDialog {...p} />);
+    const list = view.container.querySelector<HTMLDivElement>(".process-dialog-list")!;
+    const search = screen.getByRole("textbox");
+    for (const query of ["Mi", "Mistfall", ""]) {
+      list.scrollTop = 1200;
+      fireEvent.change(search, { target: { value: query } });
+      expect(list.scrollTop).toBe(0);
+      expect(search).toHaveFocus();
+      expect(screen.getByText("Mistfall Hunter")).toBeInTheDocument();
+    }
+  });
+
+  it("does not reset the user's scroll position on background refresh", () => {
+    const p = props();
+    const view = render(<ProcessPickerDialog {...p} />);
+    const search = screen.getByRole("textbox");
+    fireEvent.change(search, { target: { value: "discord" } });
+    const list = view.container.querySelector<HTMLDivElement>(".process-dialog-list")!;
+    list.scrollTop = 420;
+    view.rerender(<ProcessPickerDialog {...p} loading />);
+    view.rerender(<ProcessPickerDialog {...p} apps={p.apps.map((app) => ({ ...app }))} />);
+    expect(list.scrollTop).toBe(420);
+    expect(search).toHaveFocus();
+    expect(search).toHaveValue("discord");
+  });
+
   it("requires choosing an instance when multiple independent roots exist", async () => {
     const p = props(); p.apps[0].roots = [p.apps[0].roots[0], { ...p.apps[0].roots[0], pid: 8123 }];
     render(<ProcessPickerDialog {...p} />);

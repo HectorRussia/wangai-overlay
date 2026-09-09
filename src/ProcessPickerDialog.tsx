@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Globe2, Info, LoaderCircle, Monitor, RefreshCw, Search, X } from "lucide-react";
 import type { CaptureSource, RunningApp, SavedProcess } from "./types";
 
@@ -23,6 +23,7 @@ function isSelectedApp(app: RunningApp, selected?: SavedProcess): boolean {
 
 export function ProcessPickerDialog({ apps, selected, loading, error, previewMode, onClose, onRefresh, onSelect }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -30,6 +31,10 @@ export function ProcessPickerDialog({ apps, selected, loading, error, previewMod
   const [selecting, setSelecting] = useState<number>();
   const [selectionError, setSelectionError] = useState<string>();
   const [expanded, setExpanded] = useState<string>();
+  useLayoutEffect(() => {
+    // A new search starts at its first result; periodic refresh must not move it.
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [query]);
   useEffect(() => {
     const returnFocus = document.activeElement as HTMLElement | null;
     searchRef.current?.focus();
@@ -63,7 +68,7 @@ export function ProcessPickerDialog({ apps, selected, loading, error, previewMod
       <div className="process-dialog-search"><Search /><input aria-label="ค้นหาแอปที่จะฟัง" aria-describedby="process-dialog-hint" placeholder="ค้นหาชื่อแอปที่เปิดอยู่ หรือชื่อไฟล์ .exe" ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} /><button aria-label="รีเฟรชรายการแอป" disabled={loading} onClick={onRefresh}><RefreshCw className={loading ? "animate-spin" : ""} /></button></div>
       <p className="process-dialog-status" role="status">{loading ? "กำลังตรวจหาแอป…" : choices.length + " แอป · รวม process ย่อยแล้ว"}</p>
       {(error || selectionError) && <p className="process-dialog-error" role="alert">{selectionError ?? error}</p>}
-      <div className="process-dialog-list" aria-busy={loading}>
+      <div className="process-dialog-list" aria-busy={loading} ref={listRef}>
         {choices.map((app) => {
           const checked = isSelectedApp(app, selected);
           const multiple = app.roots.length > 1;
