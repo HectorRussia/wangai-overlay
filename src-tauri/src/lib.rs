@@ -11,6 +11,7 @@ mod processes;
 #[cfg(feature = "release-test")]
 mod release_test;
 mod settings;
+mod startup;
 mod state;
 mod translator;
 mod updater;
@@ -40,6 +41,8 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            #[cfg(feature = "release-test")]
+            release_test::delay_startup(app.handle());
             let settings_path = app.path().app_config_dir()?.join("settings.json");
             let state = AppState::new(settings_path)?;
             let settings = state.settings.snapshot();
@@ -56,6 +59,8 @@ pub fn run() {
             let web = web_companion::WebCompanionManager::start(app.handle().clone())?;
             app.manage(web);
 
+            // Configured webviews must not invoke commands before state exists.
+            startup::create_windows(app.handle())?;
             commands::restore_overlay_bounds(app.handle(), &settings)
                 .map_err(anyhow::Error::msg)?;
             hotkeys::register_hotkeys(app.handle(), &settings.hotkeys)?;
@@ -141,8 +146,13 @@ pub fn run() {
 
     app.run(|app, event| {
         if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
-            app.state::<web_companion::WebCompanionManager>().shutdown();
-            let _ = lifecycle::shutdown(app);
+            // Setup can fail before every manager is registered.
+            if let Some(web) = app.try_state::<web_companion::WebCompanionManager>() {
+                web.shutdown();
+            }
+            if app.try_state::<AppState>().is_some() {
+                let _ = lifecycle::shutdown(app);
+            }
         }
     });
 }

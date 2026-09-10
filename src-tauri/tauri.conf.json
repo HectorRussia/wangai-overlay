@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "WANGAI Settings",
         "url": "index.html#/settings/overview",
         "width": 1180,
@@ -26,6 +27,7 @@
       },
       {
         "label": "overlay",
+        "create": false,
         "title": "WANGAI Overlay",
         "url": "index.html#/overlay",
         "width": 332,

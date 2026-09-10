@@ -24,6 +24,14 @@ installed = output / 'installed'
 reports = Path(os.environ['APPDATA']) / 'dev.gamelingo.overlay.release-test'
 if installed.exists():
     raise SystemExit('Test install directory already exists: inspect/uninstall the isolated test product before rerunning')
+# NSIS process checks can match the executable name across installation paths.
+# Never let an isolated QA run stop a production app that the owner is using.
+running_app = subprocess.run([
+    'powershell.exe', '-NoProfile', '-NonInteractive', '-Command',
+    'if (Get-Process -Name gamelingo -ErrorAction SilentlyContinue) { exit 1 }; exit 0',
+], timeout=15)
+if running_app.returncode != 0:
+    raise SystemExit('Close running WANGAI before installer QA; no app was stopped or installer launched')
 for version in ('0.2.0', '0.2.1'):
     if not (output / f'v{version}/WANGAI Release Test_{version}_x64-setup.exe').is_file():
         raise SystemExit('Build both isolated installers first')
@@ -74,13 +82,14 @@ try:
     after = json.loads(newer.read_text(encoding='utf-8'))
     subprocess.run(['node', str(root / 'scripts/check-windows-gui.mjs'), str(exe)], check=True)
     assert before['workerReady'] and after['workerReady']
+    assert before['uiReady'] and after['uiReady'], 'Ready Room did not render in the installed WebView'
     assert before['workerPid'] != after['workerPid']
     wait_for(lambda: not alive(before['workerPid']) and not alive(before['pid']))
     wait_for(lambda: not alive(after['workerPid']) and not alive(after['pid']))
     assert before['settings'] == after['settings'], 'Settings/installation ID changed across update'
     assert after['update']['phase'] == 'up_to_date'
     (output / 'upgrade-result.json').write_text(json.dumps({'passed': True, 'before': before, 'after': after}, indent=2), encoding='utf-8')
-    print('Real NSIS 0.2.0 -> signed updater -> NSIS 0.2.1 passed; old worker exited; settings preserved')
+    print('Real NSIS 0.2.0 -> signed updater -> NSIS 0.2.1 passed; Ready Room rendered; old worker exited; settings preserved')
 finally:
     server.shutdown()
     server.server_close()
