@@ -52,7 +52,14 @@ export function SettingsApp({ activeTab, advancedSection = "audio" }: { activeTa
     finally { setBusy(undefined); }
   };
 
-  if (!snapshot || !vad || !hotkeys || !overlay) return <main className="grid min-h-screen place-content-center gap-3 bg-[#15161a] text-white"><LoaderCircle className="animate-spin" /><p>{loadingError ?? "กำลังเปิด WANGAI"}</p></main>;
+  if (!snapshot || !vad || !hotkeys || !overlay) return <main className="grid min-h-screen place-content-center gap-4 bg-[#15161a] p-6 text-white">
+    {loadingError ? <section className="w-full max-w-xl space-y-4 rounded-2xl border border-white/10 bg-[#1d1f25] p-6">
+      <p role="alert" className="font-bold">ยังเปิด WANGAI ไม่สำเร็จ</p>
+      <p className="text-sm text-[#a9afb8]">ลองโหลดข้อมูลอีกครั้งได้ โดยไม่ต้องปิดโปรแกรมหรือลบการตั้งค่า</p>
+      <button autoFocus className={primary} onClick={() => void refresh()}><RefreshCw />ลองใหม่</button>
+      <details className="text-sm text-[#a9afb8]"><summary>รายละเอียดข้อผิดพลาด</summary><p className="mt-2 break-words">{loadingError}</p></details>
+    </section> : <><LoaderCircle aria-hidden="true" className="animate-spin" /><p role="status">กำลังเปิด WANGAI</p></>}
+  </main>;
   const { settings, runtime } = snapshot;
   const profileKey = settings.captureMode === "process_tree" ? "processTree" : "systemOutput";
   const profile = vad[profileKey];
