@@ -105,7 +105,7 @@ python -m unittest worker\test_worker.py worker\test_integration.py
 
 WANGAI ฟังแอปขาเข้าได้ครั้งละหนึ่งโปรแกรม เสียงเพื่อน/NPC/SFX ภายใน process tree เดียวกันและหลายแท็บใน browser เดียวกันยังแยกไม่ได้ ส่วน System Output fallback เป็นเสียงรวมและไม่พยายามเดาต้นทางด้วย AI แอปไม่ auto-type เข้าเกม ไม่มี TTS/virtual mic หรือ speaker identification ส่วนระบบอัปเดตและไฟล์เตรียม deploy มีแล้ว แต่ยังไม่ได้เผยแพร่ release หรือเปิดบริการ cloud จริง
 
-## Windows trial release 0.2.1
+## Windows trial release 0.2.2
 
 Installer/signing/GitHub Draft Release setup: [Windows release guide](docs/windows-release.md).
 AI hosting preparation: [Render Free guide](docs/render-free.md).

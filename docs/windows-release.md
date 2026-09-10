@@ -1,4 +1,4 @@
-# Windows 0.2.1: installer, updates and owner checklist
+# Windows 0.2.2: installer, updates and owner checklist
 
 This repository **prepares** releases. Nothing is deployed or published by running
 the tests. Do not distribute the isolated `WANGAI Release Test` installers.
@@ -11,7 +11,7 @@ rejects missing or invalid keys.
 
 ## What the user does
 
-1. Download `WANGAI_0.2.1_x64-setup.exe` from
+1. Download `WANGAI_0.2.2_x64-setup.exe` from
    [HectorRussia/wangai-overlay Releases](https://github.com/HectorRussia/wangai-overlay/releases).
 2. Install for the current Windows user. No Python, pip, Rust or Node is needed.
    WebView2 is required; the NSIS bootstrapper installs it if absent (internet needed).
@@ -62,9 +62,9 @@ users to disable antivirus. Provide the download source and SHA256 checksums.
    AI provider keys belong **only on Render**, not in Desktop CI. No GitHub token
    is embedded in the app: this public repository supplies unauthenticated updates.
 4. Commit reviewed changes. Confirm package.json, src-tauri/Cargo.toml,
-   src-tauri/tauri.conf.json and Cargo.lock agree on `0.2.1`. Run
+   src-tauri/tauri.conf.json and Cargo.lock agree on `0.2.2`. Run
    `node scripts/prepare-release.mjs --check-version` and the full CI suite.
-5. Only when ready, create and push tag `v0.2.1`. The release workflow first runs
+5. Only when ready, create and push tag `v0.2.2`. The release workflow first runs
    tests and clean worker packaging, then builds/signs NSIS and creates a **Draft**.
    It does not publish. Do not rerun a partially completed draft job blindly: inspect
    the existing draft first; `gh release create` deliberately refuses to overwrite it.
@@ -79,7 +79,20 @@ URLs. Keep this a stable, non-prerelease channel; drafts/prereleases do not beco
 the normal GitHub latest release. Before the first published release, 404 is a
 normal unpublished status and never an AI-service failure.
 
-### 0.2.1 console/search correction
+### 0.2.2 startup recovery
+
+The main and overlay windows have `create: false` in the base Tauri config.
+Startup registers AppState, updater state and Web Companion state before explicitly
+creating either WebView. Do not re-enable automatic window creation: it can let
+frontend commands run before state registration.
+
+Desktop snapshot reads retry up to five times, with a three-second timeout per
+attempt and 250 ms between attempts. Exhaustion shows an error and a keyboard-ready
+Retry button; cancelled/timed-out reads cannot overwrite newer state. Web Companion
+keeps its existing reconnect loop. No audio behavior or settings schema changes.
+See [startup patch verification](windows-0.2.2-verification.md) before publishing.
+
+### Historical 0.2.1 console/search correction
 
 Keep the existing 0.2.0 draft unpublished: its main executable uses the Console
 subsystem. The 0.2.1 patch builds the release as a Windows GUI application and
@@ -143,6 +156,12 @@ temporary test key in ignored `output/release-test/`. The second explicitly inst
 the uniquely identified `WANGAI Release Test`, serves updates on 127.0.0.1:19438,
 and runs the real Tauri download/verify/install sequence. It checks worker readiness,
 old worker termination, new version startup and settings/installation-ID equality.
+The fixture labels remain 0.2.0/0.2.1 independently of the production version.
+It also requires the actual Ready Room DOM to appear in the installed WebView
+before and after upgrading. A test-only three-second startup delay checks that
+no WebView exists before state registration. Close production WANGAI before
+running installer QA: NSIS process checks can match the executable name even
+across installation paths. The script refuses to start if WANGAI is running.
 It uninstalls only its own test product. Reports remain for review. If interrupted,
 inspect the test product before cleanup; do not delete real WANGAI settings.
 
@@ -169,6 +188,7 @@ signing secrets, and uploads only the result report.
 - UI at 980×660 / 1180×780 and zoom; keyboard focus, progress, Later and error states.
 - Inspect bundled files/requests/logs for credentials. Review dependency licenses.
 
-See the [0.2.1 patch verification](windows-0.2.1-verification.md) and the
+See the [0.2.2 patch verification](windows-0.2.2-verification.md),
+[0.2.1 patch verification](windows-0.2.1-verification.md) and the
 [historical preparation record](windows-release-verification.md) for what was actually run.
 [Tauri updater documentation](https://v2.tauri.app/plugin/updater/).
