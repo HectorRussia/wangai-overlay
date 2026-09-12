@@ -26,7 +26,13 @@ pub fn create_windows(app: &AppHandle) -> Result<()> {
             !config.create,
             "Windows must not be auto-created before setup"
         );
-        WebviewWindowBuilder::from_config(app, config)?.build()?;
+        let mut builder = WebviewWindowBuilder::from_config(app, config)?;
+        if let Some(portable) = app.try_state::<crate::portable_runtime::PortableRuntime>() {
+            if let Some(layout) = &portable.layout {
+                builder = builder.data_directory(layout.data().join("WebView2"));
+            }
+        }
+        builder.build()?;
     }
     Ok(())
 }

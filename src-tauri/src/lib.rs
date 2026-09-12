@@ -7,6 +7,7 @@ mod hotkeys;
 mod lifecycle;
 mod models;
 mod pipeline;
+mod portable_runtime;
 mod processes;
 #[cfg(feature = "release-test")]
 mod release_test;
@@ -24,7 +25,17 @@ use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Validation is an internal, read-only host operation, before any GUI/state/server.
+    if let Some(path) = std::env::args_os().skip(1).collect::<Vec<_>>().windows(2)
+        .find(|pair| pair[0] == "--validate-portable-settings").map(|pair| pair[1].clone())
+    {
+        let valid = std::fs::read(path).ok().is_some_and(|bytes| settings::validate_portable_import(&bytes).is_ok());
+        std::process::exit(if valid { 0 } else { 1 });
+    }
+    let portable = portable_runtime::PortableRuntime::discover().expect("เปิดผ่าน WANGAI.exe ในโฟลเดอร์ Portable");
+    portable.configure_webview();
     let app = tauri::Builder::default()
+        .manage(portable)
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -43,7 +54,7 @@ pub fn run() {
         .setup(|app| {
             #[cfg(feature = "release-test")]
             release_test::delay_startup(app.handle());
-            let settings_path = app.path().app_config_dir()?.join("settings.json");
+            let settings_path = app.state::<portable_runtime::PortableRuntime>().settings_path(app.handle())?;
             let state = AppState::new(settings_path)?;
             let settings = state.settings.snapshot();
             app.manage(state);
@@ -59,11 +70,20 @@ pub fn run() {
             let web = web_companion::WebCompanionManager::start(app.handle().clone())?;
             app.manage(web);
 
+            #[cfg(feature = "release-test")]
+            release_test::checkpoint(app.handle(), "before-windows");
+
             // Configured webviews must not invoke commands before state exists.
             startup::create_windows(app.handle())?;
+            #[cfg(feature = "release-test")]
+            release_test::checkpoint(app.handle(), "windows-created");
+            portable_runtime::start_readiness_monitor(app.handle().clone());
             commands::restore_overlay_bounds(app.handle(), &settings)
                 .map_err(anyhow::Error::msg)?;
             hotkeys::register_hotkeys(app.handle(), &settings.hotkeys)?;
+
+            #[cfg(feature = "release-test")]
+            release_test::checkpoint(app.handle(), "hotkeys-registered");
 
             let state = app.state::<AppState>();
             if let Err(error) = state.worker.start(app.handle().clone(), &settings) {
@@ -74,6 +94,8 @@ pub fn run() {
                 });
                 worker::emit_status(app.handle(), "error", &error.to_string(), None);
             }
+            #[cfg(feature = "release-test")]
+            release_test::checkpoint(app.handle(), "worker-start-attempted");
             pipeline::start_auto_attach_monitor(app.handle().clone());
             #[cfg(feature = "release-test")]
             release_test::start(app.handle().clone());
@@ -111,6 +133,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            portable_runtime::portable_frontend_ready,
             updater::get_update_status,
             updater::check_for_updates,
             updater::download_and_install_update,

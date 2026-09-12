@@ -35,7 +35,7 @@ export function UpdatePanel({ compact = false }: { compact?: boolean }) {
   };
   if (!desktop) return compact ? null : <section className="update-panel"><h2>อัปเดต WANGAI</h2><p>ตรวจและติดตั้งอัปเดตจากหน้าตั้งค่า Desktop เท่านั้น</p></section>;
   if (compact && (!status?.newVersion || dismissed === status.newVersion)) return null;
-  const working = pending || status?.phase === "checking" || status?.phase === "downloading" || status?.phase === "installing";
+  const working = pending || ["checking", "downloading", "verifying", "preparing", "installing"].includes(status?.phase ?? "");
   const actions = status?.canInstall && !confirm && <div className="flex flex-wrap gap-3">
     <button ref={updateButton} className={`${button} bg-[#76dda0] text-[#15161a]`} disabled={working} onClick={() => setConfirm(true)}>อัปเดตเวอร์ชันใหม่</button>
     {compact && <button className={button} onClick={() => {

@@ -1,7 +1,8 @@
 import { AudioLines, Check, ChevronRight, Cloud, Globe2, Headphones, History, LoaderCircle, LockKeyhole, MessageSquareText, Radio, Settings, ShieldCheck, TriangleAlert } from "lucide-react";
 import { advancedHref, settingsHref } from "./router";
 import type { AppSettings, RuntimeState, SubtitleItem } from "./types";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 type Props = {
   settings: AppSettings;
@@ -20,6 +21,11 @@ type Tone = "ready" | "waiting" | "warning" | "setup";
 type Readiness = { label: string; detail: string; tone: Tone };
 
 export function ReadyRoom({ settings, runtime, history, busy, previewMode, onToggleListening, onOpenSourcePicker, onOpenWebCompanion, webCompanionOrigin, webRuntime, notification }: Props) {
+  useEffect(() => {
+    if (webRuntime || previewMode || !isTauri()) return;
+    const frame = requestAnimationFrame(() => { void invoke("portable_frontend_ready").catch(() => {}); });
+    return () => cancelAnimationFrame(frame);
+  }, [webRuntime, previewMode]);
   const incoming = incomingReadiness(settings, runtime);
   const ai = aiReadiness(runtime);
   const configured = Boolean(settings.listeningSource) && ["connected", "ready"].includes(runtime.aiService.state);

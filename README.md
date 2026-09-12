@@ -25,6 +25,21 @@ Rust downmix/resample เป็น PCM mono 16 kHz และส่งเสี�
 
 Local Web Companion bind เฉพาะ `127.0.0.1`; production ขอ port ว่างจาก Windows ทุกครั้งและคืน port เมื่อ Desktop ปิด ปุ่ม **เปิด Web App** แลก token ใน URL fragment เป็น `HttpOnly`/`SameSite=Strict` cookie ทั้ง Desktop และหน้าเว็บใช้ AI กลางโดยไม่มีฟอร์ม keyและใช้งานไม่ได้เมื่อ Desktop engine ปิด
 
+## ดาวน์โหลดสำหรับผู้ใช้ Windows — Portable 0.3.0
+
+ใน [Releases](https://github.com/HectorRussia/wangai-overlay/releases) เลือกไฟล์
+`WANGAI_0.3.0_x64-portable.exe` (หลังรุ่นนี้ได้รับการเผยแพร่) แล้วกด **เตรียมและเปิด WANGAI**
+ตัวเปิดธีมเข้ม–เขียวจะจัดโฟลเดอร์ให้ รวม Python, Silero offline และ WebView2 Fixed Version แล้ว
+ไม่ต้องแตก ZIP ไม่ลงทะเบียนตัวถอนติดตั้ง ไม่สร้าง shortcut และไม่ขอ Administrator อัตโนมัติ
+
+ครั้งถัดไปเปิด **WANGAI.exe** ในโฟลเดอร์ที่เตรียมไว้ ต้องย้ายทั้งโฟลเดอร์พร้อม `Data`
+หากลบทั้งโฟลเดอร์ settings จะถูกลบด้วย รองรับ Windows 10/11 x64 บน local/USB NTFS
+ไม่รองรับ network share การแปลยังต้องต่อบริการ AI แต่หน้าเริ่มต้นและ VAD ใช้ไฟล์ที่รวมมา
+
+ผู้ใช้ 0.2.2: ปิดรุ่นเก่า ดาวน์โหลด Portable เองครั้งแรก แล้วเลือกนำ settings เดิมมาใช้หรือเริ่มใหม่
+ไม่มีการถอนรุ่นเดิมหรือลบ settings ต้นฉบับ และไม่ใช้ NSIS updater กับ Portable
+ดู [คู่มือ Portable / migration / recovery](docs/windows-portable.md)
+
 ## ติดตั้งสำหรับพัฒนา
 
 ต้องมี Windows 11, Node.js, pnpm, Rust MSVC toolchain และ Visual Studio C++ Build Tools

@@ -1,5 +1,8 @@
 # Windows 0.2.2: installer, updates and owner checklist
 
+> Historical instructions for the `v0.2.2` checkout only. Version 0.3.0 and newer
+> use [Windows Portable](windows-portable.md). Do not build new NSIS releases from main.
+
 This repository **prepares** releases. Nothing is deployed or published by running
 the tests. Do not distribute the isolated `WANGAI Release Test` installers.
 

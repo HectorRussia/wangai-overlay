@@ -9,6 +9,7 @@ for (const [name, actual] of [
   ['Tauri', JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).version],
   ['Rust', fs.readFileSync('src-tauri/Cargo.toml', 'utf8').match(/^version = "([^"]+)"/m)?.[1]],
   ['Cargo.lock', fs.readFileSync('src-tauri/Cargo.lock', 'utf8').match(/name = "gamelingo"\r?\nversion = "([^"]+)"/)?.[1]],
+  ['Portable', fs.readFileSync('portable/Cargo.toml', 'utf8').match(/^version = "([^"]+)"/m)?.[1]],
 ]) if (actual !== version) throw Error(`${name} version does not match package.json`);
 if (process.env.GITHUB_REF_TYPE === 'tag' && (test || process.env.GITHUB_REF_NAME !== `v${version}`)) throw Error('Release tag/version mismatch or test build on release tag');
 if (process.argv.includes('--check-version')) { console.log(`Versions agree: ${version}`); process.exit(0); }
@@ -25,17 +26,16 @@ for (const file of ['wangai-worker.exe', '_internal/python312.dll', '_internal/s
 }
 const config = {
   bundle: {
-    targets: ['nsis'], createUpdaterArtifacts: true,
+    active: false, createUpdaterArtifacts: false,
     resources: { '../dist/': 'web/', '../output/worker/wangai-worker/': 'worker/', '../docs/THIRD-PARTY-NOTICES.md': 'THIRD-PARTY-NOTICES.md' },
-    windows: { nsis: { installMode: 'currentUser', displayLanguageSelector: false, languages: ['English'] } },
   },
-  plugins: { updater: { pubkey, windows: { installMode: 'passive' } } },
+  plugins: { updater: { pubkey } },
 };
 if (test) {
   config.identifier = 'dev.gamelingo.overlay.release-test';
   config.productName = 'WANGAI Release Test';
   const testVersion = process.env.WANGAI_TEST_VERSION;
-  if (testVersion) { if (!/^0\.2\.[01]$/.test(testVersion)) throw Error('Test version must be 0.2.0 or 0.2.1'); config.version = testVersion; }
+  if (testVersion) { if (!/^0\.3\.[01]$/.test(testVersion)) throw Error('Test version must be 0.3.0 or 0.3.1'); config.version = testVersion; }
   const endpoint = new URL(required('WANGAI_TEST_UPDATE_ENDPOINT'));
   if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1') throw Error('Test updater must use explicit loopback endpoint');
   config.plugins.updater.dangerousInsecureTransportProtocol = true;

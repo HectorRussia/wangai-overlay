@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 
 export type UpdateStatus = {
   revision: number;
-  phase: "disabled" | "idle" | "checking" | "up_to_date" | "unpublished" | "available" | "downloading" | "installing" | "error";
+  phase: "disabled" | "idle" | "checking" | "up_to_date" | "unpublished" | "available" | "downloading" | "verifying" | "preparing" | "installing" | "error";
   currentVersion: string;
   newVersion?: string | null;
   notes?: string | null;

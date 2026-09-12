@@ -11,6 +11,23 @@ pub struct SettingsManager {
     inner: RwLock<AppSettings>,
 }
 
+/// Portable migration validates a snapshot without loading/saving the source file.
+pub fn validate_portable_import(bytes: &[u8]) -> Result<()> {
+    anyhow::ensure!(bytes.len() <= 8 * 1024 * 1024, "Settings file is too large");
+    let value: serde_json::Value = serde_json::from_slice(bytes)?;
+    anyhow::ensure!(value["schemaVersion"] == 14, "Only schema v14 settings can be imported");
+    let id = value["installationId"].as_str().ok_or_else(|| anyhow!("Missing installation ID"))?;
+    uuid::Uuid::parse_str(id)?;
+    for key in ["captureMode", "hotkeys", "overlay", "vad", "glossary"] {
+        anyhow::ensure!(value.get(key).is_some(), "Missing settings field: {key}");
+    }
+    let settings: AppSettings = serde_json::from_value(value)?;
+    let mut normalized = settings.clone();
+    normalize(&mut normalized)?;
+    anyhow::ensure!(normalized == settings, "Settings need repair in the installed app before importing");
+    Ok(())
+}
+
 impl SettingsManager {
     pub fn load(path: PathBuf) -> Result<Self> {
         let mut settings = if path.exists() {
@@ -74,17 +91,8 @@ impl SettingsManager {
                 .with_context(|| format!("สร้างโฟลเดอร์ settings ไม่ได้: {}", parent.display()))?;
         }
         let data = serde_json::to_string_pretty(settings)?;
-        let temp_path = self.path.with_extension("json.tmp");
-        fs::write(&temp_path, &data)
-            .with_context(|| format!("เขียน settings ไม่ได้: {}", temp_path.display()))?;
-        if self.path.exists() {
-            fs::copy(&temp_path, &self.path)
-                .with_context(|| format!("บันทึก settings ไม่ได้: {}", self.path.display()))?;
-            fs::remove_file(&temp_path).ok();
-        } else {
-            fs::rename(&temp_path, &self.path)
-                .with_context(|| format!("บันทึก settings ไม่ได้: {}", self.path.display()))?;
-        }
+        wangai_portable::atomic_write(&self.path,data.as_bytes())
+            .with_context(|| format!("บันทึก settings ไม่ได้: {}",self.path.display()))?;
         let persisted = fs::read_to_string(&self.path)
             .with_context(|| format!("ตรวจสอบ settings ไม่ได้: {}", self.path.display()))?;
         if persisted != data {
@@ -326,6 +334,27 @@ fn migrate_serialized_settings(value: &mut serde_json::Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn portable_import_validates_without_changing_source_or_id() {
+        let temp=tempfile::tempdir().unwrap();let path=temp.path().join("settings.json");
+        let manager=SettingsManager::load(path.clone()).unwrap();
+        let id=manager.snapshot().installation_id;
+        let bytes=fs::read(&path).unwrap();
+        validate_portable_import(&bytes).unwrap();
+        assert_eq!(fs::read(&path).unwrap(),bytes);
+        assert_eq!(SettingsManager::load(path).unwrap().snapshot().installation_id,id);
+    }
+    #[test]
+    fn portable_import_never_silently_repairs_corrupt_or_incomplete_data() {
+        assert!(validate_portable_import(b"broken JSON").is_err());
+        let mut settings=serde_json::to_value(AppSettings::default()).unwrap();
+        settings["installationId"]="not-a-uuid".into();
+        assert!(validate_portable_import(&serde_json::to_vec(&settings).unwrap()).is_err());
+        settings=serde_json::to_value(AppSettings::default()).unwrap();
+        settings.as_object_mut().unwrap().remove("hotkeys");
+        assert!(validate_portable_import(&serde_json::to_vec(&settings).unwrap()).is_err());
+    }
     use std::path::Path;
 
     #[test]

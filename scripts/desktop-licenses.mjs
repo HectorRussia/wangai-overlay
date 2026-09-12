@@ -16,8 +16,10 @@ function copyNotices(dir, name, version, license, licenseFile) {
     if (fs.existsSync(source)) fs.cpSync(source, path.join(target, path.basename(file)), { recursive: true });
   }
 }
-const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--locked', '--format-version', '1', '--filter-platform', 'x86_64-pc-windows-msvc', '--manifest-path', 'src-tauri/Cargo.toml'], { maxBuffer: 32 * 1024 * 1024 }));
-for (const p of metadata.packages) if (p.source) copyNotices(path.dirname(p.manifest_path), p.name, p.version, p.license, p.license_file);
+for (const manifest of ['src-tauri/Cargo.toml','portable/Cargo.toml']) {
+  const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--locked', '--format-version', '1', '--filter-platform', 'x86_64-pc-windows-msvc', '--manifest-path', manifest], { maxBuffer: 32 * 1024 * 1024 }));
+  for (const p of metadata.packages) if (p.source) copyNotices(path.dirname(p.manifest_path), p.name, p.version, p.license, p.license_file);
+}
 const seen = new Set();
 function npmPackage(name, from) {
   const req = createRequire(path.resolve(from, 'package.json'));

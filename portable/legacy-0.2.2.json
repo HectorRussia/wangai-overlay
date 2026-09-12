@@ -1,0 +1,11 @@
+{
+  "version": "0.2.2",
+  "notes": "WANGAI 0.2.2 is the final installed Windows release. To migrate, download WANGAI Portable manually from Releases. Existing settings and installation are not removed.",
+  "pub_date": "2026-09-10T03:13:52.389Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTK2xuY2lvaVp5eW5zWDRocElhaWdmVjNoNWpyNSs4dXphVmpEdEQrZmhERWpKdmRIazNwMFpYTVRTTFNzQUZkdFMvTms3bVRkQXc0dEdoaWdnSlBSU1h4cUphQU5veVFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MDEwMDMyCWZpbGU6V0FOR0FJXzAuMi4yX3g2NC1zZXR1cC5leGUKSFZkVXlJTjF6d0RqbWVrdWozRDgxWmQ0dmpMTHo2L1NtVEU4N0IxZ0h4YkVKRWwzUWc2a0NYb3liWDFzbERqakQrWWRsRTA5b1gvaEUzS1lqRzltQlE9PQo=",
+      "url": "https://github.com/HectorRussia/wangai-overlay/releases/download/v0.2.2/WANGAI_0.2.2_x64-setup.exe"
+    }
+  }
+}

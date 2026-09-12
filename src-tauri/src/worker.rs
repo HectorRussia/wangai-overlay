@@ -69,9 +69,13 @@ impl WorkerManager {
             if !path.is_file() {
                 return Err(anyhow!("ไม่พบ worker ที่มากับตัวติดตั้ง กรุณาติดตั้ง WANGAI ใหม่"));
             }
-            Command::new(path)
+            let path = wangai_portable::platform::dependency_executable(&path)?;
+            let mut command = Command::new(&path);
+            command.current_dir(path.parent().unwrap());
+            command
         };
         command
+            .env("PYTHONDONTWRITEBYTECODE", "1")
             .arg("--vad-threshold")
             .arg(vad_threshold.to_string())
             .arg("--adaptive-floor")

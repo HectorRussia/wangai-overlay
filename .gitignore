@@ -1,6 +1,7 @@
 node_modules/
 dist/
 src-tauri/target/
+portable/target/
 server/target/
 ai-protocol/target/
 *.sqlite3

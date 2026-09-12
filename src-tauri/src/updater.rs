@@ -9,7 +9,7 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 
 #[cfg(not(feature = "release-test"))]
 const ENDPOINT: &str =
-    "https://github.com/HectorRussia/wangai-overlay/releases/latest/download/latest.json";
+    "https://github.com/HectorRussia/wangai-overlay/releases/latest/download/latest-portable.json";
 #[cfg(feature = "release-test")]
 const ENDPOINT: &str = env!("WANGAI_TEST_UPDATE_ENDPOINT");
 const PUBLIC_KEY: &str = match option_env!("WANGAI_UPDATER_PUBLIC_KEY") {
@@ -105,7 +105,7 @@ fn allowed_asset(url: &reqwest::Url, version: &str) -> bool {
         && url.host_str() == Some("127.0.0.1")
         && url.port() == reqwest::Url::parse(ENDPOINT).ok().and_then(|u| u.port())
     {
-        return url.path().starts_with(&format!("/v{version}/")) && url.path().ends_with(".exe");
+        return url.path() == format!("/v{version}/WANGAI_{version}_x64-update.zip");
     }
     url.scheme() == "https"
         && url.host_str() == Some("github.com")
@@ -114,10 +114,8 @@ fn allowed_asset(url: &reqwest::Url, version: &str) -> bool {
         && url.port().is_none()
         && url.query().is_none()
         && url.fragment().is_none()
-        && url.path().starts_with(&format!(
-            "/HectorRussia/wangai-overlay/releases/download/v{version}/"
-        ))
-        && url.path().ends_with(".exe")
+        && wangai_portable::validate_version(version).is_ok()
+        && url.path() == format!("/HectorRussia/wangai-overlay/releases/download/v{version}/WANGAI_{version}_x64-update.zip")
 }
 
 pub async fn check(app: AppHandle) -> UpdateStatus {
@@ -134,18 +132,10 @@ pub async fn check(app: AppHandle) -> UpdateStatus {
         s.can_install = false;
     });
     *manager.candidate.lock().unwrap() = None;
-    let shutdown_handle = app.clone();
     let builder = app
         .updater_builder()
         .pubkey(PUBLIC_KEY)
-        .timeout(Duration::from_secs(15))
-        .on_before_exit(move || {
-            // install() exits directly on Windows; RunEvent alone is insufficient.
-            let _ = crate::lifecycle::shutdown(&shutdown_handle);
-            shutdown_handle
-                .state::<crate::web_companion::WebCompanionManager>()
-                .shutdown();
-        });
+        .timeout(Duration::from_secs(15));
     let updater = match builder
         .endpoints(vec![ENDPOINT.parse().unwrap()])
         .and_then(|b| b.build())
@@ -247,52 +237,75 @@ pub async fn download_and_install_update(
         s.can_install = false;
         s.message = "กำลังดาวน์โหลด ยังฟังต่อได้ เมื่อตรวจลายเซ็นผ่านแอปจะปิดเพื่อติดตั้ง".into();
     });
-    let mut downloaded = 0;
-    let mut last_event = Instant::now();
-    let bytes = update
-        .download(
-            |length, total| {
-                downloaded += length as u64;
-                if last_event.elapsed() > Duration::from_millis(200) {
-                    manager.publish(&app, |s| {
-                        s.downloaded_bytes = downloaded;
-                        s.total_bytes = total;
-                    });
-                    last_event = Instant::now();
-                }
-            },
-            || {},
-        )
-        .await;
-    let bytes = match bytes {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return Ok(manager.fail(
-                &app,
-                "ดาวน์โหลดหรือตรวจลายเซ็นไม่สำเร็จ ยังไม่ได้ติดตั้ง แอปเดิมยังใช้งานได้",
-                true,
-            ))
-        }
-    };
-    manager.publish(&app, |s| {
-        s.phase = "installing";
-        s.downloaded_bytes = bytes.len() as u64;
-        s.total_bytes = Some(bytes.len() as u64);
-        s.message = "ตรวจลายเซ็นแล้ว กำลังบันทึกการตั้งค่าและหยุดระบบเสียงเพื่อติดตั้ง".into();
-    });
-    let handle = app.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::lifecycle::shutdown(&handle)?;
-        update
-            .install(bytes)
-            .map_err(|_| "เปิดตัวติดตั้งไม่สำเร็จ กรุณาปิดและเปิด WANGAI ใหม่".to_string())
-    })
-    .await
-    .map_err(|_| "งานติดตั้งหยุดทำงาน")?;
-    if let Err(message) = result {
-        return Ok(manager.fail(&app, &message, false));
+    let result = prepare_portable_update(&app,&update).await;
+    if let Err(error) = result {
+        return Ok(manager.fail(&app,&format!("อัปเดตยังไม่สำเร็จ: {error}"),!app.state::<crate::state::AppState>().lifecycle.is_closing()));
     }
     Ok(manager.snapshot())
+}
+
+async fn prepare_portable_update(app:&AppHandle, update:&Update) -> anyhow::Result<()> {
+    use anyhow::{ensure,Context};
+    use wangai_portable::{package,transaction::UpdateRequest,atomic_json,read_json,MAX_ARCHIVE};
+    use tokio::io::AsyncWriteExt;
+    let layout=app.state::<crate::portable_runtime::PortableRuntime>().layout.clone().context("ใช้การอัปเดตนี้ได้เฉพาะ WANGAI Portable")?;
+    ensure!(allowed_asset(&update.download_url,&update.version),"Update source rejected");
+    let lock=layout.lock()?;
+    ensure!(wangai_portable::transaction::journal(&layout)?.is_none(),"มี transaction ค้าง กรุณาปิดและเปิด WANGAI.exe เพื่อกู้คืนก่อน");
+    let (nonce,folder)=layout.new_transaction()?;
+    let result=async {
+        let manager=app.state::<UpdateManager>();
+        let client=reqwest::Client::builder().connect_timeout(Duration::from_secs(15)).timeout(Duration::from_secs(1200))
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                let url=attempt.url();
+                if attempt.previous().len()>=4 { return attempt.error("Too many download redirects"); }
+                if url.scheme()=="https" && matches!(url.host_str(),Some("github.com"|"release-assets.githubusercontent.com"|"objects.githubusercontent.com")) && url.username().is_empty() && url.password().is_none() && url.port().is_none() {attempt.follow()} else {attempt.error("Untrusted download redirect")}
+            })).build()?;
+        wangai_portable::require_space(&folder,MAX_ARCHIVE)?;
+        let mut response=client.get(update.download_url.clone()).send().await?.error_for_status()?;
+        let total=response.content_length();ensure!(total.is_none_or(|n|n>0 && n<=MAX_ARCHIVE),"Archive exceeds size limit");
+        let mut file=tokio::fs::OpenOptions::new().write(true).create_new(true).open(folder.join("payload.zip")).await?;
+        let mut downloaded=0u64;let mut event=Instant::now();
+        while let Some(chunk)=response.chunk().await? {
+            downloaded=downloaded.checked_add(chunk.len() as u64).context("Download length overflow")?;
+            ensure!(downloaded<=MAX_ARCHIVE,"Download exceeds size limit");
+            file.write_all(&chunk).await?;
+            if event.elapsed()>Duration::from_millis(200) {manager.publish(app,|s|{s.downloaded_bytes=downloaded;s.total_bytes=total;});event=Instant::now();}
+        }
+        ensure!(downloaded>0 && total.is_none_or(|n|n==downloaded),"Truncated download");
+        file.sync_all().await?;drop(file);
+        manager.publish(app,|s|{s.phase="verifying";s.message="กำลังตรวจลายเซ็นและรายการไฟล์ ยังใช้โปรแกรมต่อได้".into();});
+        let staged=folder.clone();let signature=update.signature.clone();let version=update.version.clone();let handle=app.clone();
+        tauri::async_runtime::spawn_blocking(move|| -> anyhow::Result<()> {
+            package::verify_archive(&staged.join("payload.zip"),&signature,PUBLIC_KEY)?;
+            handle.state::<UpdateManager>().publish(&handle,|s|{s.phase="preparing";s.message="กำลังเตรียมชุดโปรแกรมใหม่แยกจากรุ่นปัจจุบัน".into();});
+            package::unpack(&staged.join("payload.zip"),&signature,PUBLIC_KEY,&staged.join("staged"),Some(&version),&std::sync::atomic::AtomicBool::new(false),&|_,_|{})?;
+            Ok(())
+        }).await??;
+        let current=layout.version(&layout.active()?.current)?;
+        package::verify_installed(&current,PUBLIC_KEY,false)?;
+        let helper=folder.join("helper.exe");std::fs::copy(current.join("WANGAI.exe"),&helper)?;
+        atomic_json(&folder.join("request.json"),&UpdateRequest{format:1,nonce:nonce.clone(),version:update.version.clone(),parent_pid:std::process::id(),signature:update.signature.clone()})?;
+        // The helper opens and validates our process handle before acknowledging. No PID-reuse race.
+        let mut helper_process=std::process::Command::new(helper).arg("--apply").arg(&layout.root).arg(&nonce).spawn()?;
+        let start=Instant::now();
+        loop {
+            if let Ok(ready)=read_json::<serde_json::Value>(&folder.join("helper-ready.json")) {
+                if ready["nonce"]==nonce && ready["pid"]==helper_process.id() {break;}
+            }
+            ensure!(helper_process.try_wait()?.is_none() && start.elapsed()<Duration::from_secs(10),"ตัวช่วยอัปเดตไม่พร้อม ยังไม่ได้ปิดโปรแกรม");
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        manager.publish(app,|s|{s.phase="installing";s.message="ตรวจไฟล์แล้ว กำลังบันทึก settings และปิดระบบเสียงเพื่อเปิดรุ่นใหม่".into();});
+        let handle=app.clone();
+        tauri::async_runtime::spawn_blocking(move||crate::lifecycle::shutdown(&handle).map_err(anyhow::Error::msg)).await??;
+        app.state::<crate::web_companion::WebCompanionManager>().shutdown();
+        atomic_json(&folder.join("shutdown-ready.json"),&serde_json::json!({"nonce":nonce,"pid":std::process::id()}))?;
+        Ok::<_,anyhow::Error>(())
+    }.await;
+    drop(lock);
+    if result.is_ok() { app.exit(0); } else { let _=layout.cleanup_transaction(&nonce); }
+    result
 }
 
 #[cfg(test)]
@@ -327,14 +340,14 @@ mod tests {
     #[test]
     fn update_assets_are_pinned_to_repository_and_version() {
         let valid =
-            "https://github.com/HectorRussia/wangai-overlay/releases/download/v0.2.1/WANGAI.exe";
+            "https://github.com/HectorRussia/wangai-overlay/releases/download/v0.2.1/WANGAI_0.2.1_x64-update.zip";
         assert!(allowed_asset(&valid.parse().unwrap(), "0.2.1"));
         for invalid in [
             valid.replace("https:", "http:"),
             valid.replace("HectorRussia", "attacker"),
             valid.replace("v0.2.1", "v0.1.0"),
             format!("{valid}?token=x"),
-            valid.replace(".exe", ".zip"),
+            valid.replace("-update.zip", "-setup.exe"),
         ] {
             assert!(!allowed_asset(&invalid.parse().unwrap(), "0.2.1"));
         }
