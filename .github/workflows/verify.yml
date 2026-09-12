@@ -29,6 +29,12 @@ jobs:
       - run: cargo test --locked --manifest-path portable/Cargo.toml --features host
       - run: ./scripts/package-worker.ps1
         shell: pwsh
+      - name: Check packaged Python worker events with the real Rust decoder
+        shell: pwsh
+        run: |
+          $env:WANGAI_TEST_WORKER_EXE = (Resolve-Path 'output/worker/wangai-worker/wangai-worker.exe').Path
+          cargo test --locked --manifest-path src-tauri/Cargo.toml packaged_worker_events_follow_rust_contract -- --ignored --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: .packaging-venv/Scripts/python.exe -m unittest discover -s worker -v
       - run: .packaging-venv/Scripts/python.exe scripts/test-portable-preview.py
       - run: node scripts/desktop-licenses.mjs

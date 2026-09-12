@@ -380,7 +380,12 @@ pub struct AppSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+// Python uses snake_case event names and camelCase event fields.
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
 pub enum WorkerEvent {
     Ready {
         model: String,
@@ -412,4 +417,75 @@ pub struct WorkerStatusEvent {
     pub state: String,
     pub message: String,
     pub model: Option<String>,
+}
+
+#[cfg(test)]
+mod worker_contract_tests {
+    use super::*;
+
+    #[test]
+    fn python_speech_and_gap_events_deserialize_and_round_trip() {
+        let fixture = include_str!("../../worker/fixtures/events.jsonl");
+        let events: Vec<WorkerEvent> = fixture
+            .lines()
+            .map(|line| {
+                let event: WorkerEvent =
+                    serde_json::from_str(line).expect("Python worker wire contract");
+                assert_eq!(
+                    serde_json::to_value(&event).unwrap(),
+                    serde_json::from_str::<serde_json::Value>(line).unwrap()
+                );
+                event
+            })
+            .collect();
+        assert!(matches!(
+            events[0],
+            WorkerEvent::SpeechState {
+                stream: StreamKind::Incoming,
+                active: true,
+                utterance_id: 1,
+                sample_cursor: 512
+            }
+        ));
+        assert!(matches!(
+            events[1],
+            WorkerEvent::SpeechState {
+                stream: StreamKind::Incoming,
+                active: false,
+                utterance_id: 1,
+                sample_cursor: 1024
+            }
+        ));
+        assert!(matches!(
+            events[2],
+            WorkerEvent::AudioGap {
+                stream: StreamKind::Incoming,
+                expected_sample_cursor: 1536,
+                actual_sample_cursor: 4096
+            }
+        ));
+    }
+
+    #[test]
+    fn readiness_status_and_optional_error_stream_remain_compatible() {
+        for line in [
+            r#"{"type":"ready","model":"silero-vad","device":"cpu"}"#,
+            r#"{"type":"status","message":"starting"}"#,
+            r#"{"type":"error","message":"bad frame"}"#,
+            r#"{"type":"error","message":"bad frame","stream":"incoming"}"#,
+        ] {
+            serde_json::from_str::<WorkerEvent>(line).expect("existing worker event");
+        }
+    }
+
+    #[test]
+    fn incomplete_speech_events_are_not_silently_accepted() {
+        for line in [
+            r#"{"type":"speech_state","stream":"incoming","active":true,"sampleCursor":512}"#,
+            r#"{"type":"speech_state","stream":"incoming","active":true,"utteranceId":1}"#,
+            r#"{"type":"audio_gap","stream":"incoming","expectedSampleCursor":512}"#,
+        ] {
+            assert!(serde_json::from_str::<WorkerEvent>(line).is_err());
+        }
+    }
 }

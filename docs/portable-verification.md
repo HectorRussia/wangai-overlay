@@ -104,3 +104,37 @@ python scripts/test-portable-upgrade.py --artifacts C:/WANGAI-QA/fixtures --run-
 Manual-confirmation mode waits for the update offer and confirmation buttons in
 the real desktop window; it does not auto-call the update command. Build scripts
 also run `scripts/verify-portable-artifacts.py` before declaring assets complete.
+
+## 2026-09-12: worker speech-event contract fix
+
+The first production-key preview opened Ready Room, loaded the bundled worker,
+and showed audio levels in System Output mode, but never started transcription.
+The blocking bug was the Python/Rust event contract: Python emits camelCase
+fields (`utteranceId`, `sampleCursor`, `expectedSampleCursor`, `actualSampleCursor`),
+while Rust previously expected snake_case variant fields. `ready` events decoded,
+but speech and gap events were discarded into an unobserved `worker-log` event.
+
+- Reproduced against the unchanged Rust type and both Python source events and
+  the actual packaged worker; speech events failed with `missing field utterance_id`.
+- The shared Python/Rust regression fixture failed before the fix and passed
+  after enabling camelCase variant fields, retaining snake_case event names.
+- Malformed events now reach the existing error UI without echoing raw output;
+  the backend clears worker-ready/VAD flags and broadcasts the failure state.
+- CI explicitly runs `packaged_worker_events_follow_rust_contract` after worker
+  packaging, exercising the frozen executable through Rust's binary-frame writer
+  and actual event decoder. Deterministic mock VAD is used for this protocol test;
+  the separate real ONNX startup test is retained. No paid AI requests are made.
+- A local synthetic-speech test independently established that the previous
+  bundled real ONNX worker detects speech at -16.1 and -25.1 dBFS. This does not
+  establish successful live capture/transcription/translation in the fixed app.
+- Local fix verification passed: Rust core 89 tests (two intentionally ignored
+  in the default run), the packaged-worker contract test explicitly executed and
+  passed, Python worker 11 tests, frontend 65 tests, PE checks 4 tests, preview
+  guards 7 tests, and frontend production build. Final signed CI artifact and
+  live translation validation remain pending at this source checkpoint.
+
+The repaired preview remains **0.3.0**, with its commit/run recorded separately.
+Prepare it in a new folder; do not replace a same-version payload or overwrite
+the previous preview's Data. Production publishing is still a separate step.
+The earlier intermittent Process Tree digital silence remains a separate,
+unresolved capture issue; it must not be claimed fixed by the event-contract fix.

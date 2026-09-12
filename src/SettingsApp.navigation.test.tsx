@@ -57,6 +57,22 @@ describe("settings with nullable desktop audio diagnostics", () => {
     expect(await screen.findByText(peak == null ? "ยังไม่มี audio frame" : `${peak.toFixed(1)} dBFS`)).toBeInTheDocument();
   });
 
+  it("shows a worker protocol failure on Ready Room and Advanced instead of only a success notice", async () => {
+    const snapshot = vi.mocked(useSnapshot)().snapshot!;
+    const message = "ข้อมูลจากตัวตรวจคำพูดไม่ตรงกับแอป กรุณาเปิด WANGAI จากชุด Portable เดียวกัน";
+    Object.assign(snapshot.runtime, { workerReady: false, lastError: message });
+    const view = render(<SettingsApp activeTab="overview" />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByText("ตัวตรวจคำพูดยังไม่พร้อม")).toBeInTheDocument();
+    expect(screen.getByText("ต้องตรวจสอบ")).toBeInTheDocument();
+    view.rerender(<SettingsApp activeTab="advanced" advancedSection="audio" />);
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    Object.assign(snapshot.runtime, { workerReady: true, lastError: undefined });
+    view.rerender(<SettingsApp activeTab="overview" />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("ตัวตรวจคำพูดยังไม่พร้อม")).not.toBeInTheDocument();
+  });
+
   it("keeps success feedback and F8 separate and preserves feedback through navigation", async () => {
     window.history.replaceState(null, "", "/?preview=1&ui=success#/settings/overview");
     const view = render(<SettingsApp activeTab="overview" />);

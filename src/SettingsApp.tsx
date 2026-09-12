@@ -63,7 +63,8 @@ export function SettingsApp({ activeTab, advancedSection = "audio" }: { activeTa
   const { settings, runtime } = snapshot;
   const profileKey = settings.captureMode === "process_tree" ? "processTree" : "systemOutput";
   const profile = vad[profileKey];
-  const notification = toast && <div role={toast.kind === "error" ? "alert" : "status"} className={`settings-notification rounded-xl border px-4 py-3 text-sm ${toast.kind === "error" ? "border-red-400/30 bg-red-400/10 text-red-200" : "border-[#63c48b]/30 bg-[#63c48b]/10 text-[#8bf0b1]"}`}>{toast.text}</div>;
+  const notice = runtime.lastError ? { kind: "error", text: runtime.lastError } : toast;
+  const notification = notice && <div role={notice.kind === "error" ? "alert" : "status"} className={`settings-notification rounded-xl border px-4 py-3 text-sm ${notice.kind === "error" ? "border-red-400/30 bg-red-400/10 text-red-200" : "border-[#63c48b]/30 bg-[#63c48b]/10 text-[#8bf0b1]"}`}>{notice.text}</div>;
 
   return <main className="settings-app min-h-screen bg-[#15161a] px-6 py-5 text-[#eceef2]">
     <header className="mb-5 flex min-h-14 items-center gap-4 border-b border-white/8 pb-4">

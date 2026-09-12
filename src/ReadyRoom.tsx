@@ -28,7 +28,7 @@ export function ReadyRoom({ settings, runtime, history, busy, previewMode, onTog
   }, [webRuntime, previewMode]);
   const incoming = incomingReadiness(settings, runtime);
   const ai = aiReadiness(runtime);
-  const configured = Boolean(settings.listeningSource) && ["connected", "ready"].includes(runtime.aiService.state);
+  const configured = Boolean(settings.listeningSource) && runtime.workerReady && ["connected", "ready"].includes(runtime.aiService.state);
   const recent = history.find((item) => item.status === "success") ?? history[0];
   return <div className="ready-room-grid">
     <div className="ready-listen-toolbar">
@@ -60,6 +60,7 @@ function Recent({ item }: { item: SubtitleItem }) {
 
 function incomingReadiness(settings: AppSettings, runtime: RuntimeState): Readiness {
   if (!settings.listeningSource) return { label: "ต้องตั้งค่า", detail: "เลือกเกม Discord หรือ browser", tone: "setup" };
+  if (!runtime.workerReady) return { label: "ตัวตรวจคำพูดยังไม่พร้อม", detail: runtime.lastError ? "พบข้อผิดพลาด กรุณาตรวจข้อความแจ้งเตือน" : "กำลังเตรียม Silero VAD", tone: runtime.lastError ? "warning" : "waiting" };
   if (!runtime.listening) return { label: "พร้อม", detail: "รอเริ่มฟัง", tone: "ready" };
   if (runtime.captureWarning) return { label: "ไม่ได้ยินเสียง", detail: "เปิดวิธีแก้ปัญหาเสียง", tone: "warning" };
   if (!runtime.attachedSource) return { label: "หาแอปไม่พบ", detail: `ตรวจว่า ${settings.listeningSource.displayName} ยังเปิดอยู่`, tone: "warning" };

@@ -140,15 +140,7 @@ impl WorkerManager {
                     if line.trim().is_empty() {
                         continue;
                     }
-                    match serde_json::from_str::<WorkerEvent>(&line) {
-                        Ok(event) => pipeline::handle_worker_event(event_app.clone(), event),
-                        Err(error) => {
-                            let _ = event_app.emit(
-                                "worker-log",
-                                format!("worker event ไม่ถูกต้อง: {error}: {line}"),
-                            );
-                        }
-                    }
+                    pipeline::handle_worker_event(event_app.clone(), parse_worker_event(&line));
                 }
                 emit_status(&event_app, "stopped", "speech worker หยุดทำงาน", None);
             })?;
@@ -245,6 +237,15 @@ impl WorkerManager {
     }
 }
 
+fn parse_worker_event(line: &str) -> WorkerEvent {
+    serde_json::from_str(line).unwrap_or_else(|_| WorkerEvent::Error {
+        // Surface protocol failures through the existing error UI, not an unobserved
+        // debug-only event. Never put raw worker output in a user-facing error.
+        message: "ข้อมูลจากตัวตรวจคำพูดไม่ตรงกับแอป กรุณาเปิด WANGAI จากชุด Portable เดียวกัน".into(),
+        stream: None,
+    })
+}
+
 fn active_vad_threshold(settings: &AppSettings) -> f32 {
     settings
         .vad
@@ -337,6 +338,104 @@ pub fn emit_status(app: &AppHandle, state: &str, message: &str, model: Option<St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn malformed_worker_output_becomes_a_visible_error_without_echoing_payload() {
+        for line in [
+            "not-json-private-test-value",
+            r#"{"type":"speech_state","active":true}"#,
+        ] {
+            let WorkerEvent::Error { message, stream } = parse_worker_event(line) else {
+                panic!("Malformed protocol must reach the pipeline error UI");
+            };
+            assert!(message.contains("ข้อมูลจากตัวตรวจคำพูดไม่ตรงกับแอป"));
+            assert!(!message.contains(line));
+            assert!(stream.is_none());
+        }
+    }
+
+    #[test]
+    #[ignore = "requires WANGAI_TEST_WORKER_EXE from the packaged-worker CI step"]
+    fn packaged_worker_events_follow_rust_contract() {
+        use std::time::{Duration, Instant};
+        let exe = std::path::PathBuf::from(
+            std::env::var("WANGAI_TEST_WORKER_EXE")
+                .expect("Explicit packaged worker path required"),
+        )
+        .canonicalize()
+        .unwrap();
+        let mut command = Command::new(&exe);
+        command
+            .arg("--mock")
+            .current_dir(exe.parent().unwrap())
+            .env("HF_HUB_OFFLINE", "1")
+            .env("PYTHONNOUSERSITE", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x0800_0000);
+        }
+        let mut child = command.spawn().expect("Start isolated packaged worker");
+        let stdin = child.stdin.take().unwrap();
+        let writer = thread::spawn(move || -> std::io::Result<()> {
+            let mut stdin = stdin;
+            for frame in [
+                WorkerCommand::Audio(StreamKind::Incoming, 0, vec![0.05; 1024]),
+                WorkerCommand::Finalize(StreamKind::Incoming),
+                WorkerCommand::Reset(StreamKind::Incoming),
+                WorkerCommand::Audio(StreamKind::Incoming, 1024, vec![0.0; 512]),
+                WorkerCommand::Audio(StreamKind::Incoming, 4096, vec![0.0; 512]),
+                WorkerCommand::Shutdown,
+            ] {
+                write_frame(&mut stdin, frame)?;
+            }
+            Ok(())
+        });
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while child.try_wait().expect("Read own worker status").is_none() {
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = writer.join();
+                panic!("Packaged worker contract test timed out");
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        writer
+            .join()
+            .unwrap()
+            .expect("Send synthetic protocol frames");
+        let output = child.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = String::from_utf8(output.stdout).unwrap();
+        let mut lines = text.lines();
+        assert!(matches!(
+            serde_json::from_str::<WorkerEvent>(lines.next().unwrap()).unwrap(),
+            WorkerEvent::Ready { .. }
+        ));
+        let expected: Vec<serde_json::Value> = include_str!("../../worker/fixtures/events.jsonl")
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let actual: Vec<serde_json::Value> = lines
+            .map(|line| {
+                let event: WorkerEvent =
+                    serde_json::from_str(line).expect("Frozen Python -> Rust contract");
+                serde_json::to_value(event).unwrap()
+            })
+            .collect();
+        assert_eq!(
+            actual, expected,
+            "Packaged worker must produce usable speech boundaries and audio gaps"
+        );
+    }
 
     #[test]
     fn audio_frame_has_expected_header_and_payload() {

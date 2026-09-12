@@ -1,0 +1,3 @@
+{"type":"speech_state","stream":"incoming","active":true,"utteranceId":1,"sampleCursor":512}
+{"type":"speech_state","stream":"incoming","active":false,"utteranceId":1,"sampleCursor":1024}
+{"type":"audio_gap","stream":"incoming","expectedSampleCursor":1536,"actualSampleCursor":4096}

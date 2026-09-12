@@ -1,4 +1,6 @@
 import io
+import json
+from pathlib import Path
 import struct
 import unittest
 
@@ -8,6 +10,18 @@ from worker import main
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_emitted_events_match_shared_rust_contract_fixture(self):
+        events = []
+        session = main.StreamSession("incoming", 12_000, main.EnergyVad(500), events.append)
+        session.ingest(np.full(1024, 0.05, dtype=np.float32), 0)
+        session.finalize()
+        session.reset()
+        session.ingest(np.zeros(512, dtype=np.float32), 1024)
+        session.ingest(np.zeros(512, dtype=np.float32), 4096)
+        fixture = Path(__file__).parent / "fixtures" / "events.jsonl"
+        expected = [json.loads(line) for line in fixture.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(events, expected)
+
     def test_adaptive_silero_starts_after_three_weak_speech_frames(self):
         class FakeModel:
             def __init__(self):

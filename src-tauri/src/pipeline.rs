@@ -87,11 +87,14 @@ pub fn handle_worker_event(app: AppHandle, event: WorkerEvent) {
             let _ = app.emit("runtime-state", runtime);
         }
         WorkerEvent::Error { message, .. } => {
-            state.update_runtime(|runtime| {
+            let runtime = state.update_runtime(|runtime| {
+                runtime.worker_ready = false;
+                runtime.vad_active = false;
                 runtime.last_error = Some(message.clone());
                 runtime.status_message = "Silero VAD worker มีปัญหา".into();
             });
             let _ = app.emit("pipeline-error", message);
+            let _ = app.emit("runtime-state", runtime);
         }
     }
 }
