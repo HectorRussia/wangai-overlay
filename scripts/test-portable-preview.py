@@ -31,6 +31,15 @@ class Payload:
 
 
 class PreviewTests(unittest.TestCase):
+    def test_release_stays_draft_prerelease_and_verifies_before_creation(self):
+        workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/release.yml').read_text()
+        create = next(line for line in workflow.splitlines() if 'gh release create ' in line)
+        for flag in ('--verify-tag', '--draft', '--prerelease', '--latest=false'):
+            self.assertIn(flag, create)
+        self.assertIn('--production', workflow)
+        self.assertLess(workflow.index('scripts/verify-portable-artifacts.py'), workflow.index('gh release create '))
+        self.assertNotIn('gh release edit', workflow)
+
     def test_accepts_live_identity_and_matching_keys(self):
         audit.verify_production_payload(Payload(), GATEWAY + '/', ' public-fixture ')
 

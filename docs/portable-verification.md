@@ -1,5 +1,22 @@
 # Portable 0.3.0 verification
 
+## 2026-09-17: pre-release preparation checkpoint
+
+The signed production-key preview at commit `fc369ef501beff140b1bdeefca322bc8032e88bc`
+passed GitHub Actions run **34682590667**, including the real packaged worker
+contract and offline ONNX checks. Its assets passed checksum, payload manifest,
+production identity and all three cryptographic signature checks using the
+existing public key. The owner subsequently reported successful actual use.
+This supersedes the earlier signing-pending and live-use-pending checkpoints
+below; historical fixture results are not clean Windows or full production QA.
+
+The 0.3.0 tag build still needs its own successful CI and Draft asset inspection
+before publication. The approved target is **Pre-release, not Latest**, with
+0.2.2 remaining Latest and no changes to old release files or the normal updater
+channel. Clean Windows, Process Tree and the remaining manual/update scenarios
+below remain pending for Stable. No UI/audio/provider changes are included in
+this release-preparation step.
+
 Last run: 2026-09-10. Local working tree, not a published release.
 Host: Windows 11 Pro build 26200, non-elevated user. This is a developer machine,
 **not clean Windows**. Tests used disposable signing keys and a loopback update
@@ -74,7 +91,7 @@ worker, or update helper remained running at the final process check.
 - Native launcher resources include the real/test version so the two-version
   acceptance test can require different launcher binaries and verify replacement.
 
-## Still required before publishing
+## Remaining Stable gates (not claimed complete for Pre-release)
 
 - Clean Windows 10 and 11 VMs with no Python/venv, normal non-admin user, and no
   reliance on an installed Evergreen WebView2 runtime.

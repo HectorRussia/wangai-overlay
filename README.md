@@ -25,10 +25,13 @@ Rust downmix/resample เป็น PCM mono 16 kHz และส่งเสี�
 
 Local Web Companion bind เฉพาะ `127.0.0.1`; production ขอ port ว่างจาก Windows ทุกครั้งและคืน port เมื่อ Desktop ปิด ปุ่ม **เปิด Web App** แลก token ใน URL fragment เป็น `HttpOnly`/`SameSite=Strict` cookie ทั้ง Desktop และหน้าเว็บใช้ AI กลางโดยไม่มีฟอร์ม keyและใช้งานไม่ได้เมื่อ Desktop engine ปิด
 
-## ดาวน์โหลดสำหรับผู้ใช้ Windows — Portable 0.3.0
+## ดาวน์โหลดสำหรับผู้ใช้ Windows — Portable 0.3.0 Pre-release
 
-ใน [Releases](https://github.com/HectorRussia/wangai-overlay/releases) เลือกไฟล์
-`WANGAI_0.3.0_x64-portable.exe` (หลังรุ่นนี้ได้รับการเผยแพร่) แล้วกด **เตรียมและเปิด WANGAI**
+ใน [0.3.0 Pre-release](https://github.com/HectorRussia/wangai-overlay/releases/tag/v0.3.0) เลือกไฟล์
+`WANGAI_0.3.0_x64-portable.exe` แล้วกด **เตรียมและเปิด WANGAI**
+รุ่นนี้ดาวน์โหลดเอง ยังไม่ส่งผ่านอัปเดตอัตโนมัติปกติ และ **0.2.2 ยังคงเป็น Latest**
+เจ้าของยืนยันการใช้งาน Preview แล้ว แต่ clean Windows, Process Tree และการอัปเดตบางกรณียังทดสอบไม่ครบ
+โปรดอ่าน [ข้อจำกัด Pre-release](docs/releases/v0.3.0.md) ก่อนใช้งาน
 ตัวเปิดธีมเข้ม–เขียวจะจัดโฟลเดอร์ให้ รวม Python, Silero offline และ WebView2 Fixed Version แล้ว
 ไม่ต้องแตก ZIP ไม่ลงทะเบียนตัวถอนติดตั้ง ไม่สร้าง shortcut และไม่ขอ Administrator อัตโนมัติ
 
