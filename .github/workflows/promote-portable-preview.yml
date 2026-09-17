@@ -1,0 +1,78 @@
+name: Draft tested Portable 0.3.0 (no rebuild)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: release-v0.3.0
+  cancel-in-progress: false
+jobs:
+  draft:
+    if: github.repository == 'HectorRussia/wangai-overlay' && github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    env:
+      WANGAI_API_BASE_URL: ${{ vars.WANGAI_API_BASE_URL }}
+      WANGAI_UPDATER_PUBLIC_KEY: ${{ vars.WANGAI_UPDATER_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.8.22'
+      - run: uv venv --python 3.12 --managed-python .packaging-venv
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: '1.86.0'
+      - name: Require successful original preview build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $run = gh api repos/HectorRussia/wangai-overlay/actions/runs/34682590667 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($run.conclusion -ne 'success' -or $run.head_sha -ne 'fc369ef501beff140b1bdeefca322bc8032e88bc' -or $run.path -ne '.github/workflows/portable-preview.yml') { throw 'Unexpected preview run' }
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: WANGAI-portable-preview-34682590667-1
+          path: output/tested-preview
+          run-id: 34682590667
+          github-token: ${{ github.token }}
+      - name: Test metadata guards and build public-key verifier only
+        shell: pwsh
+        run: |
+          .packaging-venv/Scripts/python.exe scripts/test-portable-preview.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --locked --release --manifest-path portable/Cargo.toml --features tools --bin portable-verify
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Audit original signatures, promote metadata, and audit again
+        shell: pwsh
+        run: |
+          .packaging-venv/Scripts/python.exe scripts/verify-portable-artifacts.py output/tested-preview --verifier portable/target/release/portable-verify.exe --production
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .packaging-venv/Scripts/python.exe scripts/promote-tested-portable.py output/tested-preview output/promoted-release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .packaging-venv/Scripts/python.exe scripts/verify-portable-artifacts.py output/promoted-release --verifier portable/target/release/portable-verify.exe --production
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:GITHUB_REF_NAME = 'v0.3.0'
+          node scripts/release-assets.mjs output/promoted-release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Create Draft Pre-release only; never publish or replace a release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.3.0 --repo HectorRussia/wangai-overlay --verify-tag --draft --prerelease --latest=false --title 'WANGAI v0.3.0' --notes-file output/promoted-release/RELEASE-NOTES.md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $assets = Get-ChildItem -LiteralPath output/promoted-release -File | ForEach-Object { $_.FullName }
+          gh release upload v0.3.0 @assets --repo HectorRussia/wangai-overlay
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

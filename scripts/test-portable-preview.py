@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +19,7 @@ def module(name, filename):
 
 audit = module('audit', 'verify-portable-artifacts.py')
 provenance = module('provenance', 'record-portable-preview.py')
+promotion = module('promotion', 'promote-tested-portable.py')
 GATEWAY = 'https://wangai-ai.onrender.com'
 
 
@@ -31,6 +33,47 @@ class Payload:
 
 
 class PreviewTests(unittest.TestCase):
+    def test_release_checksum_guard_accepts_lf_and_crlf_but_rejects_corruption(self):
+        script = Path(__file__).resolve().parent / 'release-assets.mjs'
+        for newline in ('\n', '\r\n'):
+            with self.subTest(newline=repr(newline)), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                assets = root / 'assets'
+                assets.mkdir()
+                (root / 'portable').mkdir()
+                (root / 'package.json').write_text('{"version":"0.3.0"}')
+                (root / 'portable/legacy-0.2.2.json').write_text('{"version":"0.2.2"}')
+                for name in ('WANGAI_0.3.0_x64-portable.exe', 'WANGAI_0.3.0_x64-update.zip',
+                             'WANGAI_0.3.0_x64-update.zip.sig', 'package-manifest.json',
+                             'package-manifest.json.sig', 'windows-subsystems.json', 'webview2.lock.json'):
+                    (assets / name).write_bytes(b'fixture')
+                (assets / 'latest.json').write_text('{"version":"0.2.2"}')
+                (assets / 'latest-portable.json').write_text(json.dumps({'version': '0.3.0', 'platforms': {
+                    'windows-x86_64': {'url': 'https://github.com/HectorRussia/wangai-overlay/releases/download/v0.3.0/WANGAI_0.3.0_x64-update.zip'}}}))
+                sums = newline.join(f'{hashlib.sha256(file.read_bytes()).hexdigest()}  {file.name}' for file in sorted(assets.iterdir())) + newline
+                (assets / 'SHA256SUMS.txt').write_bytes(sums.encode())
+                environment = {**os.environ, 'GITHUB_REF_NAME': 'v0.3.0'}
+                def run():
+                    return subprocess.run(['node', str(script), str(assets)], cwd=root, env=environment, capture_output=True, timeout=20)
+                self.assertEqual(run().returncode, 0)
+                (assets / 'WANGAI_0.3.0_x64-portable.exe').write_bytes(b'corrupt')
+                self.assertNotEqual(run().returncode, 0)
+
+    def test_promotion_requires_exact_tested_source_tag_and_payload(self):
+        record = {'kind': 'signed-portable-preview', 'version': '0.3.0',
+                  'repository': 'HectorRussia/wangai-overlay', 'commit': promotion.SOURCE,
+                  'ref': 'refs/heads/codex/portable-preview-0.3.0', 'runAttempt': 1,
+                  'workflowRun': f'https://github.com/HectorRussia/wangai-overlay/actions/runs/{promotion.RUN}',
+                  'gateway': GATEWAY}
+        manifest = {'version': '0.3.0', 'architecture': 'x86_64'}
+        promotion.validate(record, manifest, ['README.md'], promotion.TAG_COMMIT, promotion.EXE_HASH)
+        for changed, tag, digest in [(['src/ReadyRoom.tsx'], promotion.TAG_COMMIT, promotion.EXE_HASH),
+                                     ([], 'a' * 40, promotion.EXE_HASH), ([], promotion.TAG_COMMIT, 'bad')]:
+            with self.assertRaises(ValueError):
+                promotion.validate(record, manifest, changed, tag, digest)
+        with self.assertRaises(ValueError):
+            promotion.validate({**record, 'commit': 'b' * 40}, manifest, [], promotion.TAG_COMMIT, promotion.EXE_HASH)
+
     def test_release_stays_draft_prerelease_and_verifies_before_creation(self):
         workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/release.yml').read_text()
         create = next(line for line in workflow.splitlines() if 'gh release create ' in line)

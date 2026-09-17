@@ -17,6 +17,25 @@ channel. Clean Windows, Process Tree and the remaining manual/update scenarios
 below remain pending for Stable. No UI/audio/provider changes are included in
 this release-preparation step.
 
+### Tag-build metadata guard and recovery
+
+Run `35219857956` passed both verification jobs and built/signed the application,
+but failed before Draft creation: the Node checksum guard split CRLF lines only
+on LF and treated the remaining CR as part of an asset filename. The guard now
+accepts LF/CRLF with a regression test that still rejects changed file contents.
+The `v0.3.0` tag is retained at `2d3d929e340d0c3ac8bcc331e3f20a6bd099d9f0`.
+
+The one-time `Draft tested Portable 0.3.0 (no rebuild)` workflow can recover by
+promoting the exact already signed, owner-tested CI artifact from `34682590667`.
+It requires that successful run/commit, the known executable SHA256, the original
+public-key signatures, and a tag diff containing only the five approved release
+metadata/guard files (no product or build inputs). It changes release notes and
+checksums only, records source/tag/promotion provenance, audits again, and creates
+a Draft Pre-release with Latest disabled. It has no signing secrets and cannot
+publish, overwrite release assets, or retag. `PREVIEW-BUILD.json` remains the
+historical build record; `RELEASE-PROVENANCE.json` describes the promotion.
+Successful promotion and local Draft inspection must be recorded separately.
+
 Last run: 2026-09-10. Local working tree, not a published release.
 Host: Windows 11 Pro build 26200, non-elevated user. This is a developer machine,
 **not clean Windows**. Tests used disposable signing keys and a loopback update
