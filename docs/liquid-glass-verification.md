@@ -80,7 +80,8 @@ python scripts/test-portable-upgrade.py --artifacts E:\WANGAI-UI-QA-0.4.0\artifa
 
 ## Still required before a stable/public 0.4.0 release
 
-- Inspect the exact production-key-signed CI Preview, including first launch.
+- First launch and native acceptance of the exact production-key-signed CI
+  Preview. Its static/cryptographic audit passed as recorded below.
 - Clean standard-user Windows 10/11 without dev dependencies; actual system DPI
   100–200%, Windows high contrast and keyboard-only use in the native app.
 - Live F7/F8/F9/F10, drag/lock/click-through, copy/paste, Web Companion and update
@@ -96,3 +97,33 @@ python scripts/test-portable-upgrade.py --artifacts E:\WANGAI-UI-QA-0.4.0\artifa
 Only `Portable Preview (no publish)` is used to produce a shareable signed build.
 It requires the live gateway and existing public/private key match, audits before
 upload, and has no release-write permission. Publication is a separate decision.
+
+## Production-signed Preview delivery
+
+- CI run [35312072091](https://github.com/HectorRussia/wangai-overlay/actions/runs/35312072091)
+  completed successfully: server verification, Windows verification and package.
+- Exact application source: `343a84087ba430d3001c60d671c801ad156348fa`, branch
+  `codex/liquid-glass-0.4.0`. Later verification-only documentation is not a new
+  application build.
+- Artifact: `WANGAI-portable-preview-35312072091-1`, GitHub artifact ID
+  `10534501953`. Downloaded without replacing an existing preview to
+  `E:\WANGAI-Portable-Preview-0.4.0\github-35312072091`.
+- Independently re-ran `verify-portable-artifacts.py --production` locally with
+  a verifier compiled with the original **public** key: passed. Verified manifest,
+  archive and preparer signatures, all supplied checksums, 3,529 payload file
+  hashes, exact embedded archive, live gateway identity and unchanged legacy
+  0.2.2 manifest. No private key or password was read locally.
+- Production preparer: **548,623,973 bytes**, expanded program files
+  **1,326,049,004 bytes**. SHA256:
+  `19255b6e0fe0124d139bf278df07edb61eb81f707d45cbd1a26ddeebbc7b066b`.
+- CI's PE audit records GUI subsystem 2 for both user entrypoints. Internal worker
+  utilities retain subsystem 3 and rely on the existing no-console worker launch;
+  this is not a claim that every bundled utility is a GUI executable.
+- This exact artifact was **not launched** during the audit, and no live audio or
+  paid AI was invoked. Isolated native upgrade/rollback evidence above remains a
+  separate test build. No tag/release/Latest/updater channel was changed.
+
+For the user trial: close other WANGAI instances, open
+`WANGAI_0.4.0_x64-portable.exe` from that folder and choose a **new** destination.
+Keep the old 0.3.0 folder and its Data intact. CSS glass remains the shipping
+default; the optional liquid-glass library still awaits native performance QA.

@@ -2,6 +2,11 @@
 
 Date: 2026-09-18. Scope: browser-rendered Quiet Studio / CSS fallback.
 
+final result: passed
+
+This result applies only to the browser UI handoff described below, not the
+uncompleted native acceptance or Stable release gates.
+
 The previous Ready Room QA report is preserved unchanged in
 `docs/design-qa-ready-room-original.md`.
 
