@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validatePortableVersion } from './portable-version.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.chdir(root);
 const test = process.argv.includes('--test');
 const version = JSON.parse(fs.readFileSync('package.json')).version;
+validatePortableVersion(version);
 for (const [name, actual] of [
   ['Tauri', JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).version],
   ['Rust', fs.readFileSync('src-tauri/Cargo.toml', 'utf8').match(/^version = "([^"]+)"/m)?.[1]],
@@ -35,7 +37,7 @@ if (test) {
   config.identifier = 'dev.gamelingo.overlay.release-test';
   config.productName = 'WANGAI Release Test';
   const testVersion = process.env.WANGAI_TEST_VERSION;
-  if (testVersion) { if (!/^0\.3\.[01]$/.test(testVersion)) throw Error('Test version must be 0.3.0 or 0.3.1'); config.version = testVersion; }
+  if (testVersion) config.version = validatePortableVersion(testVersion);
   const endpoint = new URL(required('WANGAI_TEST_UPDATE_ENDPOINT'));
   if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1') throw Error('Test updater must use explicit loopback endpoint');
   config.plugins.updater.dangerousInsecureTransportProtocol = true;

@@ -1,5 +1,5 @@
 # Opt-in: isolated identity, disposable key, loopback updater, no real AI traffic.
-param([Parameter(Mandatory=$true)][string]$OutputRoot,[string]$RuntimeCache,[ValidateSet('0.3.0','0.3.1')][string[]]$Versions=@('0.3.0','0.3.1'))
+param([Parameter(Mandatory=$true)][string]$OutputRoot,[string]$RuntimeCache,[ValidatePattern('^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$')][string[]]$Versions=@('0.3.0','0.4.0'))
 $ErrorActionPreference='Stop'
 Set-Location -LiteralPath (Join-Path $PSScriptRoot '..')
 $output=[IO.Path]::GetFullPath($OutputRoot)

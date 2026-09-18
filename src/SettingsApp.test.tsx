@@ -29,7 +29,7 @@ describe("single-source Ready Room", () => {
   it("shows only the listening source and translation rows", () => {
     const snapshot = snapshotFixture();
     render(<ReadyRoom settings={snapshot.settings} runtime={snapshot.runtime} history={snapshot.history} previewMode={false} onToggleListening={vi.fn()} onOpenSourcePicker={vi.fn()} webRuntime={false} />);
-    expect(screen.getByText("แหล่งเสียงที่ฟัง")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "แหล่งเสียงที่ฟัง" })).toBeInTheDocument();
     expect(screen.getByText("การแปล")).toBeInTheDocument();
     expect(screen.queryByText("Voice chat")).not.toBeInTheDocument();
     expect(screen.queryByText("Browser media")).not.toBeInTheDocument();
@@ -57,13 +57,13 @@ describe("single-source Ready Room", () => {
     expect(screen.queryByText("My Custom App", { exact: true })).not.toBeInTheDocument();
   });
 
-  it("keeps the listening action before the card with or without a notification", () => {
+  it("keeps the listening action above the translation with or without a notification", () => {
     const snapshot = snapshotFixture();
     const toggle = vi.fn();
     const props = { settings: snapshot.settings, runtime: { ...snapshot.runtime, listening: false }, history: [], previewMode: false, onToggleListening: toggle, onOpenSourcePicker: vi.fn(), webRuntime: false };
     const view = render(<ReadyRoom {...props} />);
     const start = screen.getByRole("button", { name: /เริ่มฟัง · F8/ });
-    const title = screen.getByRole("heading", { name: /เลือกแอปหนึ่งตัว/ });
+    const title = screen.getByRole("heading", { name: "คำแปลล่าสุด" });
     expect(start.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(start);
     expect(toggle).toHaveBeenCalledOnce();

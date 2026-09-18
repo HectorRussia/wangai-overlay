@@ -43,6 +43,26 @@ Local Web Companion bind เฉพาะ `127.0.0.1`; production ขอ port ว
 ไม่มีการถอนรุ่นเดิมหรือลบ settings ต้นฉบับ และไม่ใช้ NSIS updater กับ Portable
 ดู [คู่มือ Portable / migration / recovery](docs/windows-portable.md)
 
+## 0.4.0 Quiet Studio — UI Preview เท่านั้น
+
+งานบน `codex/liquid-glass-0.4.0` เปลี่ยนหน้าตาเป็น Sidebar เข้มเงิน–เขียว
+ปุ่มแคปซูล และ Overlay ที่อ่านคำแปลชัดขึ้น ไม่เปลี่ยนระบบเสียงหรือ Data
+ยังไม่ใช่ release สำหรับผู้ใช้ทั่วไป และไม่เปลี่ยนช่องอัปเดตปกติ
+อ่าน [ผลตรวจและสิ่งที่ยังต้องทดสอบ](docs/liquid-glass-verification.md)
+
+ลอง UI ด้วยข้อมูลจำลองโดยไม่จับเสียงหรือเรียก AI:
+
+```powershell
+pnpm dev --host 127.0.0.1 --port 1420
+```
+
+เปิด `http://127.0.0.1:1420/?preview=1&state=studio#/settings/overview`
+ปุ่มใน Browser Preview เปลี่ยนเฉพาะข้อมูลในหน่วยความจำ ไม่เขียน settings จริง
+ค่า `state` สำหรับ QA: `setup`, `silence`, `offline`, `worker-error`, `pending`,
+`long-text`, `overlay-edit`; ใช้ `#/overlay` เพื่อดูหน้าต่างคำแปล
+กระจก CSS เป็นค่าเริ่มต้น; เพิ่ม `&glass=liquid` เพื่อทดลองไลบรารีที่ตรึงไว้
+เฉพาะใน Browser Preview (ไม่ถือว่าผ่านเกณฑ์ Fixed WebView2/performance)
+
 ## ติดตั้งสำหรับพัฒนา
 
 ต้องมี Windows 11, Node.js, pnpm, Rust MSVC toolchain และ Visual Studio C++ Build Tools

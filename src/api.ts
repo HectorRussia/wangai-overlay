@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { isPreviewMode } from "./preview";
+import { previewCommand } from "./previewStore";
 import type { OverlayPresentation } from "./overlayPresentation";
 import type {
   AppSettings,
@@ -72,7 +74,7 @@ function unavailableOnWeb(feature: string): Promise<never> {
   return Promise.reject(new Error(`${feature} ใช้งานได้จาก Desktop เท่านั้น`));
 }
 
-export const api = {
+const runtimeApi = {
   openSettingsWindow: () => {
     if (tauriRuntime) return invoke<void>("open_settings_window");
     if (previewRuntime) { window.location.hash = "#/settings/overview"; return Promise.resolve(); }
@@ -146,6 +148,14 @@ export const api = {
     ? invoke<void>("open_web_companion")
     : Promise.resolve(),
 };
+
+// Preview actions are in-memory only: never call a local companion or paid AI.
+export const api = new Proxy(runtimeApi, {
+  get(target, property: keyof typeof runtimeApi) {
+    if (!tauriRuntime && isPreviewMode()) return (...args: unknown[]) => previewCommand(property, args);
+    return target[property];
+  },
+});
 
 export async function connectWebSnapshot(
   onSnapshot: (snapshot: AppSnapshot) => void,

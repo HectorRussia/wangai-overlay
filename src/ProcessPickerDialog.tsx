@@ -74,12 +74,12 @@ export function ProcessPickerDialog({ apps, selected, loading, error, previewMod
           const multiple = app.roots.length > 1;
           const duplicateName = apps.some((other) => other.id !== app.id && other.displayName === app.displayName);
           return <div className="process-app-group" key={app.id}>
-            <button aria-pressed={checked} aria-expanded={multiple ? expanded === app.id : undefined} className={checked ? "is-selected" : ""} disabled={selecting !== undefined || (previewMode && !multiple)} onClick={() => multiple ? setExpanded(expanded === app.id ? undefined : app.id) : app.roots[0] && void select(app.roots[0])}>
+            <button aria-pressed={checked} aria-expanded={multiple ? expanded === app.id : undefined} className={checked ? "is-selected" : ""} disabled={selecting !== undefined} onClick={() => multiple ? setExpanded(expanded === app.id ? undefined : app.id) : app.roots[0] && void select(app.roots[0])}>
               <span className="process-choice-icon"><Monitor /></span><span><strong>{app.displayName}</strong><small>{app.executableName} · {app.processCount} processes{multiple ? " · " + app.roots.length + " instances" : ""}</small>{duplicateName && <small>{app.executablePath}</small>}</span>
               {selecting !== undefined && app.roots.some((root) => root.pid === selecting) ? <LoaderCircle className="animate-spin" /> : checked ? <Check /> : multiple ? <ChevronDown /> : null}
             </button>
             <button className="process-details-toggle" aria-label={"รายละเอียด " + app.displayName} aria-expanded={expanded === app.id} onClick={() => setExpanded(expanded === app.id ? undefined : app.id)}>รายละเอียด</button>
-            {expanded === app.id && <div className="process-app-details"><p>{app.executablePath || "Windows ไม่อนุญาตให้อ่านตำแหน่งไฟล์"}</p>{app.roots.map((root) => <div key={root.pid}><span>{root.name} · PID {root.pid}</span>{multiple && <button disabled={previewMode || selecting !== undefined} onClick={() => void select(root)}>เลือก instance {root.pid}</button>}</div>)}</div>}
+            {expanded === app.id && <div className="process-app-details"><p>{app.executablePath || "Windows ไม่อนุญาตให้อ่านตำแหน่งไฟล์"}</p>{app.roots.map((root) => <div key={root.pid}><span>{root.name} · PID {root.pid}</span>{multiple && <button disabled={selecting !== undefined} onClick={() => void select(root)}>เลือก instance {root.pid}</button>}</div>)}</div>}
           </div>;
         })}
         {!loading && choices.length === 0 && <div className="process-dialog-empty"><strong>{query.trim() ? "ไม่พบแอปที่ตรงกับคำค้น" : "ยังไม่พบแอปที่เปิดอยู่"}</strong><p>เปิดเกมหรือแอปให้ถึงหน้าหลัก แล้วกดรีเฟรชรายการด้านบน</p>{query.trim() && <p>ถ้าเปิดอยู่แล้ว ลองค้นด้วยชื่อสั้น ๆ เช่น Hell หรือ Discord</p>}</div>}

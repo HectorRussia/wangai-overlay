@@ -32,7 +32,7 @@ pub fn delay_startup(app: &AppHandle) {
 // Probe the installed WebView DOM, not a backend readiness flag. Test feature only.
 const READY_ROOM_PROBE: &str = r#"
 (() => {
-  const room = document.querySelector('.ready-room-panel');
+  const room = document.querySelector('[data-ready-room], .ready-room-panel');
   if (room && room.querySelector('#ready-room-title') &&
       room.getBoundingClientRect().width > 0 && getComputedStyle(room).visibility !== 'hidden') {
     window.__TAURI_INTERNALS__.invoke('plugin:event|emit', {

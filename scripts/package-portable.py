@@ -10,6 +10,15 @@ from datetime import datetime, timezone
 ROOT = Path(__file__).resolve().parent.parent
 REPO = 'https://github.com/HectorRussia/wangai-overlay/releases/download'
 
+def validate_version(version):
+    import re
+    if not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', version):
+        raise ValueError('Portable version must be numeric major.minor.patch without leading zeroes')
+    parts = tuple(map(int, version.split('.')))
+    if parts < (0, 3, 0) or any(part > 9007199254740991 for part in parts):
+        raise ValueError('Portable version must be at least 0.3.0')
+    return version
+
 def digest(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -49,8 +58,11 @@ def build(args):
     if output.exists() and any(output.iterdir()): raise ValueError('Choose an empty artifact directory; existing artifacts are never overwritten')
     output.mkdir(parents=True,exist_ok=True)
     version=args.version or json.loads((ROOT/'package.json').read_text())['version']
-    import re
-    if not re.fullmatch(r'0\.3\.[01]',version): raise ValueError('Unsupported build version')
+    validate_version(version)
+    notes_file = ROOT/f'docs/releases/v{version}.md'
+    if not notes_file.is_file() and os.environ.get('WANGAI_TEST_VERSION') == version:
+        notes_file = ROOT/f"docs/releases/v{json.loads((ROOT/'package.json').read_text())['version']}.md"
+    notes = notes_file.read_text(encoding='utf8')
     pin=json.loads((ROOT/'portable/webview2.lock.json').read_text())
     files={'WANGAI.exe':args.host.resolve(),'gamelingo.exe':args.core.resolve(),'THIRD-PARTY-NOTICES.md':ROOT/'docs/THIRD-PARTY-NOTICES.md'}
     collect(ROOT/'output/worker/wangai-worker','worker',files)
@@ -83,7 +95,6 @@ def build(args):
         sig=signature.encode('utf8');dest.write(sig)
         dest.write(struct.pack('<16sQQQ',b'WANGAI_PORTABLE1',offset,payload.stat().st_size,len(sig)))
     sign(portable,args.verifier)
-    notes=(ROOT/'docs/releases/v0.3.0.md').read_text(encoding='utf8')
     (output/'RELEASE-NOTES.md').write_text(notes,encoding='utf8')
     channel={'version':version,'notes':notes,'pub_date':datetime.now(timezone.utc).isoformat(),'platforms':{'windows-x86_64':{'url':f'{REPO}/v{version}/{payload.name}','signature':signature}}}
     (output/'latest-portable.json').write_text(json.dumps(channel,ensure_ascii=False,indent=2)+'\n',encoding='utf8')

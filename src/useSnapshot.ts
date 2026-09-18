@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { api, connectWebSnapshot, isWebCompanion } from "./api";
-import { isPreviewMode, previewSnapshot } from "./preview";
+import { isPreviewMode } from "./preview";
+import { getPreviewSnapshot } from "./previewStore";
 import { loadSnapshot } from "./snapshotBootstrap";
 import type {
   AppSettings,
@@ -20,14 +21,14 @@ export function errorText(error: unknown): string {
 export function useSnapshot() {
   const preview = isPreviewMode();
   const [snapshot, setSnapshot] = useState<AppSnapshot | undefined>(() =>
-    preview ? previewSnapshot() : undefined,
+    preview ? getPreviewSnapshot() : undefined,
   );
   const [loadingError, setLoadingError] = useState<string>();
   const mounted = useRef(false);
   const activeRequest = useRef<AbortController | undefined>(undefined);
 
   const refresh = useCallback(async () => {
-    if (preview) return;
+    if (preview) { setSnapshot(getPreviewSnapshot()); return; }
     activeRequest.current?.abort();
     const request = new AbortController();
     activeRequest.current = request;
@@ -47,7 +48,11 @@ export function useSnapshot() {
   }, [preview]);
 
   useEffect(() => {
-    if (preview) return;
+    if (preview) {
+      const update = () => setSnapshot(getPreviewSnapshot());
+      window.addEventListener("wangai-preview-changed", update);
+      return () => window.removeEventListener("wangai-preview-changed", update);
+    }
     mounted.current = true;
     const cancelRequest = () => {
       mounted.current = false;

@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { isPreviewMode } from "./preview";
+import { version } from "../package.json";
 
 export type UpdateStatus = {
   revision: number;
@@ -14,9 +16,10 @@ export type UpdateStatus = {
 };
 function previewUpdate(): UpdateStatus | undefined {
   const query = new URLSearchParams(window.location.search);
-  if (!query.has("preview") || !query.has("updatePreview")) return;
-  const phase = query.get("updatePreview") === "downloading" ? "downloading" : "available";
-  return { revision: 1, phase, currentVersion: "0.2.0", newVersion: "0.2.1", notes: "ตัวอย่าง Release notes — ปรับปรุงความเสถียร\n<script>แสดงเป็นข้อความเท่านั้น</script>", downloadedBytes: 42 * 1048576, totalBytes: 120 * 1048576, canInstall: phase === "available", message: "ข้อมูลจำลองสำหรับตรวจ UI อัปเดต ไม่มีการดาวน์โหลดหรือติดตั้งจริง" };
+  if (!isPreviewMode() || !query.has("updatePreview")) return;
+  const requested = query.get("updatePreview");
+  const phase = (["downloading", "verifying", "preparing", "installing", "error"].includes(requested ?? "") ? requested : "available") as UpdateStatus["phase"];
+  return { revision: 1, phase, currentVersion: version, newVersion: "0.4.1", notes: "ตัวอย่าง Release notes — ปรับปรุงความเสถียร\n<script>แสดงเป็นข้อความเท่านั้น</script>", downloadedBytes: 42 * 1048576, totalBytes: 120 * 1048576, canInstall: phase === "available", message: "ข้อมูลจำลองสำหรับตรวจ UI อัปเดต ไม่มีการดาวน์โหลดหรือติดตั้งจริง" };
 }
 export const desktopUpdates = {
   available: () => "__TAURI_INTERNALS__" in window || Boolean(previewUpdate()),

@@ -136,6 +136,21 @@ class PreviewTests(unittest.TestCase):
                     provenance.record(Path(temporary))
                 self.assertEqual(list(Path(temporary).iterdir()), [])
 
+    def test_liquid_glass_preview_is_bound_to_its_own_version(self):
+        environment = {**self.environment(), 'GITHUB_REF': 'refs/heads/codex/liquid-glass-0.4.0'}
+        for version in ('0.3.0', '0.4.0', '0.4.1'):
+            with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, environment, clear=True):
+                root = Path(temporary)
+                (root / 'package-manifest.json').write_text(json.dumps({'version': version}))
+                if version == '0.4.0':
+                    provenance.record(root)
+                    self.assertEqual(json.loads((root / 'PREVIEW-BUILD.json').read_text())['version'], version)
+                    self.assertIn('WANGAI_0.4.0_x64-portable.exe', (root / 'PREVIEW.md').read_text(encoding='utf8'))
+                else:
+                    with self.assertRaises(ValueError):
+                        provenance.record(root)
+                    self.assertFalse((root / 'PREVIEW-BUILD.json').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

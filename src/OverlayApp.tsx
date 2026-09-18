@@ -13,8 +13,15 @@ export function OverlayApp() {
   const lastPresentation = useRef<OverlayPresentation | undefined>(undefined);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setClock(Date.now()), 500);
-    return () => window.clearInterval(timer);
+    let timer: number | undefined;
+    const sync = () => {
+      window.clearInterval(timer);
+      timer = undefined;
+      if (!document.hidden) { setClock(Date.now()); timer = window.setInterval(() => setClock(Date.now()), 500); }
+    };
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", sync); };
   }, []);
 
   const visible = useMemo(() => {
@@ -63,15 +70,19 @@ export function OverlayApp() {
   const warning = Boolean(runtime.lastError) || ["offline", "degraded"].includes(runtime.aiService.state) || (runtime.listening && !runtime.attachedSource);
   const status = runtime.microphoneActive
     ? "กำลังฟังภาษาไทย"
-    : runtime.attachedSource
+    : settings.captureMode === "system_output" && runtime.listening
+      ? "MIXED · เสียงรวมจากเครื่อง"
+      : runtime.attachedSource
       ? `กำลังฟัง ${runtime.attachedSource.displayName}`
       : runtime.statusMessage;
 
   const copy = async () => {
-    const ok = await api.copyLatestReply();
-    if (!ok) return;
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    try {
+      const ok = await api.copyLatestReply();
+      if (!ok) return;
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch { setSettingsError("คัดลอกไม่สำเร็จ กรุณาลองอีกครั้ง"); }
   };
 
   const openSettings = async () => {
@@ -111,7 +122,7 @@ export function OverlayApp() {
   }
 
   return (
-    <main className={`overlay-card ${runtime.overlayEditMode ? "is-editing" : ""}`} style={style}>
+    <main className={`overlay-card ${runtime.overlayEditMode ? "is-editing" : ""} ${visible.length === 1 && !partial ? "has-single-subtitle" : ""}`} style={style}>
       <header
         className={`overlay-titlebar flex min-h-8 items-center justify-between gap-3 px-1 ${runtime.overlayEditMode ? "is-draggable" : ""}`}
         title={runtime.overlayEditMode ? `ลากแถบนี้เพื่อย้าย · กด ${settings.hotkeys.editOverlay} เพื่อล็อกตำแหน่ง` : `กด ${settings.hotkeys.editOverlay} เพื่อย้ายหน้าต่าง`}

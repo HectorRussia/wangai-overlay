@@ -1,7 +1,7 @@
 name: Portable Preview (no publish)
 on:
   push:
-    branches: ['codex/portable-preview-0.3.0']
+    branches: ['codex/portable-preview-0.3.0', 'codex/liquid-glass-0.4.0']
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,10 +10,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify:
-    if: github.repository == 'HectorRussia/wangai-overlay' && github.ref == 'refs/heads/codex/portable-preview-0.3.0'
+    if: github.repository == 'HectorRussia/wangai-overlay' && (github.ref == 'refs/heads/codex/portable-preview-0.3.0' || github.ref == 'refs/heads/codex/liquid-glass-0.4.0')
     uses: ./.github/workflows/verify.yml
   package:
-    if: github.repository == 'HectorRussia/wangai-overlay' && github.ref == 'refs/heads/codex/portable-preview-0.3.0'
+    if: github.repository == 'HectorRussia/wangai-overlay' && (github.ref == 'refs/heads/codex/portable-preview-0.3.0' || github.ref == 'refs/heads/codex/liquid-glass-0.4.0')
     needs: verify
     runs-on: windows-2022
     timeout-minutes: 60

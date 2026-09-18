@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSnapshot } from "./types";
 import { snapshotFixture } from "./test/fixtures";
@@ -162,5 +162,27 @@ describe("WANGAI overlay", () => {
     const view = render(<OverlayApp />);
     expect(screen.getByText(/F6 เพื่อย้าย/)).toBeInTheDocument();
     expect(view.container.querySelector("header")).toHaveAttribute("title", "กด F6 เพื่อย้ายหน้าต่าง");
+  });
+
+  it("stops the subtitle clock while hidden and resumes only once", () => {
+    vi.useFakeTimers();
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    const view = render(<OverlayApp />);
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => {
+      Object.defineProperty(document, "hidden", { configurable: true, value: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => {
+      Object.defineProperty(document, "hidden", { configurable: true, value: false });
+      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    Reflect.deleteProperty(document, "hidden");
+    vi.useRealTimers();
   });
 });

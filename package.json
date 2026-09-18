@@ -1,17 +1,18 @@
 {
   "name": "gamelingo-overlay",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "vitest run && node --test scripts/check-windows-gui.test.mjs"
+    "test": "vitest run && node --test scripts/check-windows-gui.test.mjs scripts/portable-version.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",
+    "liquid-glass-react": "1.1.1",
     "lucide-react": "0.544.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"

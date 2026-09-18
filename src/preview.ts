@@ -1,7 +1,7 @@
 import type { AppSnapshot, AudioOutputDevice, CaptureSource, RunningApp } from "./types";
 
 export function isTauriRuntime(): boolean { return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window; }
-export function isPreviewMode(): boolean { return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1"; }
+export function isPreviewMode(): boolean { return typeof window !== "undefined" && !isTauriRuntime() && new URLSearchParams(window.location.search).get("preview") === "1"; }
 
 // Visual-only fixtures: never affect Desktop or Web Companion state.
 export function previewNotification(): { kind: "ok" | "error"; text: string } | undefined {
@@ -64,8 +64,21 @@ export function previewSnapshot(): AppSnapshot {
     ],
   };
   if (state === "ready") { snapshot.runtime.listening = false; snapshot.runtime.statusMessage = "พร้อมเริ่มฟัง"; }
-  if (state === "idle") { snapshot.runtime.listening = false; snapshot.runtime.attachedSource = undefined; snapshot.runtime.audioRmsDbfs = null; snapshot.runtime.audioPeakDbfs = null; snapshot.runtime.audioLastSeenAtMs = null; snapshot.history = []; }
+  if (state === "idle") { snapshot.runtime.listening = false; snapshot.runtime.statusMessage = "พร้อมเริ่มฟัง"; snapshot.runtime.attachedSource = undefined; snapshot.runtime.audioRmsDbfs = null; snapshot.runtime.audioPeakDbfs = null; snapshot.runtime.audioLastSeenAtMs = null; snapshot.history = []; }
   if (state === "warning") { snapshot.runtime.captureWarning = "ยังไม่ได้รับ audio frame จากแอปที่เลือก"; snapshot.runtime.audioPeakDbfs = null; }
+  if (state === "silence") { snapshot.runtime.audioPeakDbfs = -96; snapshot.history = []; }
+  if (state === "offline") { snapshot.runtime.aiService = { ...snapshot.runtime.aiService, state: "offline", message: "เชื่อมต่อบริการ AI ไม่สำเร็จ กรุณาลองอีกครั้ง" }; }
+  if (state === "worker-error") { snapshot.runtime.workerReady = false; snapshot.runtime.lastError = "ตัวตรวจคำพูดขัดข้อง กรุณา Restart worker ในหน้าตั้งค่าเสียง"; }
+  if (state === "pending") { snapshot.history = [{ ...snapshot.history[0], translatedText: undefined, status: "pending" }]; snapshot.runtime.aiSttBusy = true; }
+  if (state === "studio") {
+    snapshot.settings.captureMode = "system_output";
+    snapshot.runtime.vadActive = true;
+    snapshot.runtime.audioPeakDbfs = -36;
+    snapshot.runtime.statusMessage = "กำลังฟัง System Output · MIXED";
+    snapshot.runtime.effectiveCapturePid = undefined;
+    snapshot.history = [{ ...snapshot.history[0], sourceDisplayName: "MIXED", originalText: "Meet me at the north gate.", translatedText: "เจอกันที่ประตูเหนือ" }];
+  }
+  if (state === "overlay-edit") { snapshot.history = []; snapshot.runtime.overlayEditMode = true; }
   if (state === "setup") { snapshot.settings.listeningSource = undefined; snapshot.runtime.aiService = { ...snapshot.runtime.aiService, state: "offline", message: "เชื่อมต่อบริการ AI ไม่สำเร็จ" }; snapshot.runtime.listening = false; snapshot.runtime.attachedSource = undefined; snapshot.runtime.audioPeakDbfs = null; snapshot.history = []; }
   if (state === "long-text") {
     const name = "LongApplicationNameWithoutSpaces".repeat(8);

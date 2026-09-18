@@ -1,56 +1,66 @@
-# WANGAI Ready Room design QA
+# WANGAI 0.4.0 — visual implementation QA
 
-## Evidence
+Date: 2026-09-18. Scope: browser-rendered Quiet Studio / CSS fallback.
 
-- Visual target: `C:\\Users\\User\\.codex\\generated_images\\01a04a7d-45b5-7f33-af69-ca5cf495a8b3\\exec-03453479-f922-4130-a61a-1ee52213f8e9.png`
-- Implementation route: `http://127.0.0.1:1420/?preview=1&state=ready#/settings/overview`
-- Implementation capture: `C:\\Users\\User\\AppData\\Local\\Temp\\wangai-ready-room-qa\\implementation-1180x780.png`
-- Minimum-window capture: `C:\\Users\\User\\AppData\\Local\\Temp\\wangai-ready-room-qa\\implementation-980x660.png`
-- Final side-by-side comparison: `C:\\Users\\User\\AppData\\Local\\Temp\\wangai-ready-room-qa\\comparison-pass-2.png`
+The previous Ready Room QA report is preserved unchanged in
+`docs/design-qa-ready-room-original.md`.
 
-The visual target and implementation were compared in one combined image at the same 1180 × 780 viewport. The 980 × 660 capture was inspected separately for the required minimum desktop window.
+## Target and comparison
 
-## Fidelity review
+User selected the revised iPhone-inspired **desktop** Quiet Studio image. Reference:
+`output/liquid-glass-qa/selected-reference.png` (original 1487 × 1058).
+Implementation: `http://127.0.0.1:1420/?preview=1&state=studio#/settings/overview`.
+Comparison uses 1487 × 1013 content pixels, excluding the 45px reference native
+titlebar, the same dark/listening/MIXED state and the same Thai/English phrase.
+`output/liquid-glass-qa/comparison.html` places both images together; screenshots
+`comparison-before.png` and `comparison-final.png` were actually inspected.
 
-- Layout and hierarchy: the final implementation keeps one dominant Ready Room surface with the three numbered readiness rows, privacy strip, latest conversation, and a single primary F8 action. The former nested recent-conversation card was merged into the main surface.
-- Typography: the WANGAI wordmark, Ready Room label, strong Thai headline, muted supporting copy, and compact technical labels preserve the target hierarchy while using the product's existing Thai-capable font stack.
-- Color and surfaces: charcoal page and card surfaces, restrained neutral borders, mint-green readiness states, quiet warning colors, and low-elevation shadows match the selected direction without adding gradients or decorative artwork.
-- Meters and icons: source meters use eighteen discrete segments like the target and retain semantic `role="meter"` values. Existing Lucide icons are used consistently; no handcrafted SVG, CSS illustration, or placeholder art was introduced.
-- Content: game, Voice Chat, Groq, privacy, and latest-conversation copy all use current application state. Technical PID, VAD, gain, Rescue Scan, probe, and worker controls are absent from the normal Ready Room and remain available under Advanced diagnostics.
-- Responsive behavior: at 1180 × 780 the page has no vertical or horizontal overflow. At 980 × 660 the primary F8 action and all three readiness rows remain usable; the lower recent-history content scrolls naturally.
+The reference's floating Overlay is a **separate native window**, not a second
+copy embedded in Settings. It is therefore validated independently at 420 × 236.
+Windows chrome is deliberately not recreated in HTML. Local Thai fonts and Lucide
+replace the generated image's letterforms/icons; no external font/CDN is used.
 
-## Interaction and accessibility checks
+## Iteration log
 
-- The game picker opens as an accessible modal, moves focus to search, traps keyboard navigation, closes with Escape, and restores focus to its opener.
-- Ready Room meters expose labels and numeric values to assistive technology.
-- Ready Room, History, and Advanced navigation works. Legacy `audio`, `ai`, and `controls` routes map to their corresponding Advanced sections.
-- Audio diagnostics are collapsed by default and expand to reveal the existing runtime controls.
-- Browser console audit returned no errors.
-- Ready, warning, setup-required, and idle preview fixtures are covered by tests.
+1. **Blocked, P2:** heading/nav typography too small; silver surfaces too flat.
+   Increased large-window type scale/nav targets, added static silver rim and
+   subtle surface shading. Kept matte text area and no continuous animation.
+2. **Blocked, P2:** legacy Settings padding remained at narrow widths; meter bars
+   became oversized circles. Removed inherited shell padding and bounded bars.
+3. **Blocked, P2:** native-size Overlay retained tiny old subtitle typography.
+   Increased both languages; a single phrase uses larger, bounded two-line text.
+4. **Pass for browser UI handoff:** revised target/render side-by-side comparison,
+   responsive view and Overlay were re-captured. No remaining P0/P1/P2 issue was
+   observed in the tested browser states. This is not a native release gate pass.
 
-## Comparison history
+## Inspected states and interaction evidence
 
-### Pass 1
+- Ready Room: selected source, start/stop, pending, silence, offline, worker error,
+  setup/empty and long unbroken text. Start/stop and source selection were clicked
+  against the in-memory fixture, never real audio/AI.
+- Sidebar: history/settings links, active page, collapse, icon-only accessible names.
+- Audio, AI & Terms and Controls & Overlay: navigation, mode selection, adding and
+  saving Thai glossary text in the fixture; update verification state.
+- Source picker: search, select, initial search focus, Shift+Tab, Escape and focus
+  restoration. Tested again with the experimental library mounted.
+- 1487 × 1013, 980 × 660 and 740 × 507 CSS-pixel viewports. The latter is a
+  high-scale-equivalent layout check, **not** a Windows DPI 200% certification.
+  Long text/error did not overflow horizontally (document width 725, viewport 740,
+  remaining width is the vertical scrollbar).
+- Experimental `?preview=1&glass=liquid` mounts the pinned library and preserves
+  controls. No browser warning/error was recorded during that interaction test.
+  CSS fallback remains the shipping default pending the native performance gate.
+- Automated tests cover reduced motion/forced colors/hidden enhancement unmount,
+  startup acknowledgement without AI connectivity, keyboard-accessible bootstrap
+  recovery and existing command/navigation contracts.
 
-- P1 layout: the latest conversation lived in a second large card, producing extra nesting and 15 px of vertical overflow at 1180 × 780.
-- P2 fidelity: continuous progress bars did not match the target's discrete live-level meter treatment.
-- P2 typography: source names, statuses, and action controls were too small compared with the target.
+## P3 differences / explicit limits
 
-Fixes: merged recent conversation into the Ready Room surface, removed the Overview metadata footer, reduced bottom page padding, converted meters to discrete segments, and increased source-row typography, icon, row, and control sizes.
-
-### Pass 2
-
-- No unresolved P0, P1, or P2 findings.
-- P3 accepted difference: the browser preview does not draw Windows title-bar controls; the packaged Tauri window supplies native window chrome.
-
-## Verification
-
-- `pnpm test -- --run`: 33 passed
-- `pnpm build`: passed
-- `cargo test`: 64 passed
-- `python -m unittest worker.test_worker worker.test_integration`: 10 passed
-- `python worker/main.py --self-test`: passed
-- `pnpm tauri build --debug --no-bundle`: passed
-- `git diff --check`: passed (line-ending notices only)
-
-Final result: passed
+- Surface highlights are static CSS, not the mockup's raster/refraction lighting.
+- History link is beside its section heading; the privacy explanation remains
+  available in the footer. Both preserve useful existing behavior.
+- Real Windows titlebar, 100–200% system DPI, high-contrast theme, F7–F10, native
+  drag/lock/click-through, exact-artifact GPU/CPU/frame-time and live Web Companion
+  still require native acceptance. Browser evidence does not certify these.
+- The full production release status and actual native upgrade/rollback results
+  are recorded separately in `docs/liquid-glass-verification.md`.
