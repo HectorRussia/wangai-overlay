@@ -1,5 +1,21 @@
 # WANGAI 0.4.0 Quiet Studio — verification record
 
+## Publication update — 2026-09-24 (Asia/Bangkok)
+
+The user confirmed the signed Portable works and explicitly authorized public
+Pre-release publication. Published https://github.com/HectorRussia/wangai-overlay/releases/tag/v0.4.0
+as **Pre-release, not Latest**, release ID `394935896`. Tag points directly to
+tested build commit `46f7120859c2177d79f3ce2c2d2c36c001704b7d`.
+The exact signed CI payload was reused (no rebuild/re-sign); only release notes,
+channel notes, provenance and checksums were prepared for publication. Original
+PREVIEW-BUILD.json is retained as historical build-time evidence.
+All 14 uploaded assets matched local sizes and GitHub SHA256 digests before
+publication. Post-publication API confirms draft=false, prerelease=true and
+Latest remains v0.2.2 (release ID 385979850). This is manual-download only;
+normal updater URLs and old releases were not changed.
+Clean Windows, physical DPI/performance and update/rollback of this exact revision
+remain incomplete. Earlier sections below record the pre-publication audit.
+
 2026-09-18 · branch `codex/liquid-glass-0.4.0` · **Preview, not Stable**.
 0.3.0 remains the published manually downloaded Pre-release; 0.2.2 remains Latest.
 No 0.4.0 tag, public release, normal updater channel, old release asset or Render
