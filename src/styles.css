@@ -309,8 +309,8 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
   background: #0f1014 !important;
 }
 .overlay-body.preview-body[data-overlay-presentation="expanded"] #root {
-  width: 420px;
-  height: 236px;
+  width: min(100vw, var(--preview-overlay-width, 420px));
+  height: min(100vh, var(--preview-overlay-height, 236px));
 }
 .overlay-body.preview-body[data-overlay-presentation="collapsed"] #root {
   width: 332px;
@@ -425,6 +425,7 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
   grid-template-columns: minmax(0, 1fr);
   max-width: 88%;
   min-width: 0;
+  flex-shrink: 0;
   gap: 2px;
   padding: 8px 11px;
   border-radius: 15px;
@@ -432,22 +433,20 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
 }
 .overlay-bubble strong {
   display: block;
-  overflow: hidden;
   color: #f5f6f8;
   font-size: .9em;
   font-weight: 650;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .overlay-bubble > span {
   display: block;
-  overflow: hidden;
   color: #9295a1;
   font-size: .66em;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .overlay-bubble.is-incoming { align-self: flex-start; background: #25272f; }
 .overlay-bubble.is-outgoing { align-self: flex-end; padding-right: 52px; background: #63c48b; }
@@ -497,7 +496,14 @@ button svg, a svg { width: 17px; height: 17px; stroke-width: 1.8; }
   font: 750 .55em var(--font-mono);
 }
 .overlay-live span i { width: 5px; height: 5px; border-radius: 50%; background: #70d99b; animation: signal-pulse 1.2s ease-in-out infinite; }
-.overlay-live strong { overflow: hidden; font-size: .82em; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.overlay-live strong { font-size: .95em; font-weight: 600; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Keep the titlebar outside the scrollport. Flex-end on the scrollport itself
+   clips the beginning of long messages, making it impossible to scroll back. */
+.overlay-transcript { position: relative; min-height: 0; flex: 1; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 4px 2px; scrollbar-width: thin; }
+.overlay-transcript-content { min-height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; }
+.overlay-transcript-content > * { flex-shrink: 0; }
+.overlay-overflow-hint { flex-shrink: 0; margin: 4px 0 0; color: #b6bfce; font-size: 10px; line-height: 1.4; text-align: right; }
 
 .overlay-listening,
 .overlay-empty {

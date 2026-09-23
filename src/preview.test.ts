@@ -20,4 +20,14 @@ describe("v14 preview fixtures", () => {
     window.history.replaceState(null, "", "/?preview=1&ui=busy");
     expect(previewListeningBusy()).toBe(true);
   });
+  it("provides complete long mixed-language phrases and bounds visual-only overlay sizes", () => {
+    window.history.replaceState(null, "", "/?preview=1&state=transcript-wrap&overlayWidth=99999&overlayHeight=1&fontScale=99");
+    const snapshot = previewSnapshot();
+    expect(snapshot.history).toHaveLength(4);
+    expect(snapshot.history[0].translatedText).toContain("แล้วคนอื่นทำจริงไหม");
+    expect(snapshot.settings.overlay).toMatchObject({ width: 1920, height: 190, fontScale: 1.8 });
+    expect(snapshot.runtime.overlayEditMode).toBe(true);
+    window.history.replaceState(null, "", "/?preview=1&state=transcript-wrap&locked=1");
+    expect(previewSnapshot().runtime.overlayEditMode).toBe(false);
+  });
 });

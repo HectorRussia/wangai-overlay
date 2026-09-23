@@ -36,7 +36,8 @@ export const previewRunningApps: RunningApp[] = previewProcesses.map((source) =>
 
 export function previewSnapshot(): AppSnapshot {
   const now = Date.now();
-  const state = new URLSearchParams(window.location.search).get("state");
+  const params = new URLSearchParams(window.location.search);
+  const state = params.get("state");
   const snapshot: AppSnapshot = {
     settings: {
       schemaVersion: 14,
@@ -86,6 +87,29 @@ export function previewSnapshot(): AppSnapshot {
     snapshot.runtime.attachedSource = { ...previewProcesses[0], displayName: name };
     snapshot.runtime.statusMessage = `กำลังฟัง ${name}`;
     snapshot.history = snapshot.history.map((item) => ({ ...item, sourceDisplayName: name, originalText: "VeryLongTranscriptWithoutSpaces".repeat(12), translatedText: "ข้อความแปลสำหรับทดสอบการตัดบรรทัดที่ยาวมาก".repeat(12) }));
+  }
+  if (state === "transcript-wrap") {
+    snapshot.settings.captureMode = "system_output";
+    snapshot.runtime.overlayEditMode = params.get("locked") !== "1";
+    snapshot.runtime.vadActive = true;
+    snapshot.runtime.audioPeakDbfs = -36;
+    const phrases = [
+      ["problems before. Fine. Have you ever known exactly what you wanted to say and then someone actually", "ปัญหาก่อนแล้วนะ โอเค คุณเคยรู้แน่ชัดว่าต้องการจะบอกอะไร แล้วคนอื่นทำจริงไหม"],
+      ["English podcast from Speak English with Class. Jake, quick question. Hmm, I don't know where to start.", "พอดคาสต์ Englishly จาก Speak English with Class. เจค มีคำถามสั้น ๆ อืม ฉันไม่รู้ว่าจะเริ่มตรงไหนดี"],
+      ["Englishly Podcast. From Speak English with Class. Jake, quick question.", "พอดแคสต์ Englishly จาก Speak English with Class. เจค มีคำถามสั้น ๆ"],
+      ["that are drawn on the wall", "ภาพที่วาดบนผนัง"],
+    ];
+    snapshot.history = phrases.map(([originalText, translatedText], index) => ({
+      segmentId: `wrap-${index}`, stream: "incoming", sourceDisplayName: "MIXED",
+      originalLanguage: "en", originalText, translatedText, status: "success", createdAtMs: now - index * 100,
+    }));
+  }
+  // Isolated visual sizing only: never used to persist Desktop or Companion settings.
+  if (isPreviewMode()) {
+    for (const [query, field, min, max] of [["overlayWidth", "width", 340, 1920], ["overlayHeight", "height", 190, 720], ["fontScale", "fontScale", .7, 1.8]] as const) {
+      const value = Number(params.get(query));
+      if (params.has(query) && Number.isFinite(value)) snapshot.settings.overlay[field] = Math.max(min, Math.min(max, value));
+    }
   }
   return snapshot;
 }

@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { SettingsApp } from "./SettingsApp";
 import { snapshotFixture } from "./test/fixtures";
 import { useSnapshot } from "./useSnapshot";
+import { api } from "./api";
 
 vi.mock("./useSnapshot", () => ({
   useSnapshot: vi.fn(),
@@ -13,11 +14,13 @@ vi.mock("./api", () => ({
   api: {
     listRunningApps: vi.fn().mockResolvedValue([]),
     listOutputDevices: vi.fn().mockResolvedValue([]),
+    updateOverlay: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
 describe("settings with nullable desktop audio diagnostics", () => {
   beforeEach(() => {
+    vi.mocked(api.updateOverlay).mockClear();
     window.history.replaceState(null, "", "/#/settings/overview");
     const snapshot = snapshotFixture();
     // Rust serializes Option::None as JSON null, rather than omitting these fields.
@@ -86,5 +89,18 @@ describe("settings with nullable desktop audio diagnostics", () => {
     expect(screen.getByText("ใช้บริการกลาง ไม่ต้องใส่ API key หรือเลือกโมเดลเอง")).toBeInTheDocument();
     expect(screen.getByText("server-configured-model")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "AI & Terms" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("edits overlay text size through the existing settings command without resetting other preferences", async () => {
+    const snapshot = vi.mocked(useSnapshot)().snapshot!;
+    snapshot.settings.overlay.fontScale = 1.35;
+    render(<SettingsApp activeTab="advanced" advancedSection="controls" />);
+    const slider = screen.getByRole("slider", { name: /ขนาดตัวอักษร/ });
+    expect(slider).toHaveValue("1.35");
+    fireEvent.change(slider, { target: { value: "0.85" } });
+    expect(api.updateOverlay).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "บันทึก Overlay" }));
+    await waitFor(() => expect(api.updateOverlay).toHaveBeenCalledWith({ ...snapshot.settings.overlay, fontScale: .85 }));
+    expect(snapshot.settings.overlay.fontScale).toBe(1.35);
   });
 });

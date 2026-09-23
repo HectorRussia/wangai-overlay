@@ -4,6 +4,7 @@ import { api } from "./api";
 import { overlayPresentation, visibleOverlayItems, type OverlayPresentation } from "./overlayPresentation";
 import { isPreviewMode } from "./preview";
 import { useSnapshot } from "./useSnapshot";
+import { OverlayTranscript } from "./OverlayTranscript";
 
 export function OverlayApp() {
   const { snapshot } = useSnapshot();
@@ -52,10 +53,14 @@ export function OverlayApp() {
   useEffect(() => {
     if (!isPreviewMode()) return;
     document.body.dataset.overlayPresentation = presentation;
+    document.body.style.setProperty("--preview-overlay-width", `${snapshot?.settings.overlay.width ?? 420}px`);
+    document.body.style.setProperty("--preview-overlay-height", `${snapshot?.settings.overlay.height ?? 236}px`);
     return () => {
       delete document.body.dataset.overlayPresentation;
+      document.body.style.removeProperty("--preview-overlay-width");
+      document.body.style.removeProperty("--preview-overlay-height");
     };
-  }, [presentation]);
+  }, [presentation, snapshot?.settings.overlay.width, snapshot?.settings.overlay.height]);
 
   if (!snapshot) return null;
 
@@ -122,7 +127,7 @@ export function OverlayApp() {
   }
 
   return (
-    <main className={`overlay-card ${runtime.overlayEditMode ? "is-editing" : ""} ${visible.length === 1 && !partial ? "has-single-subtitle" : ""}`} style={style}>
+    <main className={`overlay-card ${runtime.overlayEditMode ? "is-editing" : ""}`} style={style}>
       <header
         className={`overlay-titlebar flex min-h-8 items-center justify-between gap-3 px-1 ${runtime.overlayEditMode ? "is-draggable" : ""}`}
         title={runtime.overlayEditMode ? `ลากแถบนี้เพื่อย้าย · กด ${settings.hotkeys.editOverlay} เพื่อล็อกตำแหน่ง` : `กด ${settings.hotkeys.editOverlay} เพื่อย้ายหน้าต่าง`}
@@ -143,12 +148,12 @@ export function OverlayApp() {
       </header>
       {settingsError && <p role="alert" className="text-xs text-red-200">{settingsError}</p>}
 
-      <section className="wangai-scrollbar flex min-h-0 flex-1 flex-col justify-end gap-1.5 overflow-hidden py-1" aria-live="polite">
+      <OverlayTranscript contentKey={JSON.stringify([visible, partial])} fontScale={settings.overlay.fontScale} editMode={runtime.overlayEditMode} editShortcut={settings.hotkeys.editOverlay}>
         {visible.map((item) => {
           const outgoing = item.stream === "microphone";
           const primary = item.translatedText ?? (item.status === "pending" ? "กำลังแปล…" : "แปลไม่สำเร็จ");
           return (
-            <article className={`overlay-bubble ${outgoing ? "is-outgoing" : "is-incoming"}`} key={item.segmentId}>
+            <article data-overlay-message className={`overlay-bubble ${outgoing ? "is-outgoing" : "is-incoming"}`} key={item.segmentId}>
               {!outgoing && <small className="overlay-source-badge">{sourceBadge(item.stream, item.sourceDisplayName)}</small>}
               <strong lang={outgoing ? "en" : "th"}>{primary}</strong>
               <span lang={outgoing ? "th" : "en"}>{item.originalText}</span>
@@ -164,7 +169,7 @@ export function OverlayApp() {
         })}
 
         {partial && (
-          <article className="overlay-live">
+          <article data-overlay-message className="overlay-live">
             <span><i />LIVE</span>
             <strong lang="en">{partial.text}</strong>
           </article>
@@ -181,7 +186,7 @@ export function OverlayApp() {
         {visible.length === 0 && !partial && runtime.overlayEditMode && (
           <div className="overlay-empty"><GripHorizontal /><strong>วาง Overlay ตรงตำแหน่งที่ต้องการ</strong><span>ลากจากแถบด้านบน แล้วกด F7 เพื่อล็อก</span></div>
         )}
-      </section>
+      </OverlayTranscript>
     </main>
   );
 }

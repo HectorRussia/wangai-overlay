@@ -5,6 +5,22 @@
 No 0.4.0 tag, public release, normal updater channel, old release asset or Render
 configuration is changed by this work.
 
+### Local typography follow-up after the signed Preview
+
+The subsequent user-requested compact text/buttons and multiline Overlay repair
+are currently a **local source revision**, not part of the signed CI artifact at
+commit `343a840` below. Current frontend verification: 86 frontend + 6 Node tests,
+TypeScript/Vite build, and browser visual/scrolling checks passed. See the compact
+follow-up section in root `design-qa.md`. No new Portable artifact was built or
+published for this adjustment; the earlier native/update results do not certify
+this revised frontend's native scrolling behavior.
+
+2026-09-23 follow-up: the user confirmed that the revised UI was tried in the
+actual app and that scrolling is comfortable. This is user-reported native
+acceptance of the compact typography/Overlay repair, not a clean-Windows,
+performance or update/rollback certification. Preparing a newly signed Preview
+from this revision is authorized; public release/Stable publication is not.
+
 ## Implemented
 
 Collapsible desktop sidebar, Ready Room source/control strip, large latest phrase,
