@@ -5,21 +5,36 @@
 No 0.4.0 tag, public release, normal updater channel, old release asset or Render
 configuration is changed by this work.
 
-### Local typography follow-up after the signed Preview
+### Compact typography follow-up — signed Preview 2026-09-23
 
-The subsequent user-requested compact text/buttons and multiline Overlay repair
-are currently a **local source revision**, not part of the signed CI artifact at
-commit `343a840` below. Current frontend verification: 86 frontend + 6 Node tests,
-TypeScript/Vite build, and browser visual/scrolling checks passed. See the compact
-follow-up section in root `design-qa.md`. No new Portable artifact was built or
-published for this adjustment; the earlier native/update results do not certify
-this revised frontend's native scrolling behavior.
+The user-requested compact text/buttons and multiline Overlay repair is committed
+and pushed as `46f7120859c2177d79f3ce2c2d2c36c001704b7d`. Frontend verification:
+86 frontend + 6 Node tests and TypeScript/Vite build passed again on 2026-09-23.
+Browser visual/scrolling evidence is in the compact follow-up section in root
+`design-qa.md`. The older artifact at commit `343a840` does not include this fix.
 
 2026-09-23 follow-up: the user confirmed that the revised UI was tried in the
 actual app and that scrolling is comfortable. This is user-reported native
 acceptance of the compact typography/Overlay repair, not a clean-Windows,
-performance or update/rollback certification. Preparing a newly signed Preview
-from this revision is authorized; public release/Stable publication is not.
+performance or update/rollback certification.
+
+The newly signed Preview passed all CI jobs:
+https://github.com/HectorRussia/wangai-overlay/actions/runs/35887304454
+Artifact `WANGAI-portable-preview-35887304454-1`, ID `10764406787`.
+Downloaded to `E:\WANGAI-Portable-Preview-0.4.0\github-35887304454`.
+Independent local verification with the original public key passed all three
+signatures (manifest, archive, preparer), checksums, 3,529 file hashes, production
+gateway/key identity, embedded payload equivalence and unchanged legacy 0.2.2
+manifest. Portable size: 548,626,346 bytes. SHA256:
+`86ef838eac75c68543615f20bd1f8837ce2ca5db8112cd50029bbb159accde10`.
+
+CI also passed core Rust 89 tests (2 ignored), Portable 14 tests, the opt-in
+packaged-worker decoder test, 11 Python worker tests, 11 preview guard tests and
+server verification. No paid AI was called. This exact signed executable was not
+launched locally; clean Windows, performance and update/rollback of this revision
+remain unverified. No tag, release or normal updater channel was changed.
+Use a fresh folder for this same-version 0.4.0 Preview; do not overwrite an older
+0.4.0 Portable or its Data. Public release/Stable publication is not authorized.
 
 ## Implemented
 
