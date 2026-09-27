@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { OverlayPresentation } from "./overlayPresentation";
 import type {
   AppSettings,
   AppSnapshot,
@@ -75,10 +74,11 @@ function unavailableOnWeb(feature: string): Promise<never> {
 export const api = {
   openSettingsWindow: () => {
     if (tauriRuntime) return invoke<void>("open_settings_window");
-    if (previewRuntime) { window.location.hash = "#/settings/overview"; return Promise.resolve(); }
+    if (previewRuntime) { window.location.hash = "#/settings/advanced"; return Promise.resolve(); }
     return unavailableOnWeb("การเปิดหน้าตั้งค่า Desktop");
   },
   quitApp: () => tauriRuntime ? invoke<void>("quit_app") : unavailableOnWeb("การออกจากโปรแกรม Desktop"),
+  setOverlayPresentation: (_presentation: "collapsed" | "expanded") => Promise.resolve(),
   listRunningApps: () => tauriRuntime
     ? invoke<RunningApp[]>("list_running_apps")
     : webJson<RunningApp[]>("/api/v1/apps"),
@@ -91,12 +91,27 @@ export const api = {
   listOutputDevices: () => tauriRuntime
     ? invoke<AudioOutputDevice[]>("list_output_devices")
     : webJson<AudioOutputDevice[]>("/api/v1/output-devices"),
+  defaultMicrophoneName: () => tauriRuntime
+    ? invoke<string | null>("default_microphone_name")
+    : webJson<string | null>("/api/v1/default-microphone"),
+  listMicrophoneDevices: () => tauriRuntime
+    ? invoke<AudioOutputDevice[]>("list_microphone_devices")
+    : webJson<AudioOutputDevice[]>("/api/v1/microphones"),
+  updateMicrophoneDevice: (deviceId?: string) => tauriRuntime
+    ? invoke<AppSettings>("update_microphone_device", { deviceId: deviceId ?? null })
+    : webCommand<AppSettings>("update_microphone_device", { device_id: deviceId ?? null }),
   selectListeningSource: (source: CaptureSource) => tauriRuntime
     ? invoke<AppSettings>("select_listening_source", { source })
     : webCommand<AppSettings>("select_listening_source", { source }),
+  clearListeningSource: () => tauriRuntime
+    ? invoke<AppSettings>("clear_listening_source")
+    : webCommand<AppSettings>("clear_listening_source"),
   toggleListening: () => tauriRuntime
     ? invoke<boolean>("toggle_listening")
     : webCommand<boolean>("toggle_listening"),
+  startSession: () => tauriRuntime
+    ? invoke<boolean>("start_session")
+    : webCommand<boolean>("start_session"),
   setListening: (enabled: boolean) => tauriRuntime
     ? invoke<boolean>("set_listening", { enabled })
     : webCommand<boolean>("set_listening", { enabled }),
@@ -106,6 +121,9 @@ export const api = {
   updateHotkeys: (hotkeys: HotkeySettings) => tauriRuntime
     ? invoke<AppSettings>("update_hotkeys", { hotkeys })
     : webCommand<AppSettings>("update_hotkeys", { hotkeys }),
+  setHotkeyCaptureMode: (enabled: boolean) => tauriRuntime
+    ? invoke<void>("set_hotkey_capture_mode", { enabled })
+    : Promise.resolve(),
   updateOverlay: (overlay: OverlaySettings) => tauriRuntime
     ? invoke<AppSettings>("update_overlay_settings", { overlay })
     : webCommand<AppSettings>("update_overlay_settings", { overlay }),
@@ -127,9 +145,6 @@ export const api = {
   setOverlayEditMode: (enabled: boolean) => tauriRuntime
     ? invoke<boolean>("set_overlay_edit_mode", { enabled })
     : webCommand<boolean>("set_overlay_edit_mode", { enabled }),
-  setOverlayPresentation: (presentation: OverlayPresentation) => tauriRuntime
-    ? invoke<void>("set_overlay_presentation", { presentation })
-    : Promise.resolve(),
   saveOverlayBounds: () => tauriRuntime ? invoke<void>("save_overlay_bounds") : unavailableOnWeb("การบันทึกตำแหน่งหน้าต่าง Overlay"),
   startOverlayDrag: () => tauriRuntime ? invoke<void>("start_overlay_drag") : unavailableOnWeb("การลากหน้าต่าง Overlay"),
   copyLatestReply: () => tauriRuntime

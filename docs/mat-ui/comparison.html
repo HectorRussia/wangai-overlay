@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WANGAI · UI comparison</title>
+<style>body{margin:24px;background:#1b1c1f;color:#f3f2ee;font:16px/1.6 system-ui,sans-serif}h1{font-size:24px}h2{font-size:20px}p{max-width:960px;color:#bdcbd0}.pair{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;margin-bottom:40px}figure{margin:0;min-width:0}figcaption{padding:8px 0;color:#8fdee1}img{width:100%;height:auto;border:1px solid #454a50;border-radius:6px}.mobile{max-width:390px}@media(max-width:850px){.pair{grid-template-columns:1fr}}</style>
+<h1>WANGAI — เทียบภาพต้นฉบับกับงานรอบแก้ไข</h1>
+<p>ต้นทาง: thefogusz/wangai-overlay @ 5c3e05e4 · ภาพขวาเป็น React ที่ทำงานจริงใน browser preview ไม่ใช่ภาพวาดจำลอง ชื่อแอปและสถานะต่างกันตามข้อมูลทดสอบ หน้าหลักฝั่งต้นฉบับมีกรอบ Windows รวมอยู่ด้วย</p>
+<h2>หน้าหลัก</h2>
+<div class="pair"><figure><figcaption>ภาพที่ผู้ใช้ส่ง</figcaption><img src="main-reference.png" alt="หน้าหลักต้นฉบับ"></figure><figure><figcaption>งานใหม่ · client area 820×480</figcaption><img src="main-implemented.png" alt="หน้าหลักหลังแก้ไข"></figure></div>
+<h2>ตั้งค่า Overlay</h2>
+<p>พื้นหลัง 50% · กล่องข้อความ/ตัวอักษร 100% · ขนาดข้อความสี่ส่วน 100% · แสดง 30 วินาที / 4 ข้อความ</p>
+<div class="pair"><figure><figcaption>ภาพที่ผู้ใช้ส่ง</figcaption><img src="settings-reference.png" alt="ตั้งค่า Overlay ต้นฉบับ"></figure><figure><figcaption>งานใหม่ · 740×824</figcaption><img src="settings-implemented.png" alt="ตั้งค่า Overlay หลังแก้ไข"></figure></div>
+<h2>Web Companion จอแคบ</h2><p>390×844 พร้อมชื่อแอปยาว ปรับแถวสถานะให้เรียงลงมาและคงปุ่มประวัติ/ตั้งค่าไว้</p><img class="mobile" src="web-narrow.png" alt="Web Companion บนจอแคบ">
+</html>

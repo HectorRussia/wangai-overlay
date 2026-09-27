@@ -15,13 +15,14 @@ pub struct SettingsManager {
 pub fn validate_portable_import(bytes: &[u8]) -> Result<()> {
     anyhow::ensure!(bytes.len() <= 8 * 1024 * 1024, "Settings file is too large");
     let value: serde_json::Value = serde_json::from_slice(bytes)?;
-    anyhow::ensure!(value["schemaVersion"] == 14, "Only schema v14 settings can be imported");
+    anyhow::ensure!((14..=16).contains(&value["schemaVersion"].as_u64().unwrap_or(0)), "Only schema v14, v15 or v16 settings can be imported");
     let id = value["installationId"].as_str().ok_or_else(|| anyhow!("Missing installation ID"))?;
     uuid::Uuid::parse_str(id)?;
     for key in ["captureMode", "hotkeys", "overlay", "vad", "glossary"] {
         anyhow::ensure!(value.get(key).is_some(), "Missing settings field: {key}");
     }
-    let settings: AppSettings = serde_json::from_value(value)?;
+    let mut settings: AppSettings = serde_json::from_value(value)?;
+    settings.schema_version = 16;
     let mut normalized = settings.clone();
     normalize(&mut normalized)?;
     anyhow::ensure!(normalized == settings, "Settings need repair in the installed app before importing");
@@ -39,9 +40,9 @@ impl SettingsManager {
                 .get("schemaVersion")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0)
-                < 14
+                < 16
             {
-                let backup = path.with_extension("pre-v14.json");
+                let backup = path.with_extension(if value["schemaVersion"].as_u64().unwrap_or(0) < 14 { "pre-v14.json" } else { "pre-v16.json" });
                 if !backup.exists() {
                     fs::copy(&path, &backup).context("สำรอง settings ก่อน migration ไม่สำเร็จ")?;
                 }
@@ -132,6 +133,10 @@ impl SettingsManager {
         })
     }
 
+    pub fn update_microphone_device(&self, device_id: Option<String>) -> Result<AppSettings> {
+        self.update(|settings| { settings.microphone_device_id = device_id; Ok(()) })
+    }
+
     pub fn update_rescue_scan(&self, enabled: bool) -> Result<AppSettings> {
         self.update(|settings| {
             settings.rescue_scan_enabled = enabled;
@@ -155,13 +160,19 @@ fn normalize(settings: &mut AppSettings) -> Result<()> {
     if settings.schema_version < 10 && settings.overlay.max_items == 3 {
         settings.overlay.max_items = 4;
     }
-    settings.schema_version = 14;
+    settings.schema_version = 16;
     if uuid::Uuid::parse_str(&settings.installation_id).is_err() {
         settings.installation_id = uuid::Uuid::new_v4().to_string();
     }
     settings.overlay.opacity = settings.overlay.opacity.clamp(0.2, 1.0);
+    settings.overlay.bubble_opacity = settings.overlay.bubble_opacity.clamp(0.6, 1.0);
+    settings.overlay.text_opacity = settings.overlay.text_opacity.clamp(0.8, 1.0);
     settings.overlay.font_scale = settings.overlay.font_scale.clamp(0.7, 1.8);
-    settings.overlay.fade_seconds = settings.overlay.fade_seconds.clamp(2, 30);
+    settings.overlay.incoming_translation_scale = settings.overlay.incoming_translation_scale.clamp(0.8, 1.6);
+    settings.overlay.incoming_original_scale = settings.overlay.incoming_original_scale.clamp(0.8, 1.6);
+    settings.overlay.outgoing_translation_scale = settings.overlay.outgoing_translation_scale.clamp(0.8, 1.6);
+    settings.overlay.outgoing_original_scale = settings.overlay.outgoing_original_scale.clamp(0.8, 1.6);
+    settings.overlay.fade_seconds = settings.overlay.fade_seconds.clamp(2, 60);
     settings.overlay.max_items = settings.overlay.max_items.clamp(1, 5);
     settings.overlay.width = settings.overlay.width.clamp(340, 1920);
     settings.overlay.height = settings.overlay.height.clamp(190, 720);
@@ -192,6 +203,8 @@ fn normalize(settings: &mut AppSettings) -> Result<()> {
         return Err(anyhow!("hotkey ต้องไม่ว่าง"));
     }
     for (index, hotkey) in hotkeys.iter().enumerate() {
+        hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>()
+            .map_err(|error| anyhow!("ปุ่มลัด {hotkey} ไม่ถูกต้อง: {error}"))?;
         if hotkeys
             .iter()
             .skip(index + 1)
@@ -336,6 +349,63 @@ mod tests {
     use super::*;
 
     #[test]
+    fn v14_to_v16_preserves_preferences_and_backs_up_exact_bytes() {
+        for version in 14..=16 {
+            let temp = tempfile::tempdir().unwrap();
+            let path = temp.path().join("settings.json");
+            let mut expected = AppSettings::default();
+            expected.overlay.fade_seconds = 8;
+            expected.overlay.x = Some(-400);
+            expected.overlay.y = Some(150);
+            expected.overlay.width = 700;
+            expected.overlay.opacity = 0.7;
+            expected.hotkeys.toggle_listening = "Ctrl+F8".into();
+            expected.capture_mode = CaptureMode::SystemOutput;
+            expected.vad.system_output.gain_db = 7.0;
+            expected.glossary.push(crate::models::GlossaryTerm { source: "custom".into(), target: "คำศัพท์ของฉัน".into() });
+            let mut old = serde_json::to_value(&expected).unwrap();
+            old["schemaVersion"] = version.into();
+            if version < 16 {
+                old.as_object_mut().unwrap().remove("microphoneDeviceId");
+                for key in ["bubbleOpacity", "textOpacity", "incomingTranslationScale", "incomingOriginalScale", "outgoingTranslationScale", "outgoingOriginalScale"] {
+                    old["overlay"].as_object_mut().unwrap().remove(key);
+                }
+            }
+            let bytes = serde_json::to_vec_pretty(&old).unwrap();
+            validate_portable_import(&bytes).unwrap();
+            fs::write(&path, &bytes).unwrap();
+            let manager = SettingsManager::load(path.clone()).unwrap();
+            assert_eq!(manager.snapshot(), expected);
+            assert_eq!(manager.snapshot().hotkeys.copy_latest, "F10");
+            if version < 16 { assert_eq!(fs::read(path.with_extension("pre-v16.json")).unwrap(), bytes); }
+            assert_eq!(SettingsManager::load(path).unwrap().snapshot(), expected);
+        }
+    }
+
+    #[test]
+    fn new_appearance_and_microphone_round_trip_and_import_validation() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("settings.json");
+        let manager = SettingsManager::load(path.clone()).unwrap();
+        assert_eq!(manager.snapshot().overlay.fade_seconds, 30);
+        assert_eq!(manager.snapshot().overlay.bubble_opacity, 1.0);
+        assert_eq!(manager.snapshot().microphone_device_id, None);
+        manager.update_microphone_device(Some("windows-endpoint-id".into())).unwrap();
+        let mut overlay = manager.snapshot().overlay;
+        overlay.incoming_translation_scale = 1.4;
+        overlay.outgoing_original_scale = 0.85;
+        overlay.text_opacity = 0.9;
+        manager.update_overlay(overlay).unwrap();
+        assert_eq!(SettingsManager::load(path.clone()).unwrap().snapshot(), manager.snapshot());
+        validate_portable_import(&fs::read(path).unwrap()).unwrap();
+        let mut invalid = serde_json::to_value(manager.snapshot()).unwrap();
+        invalid["overlay"]["bubbleOpacity"] = 9.0.into();
+        assert!(validate_portable_import(&serde_json::to_vec(&invalid).unwrap()).is_err());
+        invalid["schemaVersion"] = 17.into();
+        assert!(validate_portable_import(&serde_json::to_vec(&invalid).unwrap()).is_err());
+    }
+
+    #[test]
     fn portable_import_validates_without_changing_source_or_id() {
         let temp=tempfile::tempdir().unwrap();let path=temp.path().join("settings.json");
         let manager=SettingsManager::load(path.clone()).unwrap();
@@ -442,7 +512,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 14);
+        assert_eq!(migrated.schema_version, 16);
         assert!(!migrated.auto_attach);
     }
 
@@ -463,7 +533,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 14);
+        assert_eq!(migrated.schema_version, 16);
         assert_eq!(migrated.capture_mode, CaptureMode::ProcessTree);
         assert_eq!(migrated.vad.process_tree.gain_db, 0.0);
         assert_eq!(migrated.vad.process_tree.vad_threshold, 0.2);
@@ -489,7 +559,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 14);
+        assert_eq!(migrated.schema_version, 16);
         assert_eq!(migrated.vad.process_tree.vad_threshold, 0.42);
         assert_eq!(migrated.vad.process_tree.gain_db, 4.0);
         assert_eq!(migrated.vad.system_output.vad_threshold, 0.35);
@@ -524,7 +594,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 14);
+        assert_eq!(migrated.schema_version, 16);
         assert_eq!(migrated.output_device_id, None);
     }
 
@@ -552,7 +622,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let manager = SettingsManager::load(path.clone()).expect("migrate");
-        assert_eq!(manager.snapshot().schema_version, 14);
+        assert_eq!(manager.snapshot().schema_version, 16);
         assert!(!manager.snapshot().rescue_scan_enabled);
         manager.update_rescue_scan(true).expect("enable cloud scan");
 
@@ -575,7 +645,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 14);
+        assert_eq!(migrated.schema_version, 16);
         assert_eq!(migrated.overlay.width, 420);
         assert_eq!(migrated.overlay.height, 236);
         assert_eq!(migrated.overlay.x, Some(320));
@@ -597,7 +667,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 14);
+        assert_eq!(migrated.schema_version, 16);
         assert_eq!(migrated.overlay.max_items, 4);
     }
 
@@ -621,7 +691,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 14);
+        assert_eq!(migrated.schema_version, 16);
         assert_eq!(migrated.capture_mode, CaptureMode::ProcessTree);
         assert_eq!(
             migrated.listening_source.unwrap().display_name,
@@ -654,7 +724,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
 
         let migrated = SettingsManager::load(path).expect("migrate").snapshot();
-        assert_eq!(migrated.schema_version, 14);
+        assert_eq!(migrated.schema_version, 16);
         assert_eq!(
             migrated.listening_source.unwrap().display_name,
             "Google Chrome"
@@ -677,7 +747,7 @@ mod tests {
         let original = serde_json::to_vec(&old).unwrap();
         fs::write(&path, &original).unwrap();
         let snapshot = SettingsManager::load(path.clone()).unwrap().snapshot();
-        assert_eq!(snapshot.schema_version, 14);
+        assert_eq!(snapshot.schema_version, 16);
         assert_eq!(
             snapshot.listening_source.as_ref().unwrap().display_name,
             "Discord"

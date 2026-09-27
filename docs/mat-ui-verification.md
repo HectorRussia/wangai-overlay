@@ -1,5 +1,7 @@
 # Mat UI integration verification
 
+> Historical first-pass report for commit `3c1f7a3`. The corrected layout, expanded Desktop scope, and current results are in [mat-ui-correction.md](mat-ui-correction.md).
+
 Date: 2026-09-27
 
 ## Source and boundaries

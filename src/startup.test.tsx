@@ -12,6 +12,7 @@ vi.mock("./api", () => ({
   api: {
     snapshot: mocks.snapshot,
     listOutputDevices: vi.fn(async () => []),
+    defaultMicrophoneName: vi.fn(async () => "Microphone (Default)"),
     getWebCompanionInfo: vi.fn(async () => ({ origin: "http://127.0.0.1", running: true })),
   },
   isWebCompanion: mocks.web,
@@ -26,7 +27,7 @@ vi.mock("./updates", () => ({ desktopUpdates: { available: () => false } }));
 import { SettingsApp } from "./SettingsApp";
 
 const notReady = "state not managed for field `state` on command `get_snapshot`";
-const readyRoom = () => screen.queryByRole("region", { name: "พร้อมแล้ว — เลือกแอปหนึ่งตัวแล้วเริ่มฟัง" });
+const readyRoom = () => screen.queryByRole("region", { name: /กำลังแปลเสียง|แปลเสียงสด|เลือกแอปเพื่อเริ่ม/ });
 const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 
 describe("real SettingsApp bootstrap (without mocking useSnapshot)", () => {

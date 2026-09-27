@@ -166,7 +166,19 @@ impl Default for HotkeySettings {
 #[serde(rename_all = "camelCase")]
 pub struct OverlaySettings {
     pub opacity: f64,
+    #[serde(default = "fully_opaque")]
+    pub bubble_opacity: f64,
+    #[serde(default = "fully_opaque")]
+    pub text_opacity: f64,
     pub font_scale: f64,
+    #[serde(default = "default_text_scale")]
+    pub incoming_translation_scale: f64,
+    #[serde(default = "default_text_scale")]
+    pub incoming_original_scale: f64,
+    #[serde(default = "default_text_scale")]
+    pub outgoing_translation_scale: f64,
+    #[serde(default = "default_text_scale")]
+    pub outgoing_original_scale: f64,
     pub fade_seconds: u64,
     pub max_items: usize,
     pub x: Option<i32>,
@@ -179,8 +191,14 @@ impl Default for OverlaySettings {
     fn default() -> Self {
         Self {
             opacity: 0.92,
+            bubble_opacity: 1.0,
+            text_opacity: 1.0,
             font_scale: 1.0,
-            fade_seconds: 8,
+            incoming_translation_scale: 1.0,
+            incoming_original_scale: 1.0,
+            outgoing_translation_scale: 1.0,
+            outgoing_original_scale: 1.0,
+            fade_seconds: 30,
             max_items: 4,
             x: None,
             y: None,
@@ -190,12 +208,8 @@ impl Default for OverlaySettings {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum OverlayPresentation {
-    Collapsed,
-    Expanded,
-}
+fn fully_opaque() -> f64 { 1.0 }
+fn default_text_scale() -> f64 { 1.0 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
@@ -264,6 +278,7 @@ pub struct AppSettings {
     pub listening_source: Option<SavedProcess>,
     pub capture_mode: CaptureMode,
     pub output_device_id: Option<String>,
+    pub microphone_device_id: Option<String>,
     pub rescue_scan_enabled: bool,
     pub auto_attach: bool,
     pub hotkeys: HotkeySettings,
@@ -276,10 +291,11 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            schema_version: 14,
+            schema_version: 16,
             listening_source: None,
             capture_mode: CaptureMode::default(),
             output_device_id: None,
+            microphone_device_id: None,
             rescue_scan_enabled: false,
             auto_attach: true,
             hotkeys: HotkeySettings::default(),
@@ -328,6 +344,9 @@ pub struct RuntimeState {
     pub audio_rms_dbfs: Option<f32>,
     pub audio_peak_dbfs: Option<f32>,
     pub audio_last_seen_at_ms: Option<i64>,
+    pub microphone_rms_dbfs: Option<f32>,
+    pub microphone_peak_dbfs: Option<f32>,
+    pub microphone_last_seen_at_ms: Option<i64>,
     pub vad_active: bool,
     pub effective_vad_threshold: f32,
     pub effective_vad_gain_db: f32,
@@ -358,6 +377,9 @@ impl Default for RuntimeState {
             audio_rms_dbfs: None,
             audio_peak_dbfs: None,
             audio_last_seen_at_ms: None,
+            microphone_rms_dbfs: None,
+            microphone_peak_dbfs: None,
+            microphone_last_seen_at_ms: None,
             vad_active: false,
             effective_vad_threshold: 0.5,
             effective_vad_gain_db: 0.0,
@@ -489,3 +511,7 @@ mod worker_contract_tests {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OverlayPresentation { Collapsed, Expanded }

@@ -84,7 +84,13 @@ export interface HotkeySettings {
 
 export interface OverlaySettings {
   opacity: number;
+  bubbleOpacity: number;
+  textOpacity: number;
   fontScale: number;
+  incomingTranslationScale: number;
+  incomingOriginalScale: number;
+  outgoingTranslationScale: number;
+  outgoingOriginalScale: number;
   fadeSeconds: number;
   maxItems: number;
   x?: number;
@@ -120,6 +126,7 @@ export interface AppSettings {
   listeningSource?: SavedProcess;
   captureMode: CaptureMode;
   outputDeviceId?: string;
+  microphoneDeviceId?: string | null;
   rescueScanEnabled: boolean;
   autoAttach: boolean;
   hotkeys: HotkeySettings;
@@ -147,6 +154,9 @@ export interface RuntimeState {
   audioRmsDbfs?: number | null;
   audioPeakDbfs?: number | null;
   audioLastSeenAtMs?: number | null;
+  microphoneRmsDbfs?: number | null;
+  microphonePeakDbfs?: number | null;
+  microphoneLastSeenAtMs?: number | null;
   vadActive: boolean;
   effectiveVadThreshold: number;
   effectiveVadGainDb: number;

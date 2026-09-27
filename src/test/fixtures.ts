@@ -3,7 +3,7 @@ import type { AppSnapshot } from "../types";
 export function snapshotFixture(now = Date.now()): AppSnapshot {
   return {
     settings: {
-      schemaVersion: 14,
+      schemaVersion: 16,
       listeningSource: {
         executablePath: "C:\\Games\\MistfallHunter-Win64-Shipping.exe",
         executableName: "MistfallHunter-Win64-Shipping.exe",
@@ -22,8 +22,14 @@ export function snapshotFixture(now = Date.now()): AppSnapshot {
       },
       overlay: {
         opacity: 0.94,
+        bubbleOpacity: 1,
+        textOpacity: 1,
         fontScale: 1,
-        fadeSeconds: 8,
+        incomingTranslationScale: 1,
+        incomingOriginalScale: 1,
+        outgoingTranslationScale: 1,
+        outgoingOriginalScale: 1,
+        fadeSeconds: 30,
         maxItems: 4,
         width: 420,
         height: 236,

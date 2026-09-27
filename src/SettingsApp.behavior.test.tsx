@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsApp } from "./SettingsApp";
 import { api } from "./api";
@@ -11,6 +11,8 @@ vi.mock("./updates", () => ({ desktopUpdates: { available: () => false } }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => false }));
 vi.mock("./api", () => ({ api: {
   listOutputDevices: vi.fn(async () => []),
+  listMicrophoneDevices: vi.fn(async () => []), startSession: vi.fn(async () => true),
+  setHotkeyCaptureMode: vi.fn(async () => undefined),
   listRunningApps: vi.fn(),
   getWebCompanionInfo: vi.fn(async () => ({ origin: "http://127.0.0.1:1431", running: true })),
   toggleListening: vi.fn(async () => true),
@@ -34,24 +36,24 @@ describe.each(["desktop", "web"] as const)("Mat UI preserves %s command bindings
   });
   afterEach(() => { cleanup(); Reflect.deleteProperty(window, "__TAURI_INTERNALS__"); });
 
-  it("starts and stops with the original toggle command, without changing window mode", async () => {
+  it("starts through the session flow and stops through the existing toggle", async () => {
     snapshot.runtime.listening = false;
     const view = render(<SettingsApp activeTab="overview" />);
-    fireEvent.click(screen.getByRole("button", { name: /เริ่มฟัง · F8/ }));
+    fireEvent.click(screen.getByRole("button", { name: "เริ่มใช้งาน" }));
     await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
-    expect(api.toggleListening).toHaveBeenCalledWith();
+    expect(api.startSession).toHaveBeenCalledWith();
     snapshot.runtime.listening = true;
     view.rerender(<SettingsApp activeTab="overview" />);
-    fireEvent.click(screen.getByRole("button", { name: /หยุดฟัง · F8/ }));
-    await waitFor(() => expect(api.toggleListening).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: /หยุดใช้งาน/ }));
+    await waitFor(() => expect(api.toggleListening).toHaveBeenCalledOnce());
     expect(api.quitApp).not.toHaveBeenCalled();
   });
 
   it("selects an app through the original picker and refreshes the snapshot", async () => {
     render(<SettingsApp activeTab="overview" />);
-    fireEvent.click(screen.getByRole("button", { name: "เปลี่ยน" }));
+    fireEvent.click(screen.getByRole("button", { name: "เปลี่ยนแอปที่ฟัง" }));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(await within(dialog).findByRole("button", { name: /Discord\.exe/i }));
+    fireEvent.click(await within(dialog).findByRole("button", { name: "เลือก Discord" }));
     await waitFor(() => expect(api.selectListeningSource).toHaveBeenCalledWith(previewRunningApps[1].roots[0]));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(refresh).toHaveBeenCalledOnce();
@@ -60,11 +62,13 @@ describe.each(["desktop", "web"] as const)("Mat UI preserves %s command bindings
 
   it("keeps hotkey and overlay edits local until their Save buttons are pressed", async () => {
     render(<SettingsApp activeTab="advanced" advancedSection="controls" />);
-    fireEvent.change(screen.getByRole("textbox", { name: "toggleListening" }), { target: { value: "F6" } });
-    fireEvent.change(screen.getByRole("slider", { name: /Opacity/ }), { target: { value: "0.7" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "เปลี่ยนปุ่มลัด เริ่มหรือหยุดฟัง" })); });
+    await screen.findByText("กดปุ่มที่ต้องการ…");
+    fireEvent.keyDown(window, { key: "F6", code: "F6" });
+    fireEvent.change(screen.getByRole("slider", { name: /พื้นหลังหน้าต่าง/ }), { target: { value: "0.7" } });
     expect(api.updateHotkeys).not.toHaveBeenCalled();
     expect(api.updateOverlay).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "บันทึก Hotkeys" }));
+    fireEvent.click(screen.getByRole("button", { name: "บันทึกปุ่มลัด" }));
     await waitFor(() => expect(api.updateHotkeys).toHaveBeenCalledWith({ ...snapshot.settings.hotkeys, toggleListening: "F6" }));
     fireEvent.click(screen.getByRole("button", { name: "บันทึก Overlay" }));
     await waitFor(() => expect(api.updateOverlay).toHaveBeenCalledWith({ ...snapshot.settings.overlay, opacity: 0.7 }));
@@ -90,23 +94,22 @@ describe.each(["desktop", "web"] as const)("Mat UI preserves %s command bindings
   it("shows command errors and leaves Stop available for retry", async () => {
     vi.mocked(api.toggleListening).mockRejectedValueOnce(new Error("capture unavailable"));
     render(<SettingsApp activeTab="overview" />);
-    fireEvent.click(screen.getByRole("button", { name: /หยุดฟัง · F8/ }));
+    fireEvent.click(screen.getByRole("button", { name: /หยุดใช้งาน/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("capture unavailable");
-    expect(screen.getByRole("button", { name: /หยุดฟัง · F8/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /หยุดใช้งาน/ })).toBeEnabled();
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("exposes desktop exit and Web App actions only on Desktop", async () => {
-    render(<SettingsApp activeTab="overview" />);
+  it("keeps Web Companion access in advanced settings on Desktop", async () => {
+    render(<SettingsApp activeTab="advanced" advancedSection="audio" />);
     if (runtime === "desktop") {
-      fireEvent.click(screen.getByRole("button", { name: "เปิด Web App" }));
+      fireEvent.click(screen.getByRole("button", { name: "เปิด Web Companion" }));
       await waitFor(() => expect(api.openWebCompanion).toHaveBeenCalledOnce());
-      fireEvent.click(screen.getByRole("button", { name: "ออกจากโปรแกรม" }));
-      expect(api.quitApp).toHaveBeenCalledOnce();
+      expect(api.quitApp).not.toHaveBeenCalled();
     } else {
-      expect(screen.queryByRole("button", { name: "เปิด Web App" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "เปิด Web Companion" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "ออกจากโปรแกรม" })).not.toBeInTheDocument();
-      expect(screen.getByText(/Web Companion · เชื่อมต่อ Desktop/)).toBeInTheDocument();
+
     }
   });
 });

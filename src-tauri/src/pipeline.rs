@@ -182,7 +182,7 @@ pub fn set_listening(app: &AppHandle, enabled: bool) -> Result<bool> {
             runtime.status_message = "หยุดฟังเสียงขาเข้าแล้ว".into();
         });
         let _ = app.emit("runtime-state", runtime);
-        commands::open_settings_window(app.clone()).map_err(anyhow::Error::msg)?;
+        commands::show_main_after_stop(app).map_err(anyhow::Error::msg)?;
         return Ok(false);
     }
     let settings = state.settings.snapshot();
@@ -319,17 +319,24 @@ pub fn start_push_to_talk(app: &AppHandle) -> Result<()> {
     if !state.gateway.can_submit() {
         return Err(anyhow::anyhow!(state.gateway.status().message));
     }
+    let selected_mic = state.settings.snapshot().microphone_device_id;
+    if let Some(id) = selected_mic.as_deref() {
+        audio::resolve_microphone_device(id)?;
+    }
     state.ai_stt.reset_stream(StreamKind::Microphone);
     state.ai_stt.start_microphone(app);
     if let Err(error) = state
         .audio
-        .start_microphone(app.clone(), state.ai_stt.clone())
+        .start_microphone(app.clone(), state.ai_stt.clone(), selected_mic)
     {
         state.ai_stt.reset_stream(StreamKind::Microphone);
         return Err(error);
     }
     let runtime = state.update_runtime(|runtime| {
         runtime.microphone_active = true;
+        runtime.microphone_rms_dbfs = None;
+        runtime.microphone_peak_dbfs = None;
+        runtime.microphone_last_seen_at_ms = None;
         runtime.status_message = "กำลังฟังไมค์ภาษาไทย".into();
     });
     let _ = app.emit("runtime-state", runtime);
@@ -346,6 +353,9 @@ pub fn stop_push_to_talk(app: &AppHandle) {
     state.ai_stt.end_microphone(app.clone());
     let runtime = state.update_runtime(|runtime| {
         runtime.microphone_active = false;
+        runtime.microphone_rms_dbfs = None;
+        runtime.microphone_peak_dbfs = None;
+        runtime.microphone_last_seen_at_ms = None;
         runtime.status_message = if runtime.listening {
             "กำลังฟังเสียงขาเข้า".into()
         } else {

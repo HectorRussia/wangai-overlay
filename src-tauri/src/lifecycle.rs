@@ -45,6 +45,9 @@ pub fn shutdown(app: &AppHandle) -> Result<(), String> {
                 state.update_runtime(|r| {
                     r.listening = false;
                     r.microphone_active = false;
+                    r.microphone_rms_dbfs = None;
+                    r.microphone_peak_dbfs = None;
+                    r.microphone_last_seen_at_ms = None;
                 });
                 state
                     .settings
