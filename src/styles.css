@@ -1,7 +1,24 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Noto Sans Thai";
+  src: url("../assets/fonts/NotoSansThai.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kanit";
+  src: url("../assets/fonts/Kanit-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: "Leelawadee UI", "Tahoma", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Noto Sans Thai", "Leelawadee UI", "Tahoma", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Kanit", "Noto Sans Thai", "Leelawadee UI", sans-serif;
   --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 

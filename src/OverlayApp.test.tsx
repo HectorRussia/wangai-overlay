@@ -36,6 +36,7 @@ describe("WANGAI overlay", () => {
     mocks.setOverlayPresentation.mockClear();
     mocks.openSettingsWindow.mockReset();
     mocks.startOverlayDrag.mockReset();
+    mocks.copyLatestReply.mockClear();
   });
 
   afterEach(() => {
@@ -162,5 +163,16 @@ describe("WANGAI overlay", () => {
     const view = render(<OverlayApp />);
     expect(screen.getByText(/F6 เพื่อย้าย/)).toBeInTheDocument();
     expect(view.container.querySelector("header")).toHaveAttribute("title", "กด F6 เพื่อย้ายหน้าต่าง");
+  });
+
+  it("keeps Copy behind edit mode and sends the original latest-reply command", async () => {
+    const view = render(<OverlayApp />);
+    expect(screen.queryByRole("button", { name: "Copy" })).not.toBeInTheDocument();
+    expect(screen.getByText("F10 Copy")).toBeInTheDocument();
+    mocks.snapshot = { ...mocks.snapshot!, runtime: { ...mocks.snapshot!.runtime, overlayEditMode: true } };
+    view.rerender(<OverlayApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(mocks.copyLatestReply).toHaveBeenCalledOnce());
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
   });
 });
