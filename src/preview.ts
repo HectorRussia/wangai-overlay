@@ -56,7 +56,7 @@ export function previewSnapshot(): AppSnapshot {
       glossary: [{ source: "north gate", target: "ประตูเหนือ" }],
     },
     runtime: {
-      listening: true, microphoneActive: false, overlayEditMode: false, workerReady: true, workerModel: "silero-vad", aiSttBusy: false, aiStatus: "บริการ AI พร้อมใช้งาน", aiService: { state: "ready", message: "บริการ AI พร้อมใช้งาน", incomingModel: "whisper-large-v3", microphoneModel: "whisper-large-v3-turbo", translationModel: "server-configured-model", retryAfterMs: null },
+      listening: true, microphoneActive: false, overlayEditMode: false, workerReady: true, workerModel: "silero-vad", aiSttBusy: false, aiStatus: "บริการ AI พร้อมใช้งาน", aiService: { state: "ready", message: "บริการ AI พร้อมใช้งาน", incomingModel: "whisper-large-v3-turbo", microphoneModel: "whisper-large-v3-turbo", translationModel: "server-configured-model", retryAfterMs: null },
       attachedSource: previewProcesses[0], effectiveCapturePid: 4100, effectiveCaptureName: "MistfallHunter.exe", effectiveOutputDeviceIsDefault: false,
       audioRmsDbfs: -31.5, audioPeakDbfs: -12.2, audioLastSeenAtMs: now, vadActive: false,
       effectiveVadThreshold: 0.5, effectiveVadGainDb: 0, effectiveVadAutoGainDb: 0, droppedAudioChunks: 0,

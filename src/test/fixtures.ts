@@ -52,7 +52,7 @@ export function snapshotFixture(now = Date.now()): AppSnapshot {
       workerModel: "silero-vad",
       aiSttBusy: false,
       aiStatus: "บริการ AI พร้อมใช้งาน",
-      aiService: { state: "ready", message: "บริการ AI พร้อมใช้งาน", incomingModel: "whisper-large-v3", microphoneModel: "whisper-large-v3-turbo", translationModel: "server-configured-model", retryAfterMs: null },
+      aiService: { state: "ready", message: "บริการ AI พร้อมใช้งาน", incomingModel: "whisper-large-v3-turbo", microphoneModel: "whisper-large-v3-turbo", translationModel: "server-configured-model", retryAfterMs: null },
       attachedSource: {
         pid: 4242,
         name: "MistfallHunter-Win64-Shipping.exe",
