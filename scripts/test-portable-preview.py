@@ -20,6 +20,7 @@ def module(name, filename):
 audit = module('audit', 'verify-portable-artifacts.py')
 provenance = module('provenance', 'record-portable-preview.py')
 promotion = module('promotion', 'promote-tested-portable.py')
+packaging = module('packaging', 'package-portable.py')
 GATEWAY = 'https://wangai-ai.onrender.com'
 
 
@@ -33,6 +34,13 @@ class Payload:
 
 
 class PreviewTests(unittest.TestCase):
+    def test_packaging_uses_matching_release_notes_and_keeps_test_fixture(self):
+        self.assertIn('WANGAI 0.5.0', packaging.release_notes('0.5.0'))
+        self.assertEqual(packaging.release_notes('0.3.1'), packaging.release_notes('0.3.0'))
+        for invalid in ('../0.5.0', '0.5.0/notes', '0.5.0-beta', '0.6.0'):
+            with self.subTest(version=invalid), self.assertRaises(ValueError):
+                packaging.release_notes(invalid)
+
     def test_release_checksum_guard_accepts_lf_and_crlf_but_rejects_corruption(self):
         script = Path(__file__).resolve().parent / 'release-assets.mjs'
         for newline in ('\n', '\r\n'):
