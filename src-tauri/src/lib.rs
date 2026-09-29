@@ -14,6 +14,7 @@ mod release_test;
 mod settings;
 mod startup;
 mod state;
+mod tray;
 mod translator;
 mod updater;
 mod web_companion;
@@ -75,6 +76,7 @@ pub fn run() {
 
             // Configured webviews must not invoke commands before state exists.
             startup::create_windows(app.handle())?;
+            tray::create_tray(app.handle())?;
             #[cfg(feature = "release-test")]
             release_test::checkpoint(app.handle(), "windows-created");
             portable_runtime::start_readiness_monitor(app.handle().clone());
@@ -112,6 +114,12 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Focused(false)) {
+                let state = window.state::<AppState>();
+                if state.hotkey_capture_active.load(std::sync::atomic::Ordering::Relaxed) {
+                    let _ = hotkeys::set_capture_mode(window.app_handle(), &state, false);
+                }
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
                     api.prevent_close();
@@ -121,14 +129,12 @@ pub fn run() {
                         runtime.listening || runtime.microphone_active
                     };
                     if running {
-                        if commands::show_listening_overlay(window.app_handle()).is_ok() {
-                            let _ = window.hide();
-                        }
-                    } else {
-                        window.app_handle().exit(0);
+                        let _ = commands::show_listening_overlay(window.app_handle());
                     }
+                    let _ = window.hide();
                 } else if window.label() == "overlay" {
-                    window.app_handle().exit(0);
+                    api.prevent_close();
+                    let _ = window.hide();
                 }
             }
         })
@@ -141,23 +147,29 @@ pub fn run() {
             commands::list_capture_sources,
             commands::list_running_apps,
             commands::list_output_devices,
+            commands::default_microphone_name,
+            commands::list_microphone_devices,
+            commands::update_microphone_device,
             commands::get_web_companion_info,
             commands::open_web_companion,
             commands::open_settings_window,
-            commands::quit_app,
             commands::select_listening_source,
+            commands::clear_listening_source,
             commands::update_capture_mode,
             commands::update_output_device,
             commands::update_rescue_scan,
             commands::toggle_listening,
+            commands::start_session,
+            commands::quit_app,
+            commands::set_overlay_presentation,
             commands::set_listening,
             commands::probe_recent_audio,
             commands::update_hotkeys,
+            commands::set_hotkey_capture_mode,
             commands::update_overlay_settings,
             commands::update_vad_settings,
             commands::update_glossary,
             commands::set_overlay_edit_mode,
-            commands::set_overlay_presentation,
             commands::save_overlay_bounds,
             commands::start_overlay_drag,
             commands::copy_latest_reply,

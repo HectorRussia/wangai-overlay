@@ -33,7 +33,7 @@ pub fn delay_startup(app: &AppHandle) {
 const READY_ROOM_PROBE: &str = r#"
 (() => {
   const room = document.querySelector('.ready-room-panel');
-  if (room && room.querySelector('#ready-room-title') &&
+  if (room && room.querySelector('button') &&
       room.getBoundingClientRect().width > 0 && getComputedStyle(room).visibility !== 'hidden') {
     window.__TAURI_INTERNALS__.invoke('plugin:event|emit', {
       event: 'release-test-ui-ready', payload: null

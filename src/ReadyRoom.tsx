@@ -1,26 +1,32 @@
-import { AudioLines, Check, ChevronRight, Cloud, Globe2, Headphones, History, LoaderCircle, LockKeyhole, MessageSquareText, Radio, Settings, ShieldCheck, TriangleAlert } from "lucide-react";
-import { advancedHref, settingsHref } from "./router";
-import type { AppSettings, RuntimeState, SubtitleItem } from "./types";
+import { AudioLines, Check, ChevronRight, Cloud, Globe2, Headphones, LoaderCircle, Mic, Radio, ShieldCheck, TriangleAlert } from "lucide-react";
+import type { AppSettings, CaptureMode, RuntimeState } from "./types";
 import { useEffect, type ReactNode } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { AudioWaveform } from "./AudioWaveform";
 
 type Props = {
   settings: AppSettings;
   runtime: RuntimeState;
-  history: SubtitleItem[];
   busy?: string;
   previewMode: boolean;
   onToggleListening: () => void;
   onOpenSourcePicker: () => void;
+  onCaptureModeChange?: (mode: CaptureMode) => void;
   onOpenWebCompanion?: () => void;
   webCompanionOrigin?: string;
   webRuntime: boolean;
   notification?: ReactNode;
+  showSecondary?: boolean;
+  showIntro?: boolean;
+  microphoneName?: string | null;
+  microphoneError?: boolean;
+  onRefreshMicrophone?: () => void;
+  onOpenMicrophonePicker?: () => void;
 };
 type Tone = "ready" | "waiting" | "warning" | "setup";
 type Readiness = { label: string; detail: string; tone: Tone };
 
-export function ReadyRoom({ settings, runtime, history, busy, previewMode, onToggleListening, onOpenSourcePicker, onOpenWebCompanion, webCompanionOrigin, webRuntime, notification }: Props) {
+export function ReadyRoom({ settings, runtime, busy, previewMode, onToggleListening, onOpenSourcePicker, onCaptureModeChange, onOpenWebCompanion, webCompanionOrigin, webRuntime, notification, showSecondary = true, showIntro = true, microphoneName, microphoneError = false, onRefreshMicrophone, onOpenMicrophonePicker }: Props) {
   useEffect(() => {
     if (webRuntime || previewMode || !isTauri()) return;
     const frame = requestAnimationFrame(() => { void invoke("portable_frontend_ready").catch(() => {}); });
@@ -28,53 +34,57 @@ export function ReadyRoom({ settings, runtime, history, busy, previewMode, onTog
   }, [webRuntime, previewMode]);
   const incoming = incomingReadiness(settings, runtime);
   const ai = aiReadiness(runtime);
+  const microphone = microphoneReadiness(settings, runtime, microphoneName, microphoneError);
   const configured = Boolean(settings.listeningSource) && runtime.workerReady && ["connected", "ready"].includes(runtime.aiService.state);
-  const recent = history.find((item) => item.status === "success") ?? history[0];
+  const needsSource = !settings.listeningSource;
+  const readinessTitle = needsSource ? "เลือกแอปเพื่อเริ่ม" : runtime.listening ? "กำลังแปลเสียง" : "แปลเสียงสด";
   return <div className="ready-room-grid">
-    <div className="ready-listen-toolbar">
-      <div className="ready-notification-slot">{notification}</div>
-      <button className={`ready-listen-button ${runtime.listening ? "is-listening" : ""}`} disabled={busy === "listen" || previewMode || (!runtime.listening && !configured)} onClick={onToggleListening}>{busy === "listen" ? <LoaderCircle className="animate-spin" /> : runtime.listening ? <AudioLines /> : <Headphones />}<span>{runtime.listening ? "หยุดฟัง · F8" : "เริ่มฟัง · F8"}</span><small title={settings.listeningSource?.displayName}>{runtime.listening ? `กำลังฟัง ${settings.captureMode === "system_output" ? "MIXED" : settings.listeningSource?.displayName ?? "แอปที่เลือก"}` : "พร้อมแปลเสียงขาเข้า"}</small></button>
-    </div>
-    <section className="ready-room-panel" aria-labelledby="ready-room-title">
-      <div className="ready-room-intro"><div><p className="eyebrow">READY ROOM</p><h2 id="ready-room-title">{configured ? "พร้อมแล้ว — เลือกแอปหนึ่งตัวแล้วเริ่มฟัง" : "ตั้งค่าอีกนิด แล้วเริ่มฟังได้เลย"}</h2><p>WANGAI ฟังแอปที่คุณเลือกครั้งละหนึ่งโปรแกรม ไม่มีเสียงซ้ำจากแหล่งอื่น</p></div><span className={`ready-summary ${configured ? "is-ready" : "is-warning"}`}>{configured ? <Check /> : <TriangleAlert />}{configured ? "พร้อมใช้งาน" : "ต้องตรวจสอบ"}</span></div>
+    {notification && <div className="ready-notification-slot">{notification}</div>}
+    <section className="ready-room-panel" aria-labelledby={showIntro ? "ready-room-title" : undefined} aria-label={showIntro ? undefined : readinessTitle}>
+      {showIntro && <div className="ready-room-intro"><div><p className="eyebrow">WANGAI LIVE</p><h2 id="ready-room-title">{readinessTitle}</h2><p>{needsSource ? "เลือกแอปที่ต้องการฟังก่อนเริ่มแปลเสียง" : "คำแปลภาษาไทยจะแสดงบน Overlay ระหว่างเล่นเกม"}</p></div></div>}
+      <div className={`ready-primary-action ${needsSource ? "is-empty" : ""}`}><span className="ready-game-mark" aria-hidden="true"><Headphones /></span><div className="ready-primary-context"><small>{needsSource ? "แหล่งเสียง" : runtime.listening ? "แอปที่กำลังฟัง" : "แอปที่เลือก"}</small><strong>{settings.listeningSource?.displayName ?? "ยังไม่ได้เลือกแอป"}</strong><span>{runtime.listening ? "ฟังเสียงอยู่ · แปลเป็นไทยแบบสด" : configured ? "กด F8 เพื่อเชื่อมต่อเสียงจากแอป" : needsSource ? "เลือกเกมหรือแอปที่ต้องการฟัง" : "รอระบบเสียงหรือบริการ AI พร้อม"}</span></div>{needsSource ? <button aria-label="เลือกแอปที่จะฟัง" className="ready-listen-button is-select" onClick={onOpenSourcePicker}><Headphones /><span>เลือกแอป</span><small>ขั้นตอนแรก</small></button> : <button aria-describedby={!runtime.listening && !configured ? runtime.workerReady ? "ready-ai-status" : "ready-source-status" : undefined} className={`ready-listen-button ${runtime.listening ? "is-listening" : ""}`} disabled={busy === "listen" || previewMode || (!runtime.listening && !configured)} onClick={onToggleListening}>{busy === "listen" ? <LoaderCircle className="animate-spin" /> : runtime.listening ? <AudioLines /> : <Headphones />}<span>{runtime.listening ? "หยุดใช้งาน" : "เริ่มใช้งาน"}</span></button>}</div>
       <div className="ready-source-list">
-        <Row action="เปลี่ยน" icon={<Radio />} index={1} meterLabel="ระดับเสียงขาเข้า" meterValue={runtime.audioPeakDbfs} name={settings.listeningSource?.displayName ?? "ยังไม่ได้เลือกแอป"} onAction={onOpenSourcePicker} readiness={incoming} title="แหล่งเสียงที่ฟัง" />
-        <Row action="ข้อมูล" actionHref={advancedHref("ai")} icon={<Cloud />} index={2} meterLabel="โมเดลและ API key" meterText="จัดการบนเซิร์ฟเวอร์" name="บริการ AI กลาง" readiness={ai} title="การแปล" />
+        {!needsSource && <Row action="เปลี่ยน" actionAriaLabel="เปลี่ยนแอปที่ฟัง" className="incoming-row" icon={<Radio />} index={1} name={settings.listeningSource?.displayName ?? "แอปที่เลือก"} onAction={onOpenSourcePicker} readiness={incoming} statusId="ready-source-status" title="แหล่งเสียงที่ฟัง" waveform={{ label: "ระดับเสียงจากแอป", active: runtime.listening && Boolean(runtime.attachedSource), rmsDbfs: runtime.audioRmsDbfs, peakDbfs: runtime.audioPeakDbfs, sampleAt: runtime.audioLastSeenAtMs }} />}
+        <Row action={onOpenMicrophonePicker ? "เปลี่ยน" : (microphoneError || microphoneName === null) && onRefreshMicrophone ? "ตรวจใหม่" : undefined} actionAriaLabel={onOpenMicrophonePicker ? "เปลี่ยนไมโครโฟน" : undefined} className="microphone-row" icon={<Mic />} index={needsSource ? 1 : 2} name={microphoneName || (microphoneError ? "ตรวจไมโครโฟนไม่ได้" : microphoneName === null ? "ไม่พบไมโครโฟน" : "กำลังตรวจไมโครโฟน")} onAction={onOpenMicrophonePicker ?? onRefreshMicrophone} readiness={microphone} title="ไมโครโฟนของเรา" waveform={{ label: "ระดับเสียงไมโครโฟน", active: runtime.microphoneActive, rmsDbfs: runtime.microphoneRmsDbfs, peakDbfs: runtime.microphonePeakDbfs, sampleAt: runtime.microphoneLastSeenAtMs }} />
+        {!needsSource && <Row className="translation-row" icon={<Cloud />} index={3} name="อังกฤษ → ไทย" readiness={ai} statusId="ready-ai-status" title="การแปล" />}
       </div>
-      <div className="ready-privacy"><ShieldCheck /><div><strong>วางใจเรื่องความเป็นส่วนตัว</strong><span>ส่งเฉพาะช่วงคำพูดและข้อความผ่านเซิร์ฟเวอร์ WANGAI ไปยัง AI provider ไม่บันทึกเนื้อหาบนเซิร์ฟเวอร์ เก็บสถิติการใช้งานด้วยรหัสติดตั้งแบบสุ่ม</span></div><LockKeyhole /></div>
-      <section className="ready-recent" aria-labelledby="recent-title"><div className="ready-section-heading"><div><p className="eyebrow">LIVE MEMORY</p><h2 id="recent-title">บทสนทนาล่าสุด</h2></div><a href={settingsHref("history")}>ดูทั้งหมด <ChevronRight /></a></div>{recent ? <Recent item={recent} /> : <div className="ready-empty"><MessageSquareText /><div><strong>ยังไม่มีบทสนทนา</strong><span>ข้อความแรกจะปรากฏที่นี่เมื่อเริ่มฟัง</span></div></div>}</section>
+      {!needsSource && onCaptureModeChange && (settings.captureMode === "system_output" || (runtime.listening && runtime.captureWarning)) && <div className="ready-capture-recovery"><span>{settings.captureMode === "system_output" ? "กำลังฟังเสียงทั้งเครื่อง รวมเสียงจากแอปอื่น" : "ไม่ได้ยินเสียงจากแอปที่เลือก"}</span><button disabled={busy === "mode" || previewMode} onClick={() => onCaptureModeChange(settings.captureMode === "system_output" ? "process_tree" : "system_output")}>{settings.captureMode === "system_output" ? "กลับไปฟังเฉพาะแอป" : "ลองฟังเสียงทั้งเครื่อง"}</button></div>}
     </section>
-    <div className="ready-footer-actions"><a href={settingsHref("history")}><History />ประวัติ</a><a href={advancedHref("audio")}><Settings />การตั้งค่าขั้นสูง</a>{!webRuntime && onOpenWebCompanion && <button title={webCompanionOrigin} onClick={onOpenWebCompanion}><Globe2 />เปิด Web App</button>}{webRuntime && <span><Globe2 />Web Companion · เชื่อมต่อ Desktop</span>}{previewMode && <span>ข้อมูลจำลองสำหรับ Browser Preview</span>}</div>
+    {showSecondary && <><details className="ready-privacy"><summary><ShieldCheck />ความเป็นส่วนตัวและการส่งข้อมูล <ChevronRight /></summary><p>ส่งเฉพาะช่วงคำพูดและข้อความผ่านเซิร์ฟเวอร์ WANGAI ไปยัง AI provider ไม่บันทึกเนื้อหาบนเซิร์ฟเวอร์ เก็บสถิติการใช้งานด้วยรหัสติดตั้งแบบสุ่ม</p></details><div className="ready-footer-actions">{!webRuntime && onOpenWebCompanion && <button title={webCompanionOrigin} onClick={onOpenWebCompanion}><Globe2 />เปิด Web App</button>}{webRuntime && <span><Globe2 />Web Companion · เชื่อมต่อ Desktop</span>}{previewMode && <span>ข้อมูลจำลองสำหรับ Browser Preview</span>}</div></>}
   </div>;
 }
 
-function Row({ index, icon, title, name, readiness, meterLabel, meterValue, meterPercent, meterText, action, actionHref, onAction }: { index: number; icon: React.ReactNode; title: string; name: string; readiness: Readiness; meterLabel: string; meterValue?: number | null; meterPercent?: number; meterText?: string; action: string; actionHref?: string; onAction?: () => void }) {
-  const percent = meterPercent ?? levelPercent(meterValue);
-  return <article className={`ready-source-row tone-${readiness.tone}`}><span className="ready-step">{index}</span><span className="ready-source-icon">{icon}</span><div className="ready-source-name"><strong>{title}</strong><span title={name}>{name}</span></div><div className="ready-source-status"><span className="ready-status-icon">{readiness.tone === "ready" || readiness.tone === "waiting" ? <Check /> : <TriangleAlert />}</span><span><strong>{readiness.label}</strong><small>{readiness.detail}</small></span></div><div className="ready-meter-wrap"><span>{meterLabel}</span>{meterText ? <strong className="text-sm text-[#76dda0]">{meterText}</strong> : <div aria-label={meterLabel} aria-valuemax={100} aria-valuemin={0} aria-valuenow={Math.round(percent)} className="ready-meter" role="meter">{Array.from({ length: 18 }, (_, i) => <span className={i < Math.round((percent / 100) * 18) ? "is-active" : ""} key={i} />)}</div>}</div>{actionHref ? <a className="ready-change-button" href={actionHref}>{action}</a> : <button className="ready-change-button" onClick={onAction}>{action}</button>}</article>;
+type Waveform = { label: string; active: boolean; rmsDbfs?: number | null; peakDbfs?: number | null; sampleAt?: number | null };
+
+function Row({ index, icon, title, name, readiness, action, actionAriaLabel, onAction, statusId, className = "", waveform }: { index: number; icon: React.ReactNode; title: string; name: string; readiness: Readiness; action?: string; actionAriaLabel?: string; onAction?: () => void; statusId?: string; className?: string; waveform?: Waveform }) {
+  return <article className={`ready-source-row tone-${readiness.tone} ${className} ${action ? "" : "no-action"} no-meter`}><span className="ready-step">{index}</span><span className="ready-source-icon">{icon}</span><div className={`ready-source-name ${waveform ? "with-wave" : ""}`}><strong>{title}</strong><span title={name}>{name}</span>{waveform && <AudioWaveform {...waveform} />}</div><div className="ready-source-status" id={statusId}><span className="ready-status-icon">{readiness.tone === "ready" || readiness.tone === "waiting" ? <Check /> : <TriangleAlert />}</span><span><strong>{readiness.label}</strong><small title={readiness.detail}>{readiness.detail}</small></span></div>{action && <button aria-label={actionAriaLabel} className="ready-change-button" onClick={onAction}>{action}</button>}</article>;
 }
 
-function Recent({ item }: { item: SubtitleItem }) {
-  const source = item.stream === "microphone" ? "F9 REPLY" : item.sourceDisplayName ?? "INCOMING";
-  return <article className="ready-conversation-row"><span className="ready-conversation-icon"><MessageSquareText /></span><time>{new Date(item.createdAtMs).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</time><div><strong>{source}</strong><span>{item.originalText}</span></div><ChevronRight /><p>{item.translatedText ?? (item.status === "pending" ? "กำลังแปล…" : "แปลไม่สำเร็จ")}</p></article>;
+function microphoneReadiness(settings: AppSettings, runtime: RuntimeState, name?: string | null, error = false): Readiness {
+  if (error) return { label: "ตรวจไมค์ไม่ได้", detail: "กดตรวจใหม่อีกครั้ง", tone: "warning" };
+  if (name === null) return { label: "ไม่พบไมโครโฟน", detail: "กดเปลี่ยนเพื่อเลือกอุปกรณ์", tone: "warning" };
+  if (name === undefined) return { label: "กำลังตรวจไมค์", detail: "ตรวจอุปกรณ์รับเสียงหลักของ Windows", tone: "waiting" };
+  if (runtime.microphoneActive) return { label: "กำลังรับเสียง", detail: `ปล่อย ${settings.hotkeys.pushToTalk} เพื่อแปลเป็นอังกฤษ`, tone: "ready" };
+  if (!["connected", "ready"].includes(runtime.aiService.state)) return { label: "ยังแปลตอบไม่ได้", detail: "รอบริการแปลเชื่อมต่อ", tone: "warning" };
+  return { label: `กด ${settings.hotkeys.pushToTalk} ค้างเพื่อพูด`, detail: "เสียงไทย → ข้อความอังกฤษ", tone: "ready" };
 }
 
 function incomingReadiness(settings: AppSettings, runtime: RuntimeState): Readiness {
-  if (!settings.listeningSource) return { label: "ต้องตั้งค่า", detail: "เลือกเกม Discord หรือ browser", tone: "setup" };
+  if (!settings.listeningSource) return { label: "ยังไม่ได้เลือกแอป", detail: "กดเลือกแอปเพื่อเริ่มใช้งาน", tone: "setup" };
   if (!runtime.workerReady) return { label: "ตัวตรวจคำพูดยังไม่พร้อม", detail: runtime.lastError ? "พบข้อผิดพลาด กรุณาตรวจข้อความแจ้งเตือน" : "กำลังเตรียม Silero VAD", tone: runtime.lastError ? "warning" : "waiting" };
-  if (!runtime.listening) return { label: "พร้อม", detail: "รอเริ่มฟัง", tone: "ready" };
-  if (runtime.captureWarning) return { label: "ไม่ได้ยินเสียง", detail: "เปิดวิธีแก้ปัญหาเสียง", tone: "warning" };
+  if (!runtime.listening) return { label: "เลือกแล้ว", detail: "กด F8 เพื่อเริ่มใช้งาน", tone: "ready" };
+  if (runtime.captureWarning) return { label: "ไม่ได้ยินเสียง", detail: "ตรวจเสียงในแอปและ Volume Mixer", tone: "warning" };
   if (!runtime.attachedSource) return { label: "หาแอปไม่พบ", detail: `ตรวจว่า ${settings.listeningSource.displayName} ยังเปิดอยู่`, tone: "warning" };
-  if (runtime.audioLastSeenAtMs == null) return { label: "ยังไม่มี audio frame", detail: "กำลังเชื่อมต่อแหล่งเสียง", tone: "waiting" };
-  if ((runtime.audioPeakDbfs ?? -96) <= -90) return { label: "Digital silence", detail: "แอปยังไม่มีเสียงออก", tone: "warning" };
-  if (!runtime.vadActive) return { label: "กำลังฟัง", detail: settings.captureMode === "system_output" ? "รับเสียง MIXED · VAD ยังไม่พบคำพูด" : "VAD ยังไม่พบคำพูด", tone: "waiting" };
+  if (runtime.audioLastSeenAtMs == null) return { label: "รอเสียงจากแอป", detail: "กำลังเชื่อมต่อแหล่งเสียง", tone: "waiting" };
+  if ((runtime.audioPeakDbfs ?? -96) <= -90) return { label: "ยังไม่ได้ยินเสียง", detail: "ตรวจว่าแอปกำลังเล่นเสียง", tone: "warning" };
+  if (!runtime.vadActive) return { label: "กำลังฟัง", detail: settings.captureMode === "system_output" ? "รอคำพูดจากเสียงรวม" : "รอคำพูดจากแอป", tone: "waiting" };
   return { label: "กำลังตรวจพบคำพูด", detail: settings.captureMode === "system_output" ? "แหล่งข้อความจะแสดง MIXED" : `รับเสียงจาก ${settings.listeningSource.displayName}`, tone: "ready" };
 }
 function aiReadiness(runtime: RuntimeState): Readiness {
   const service = runtime.aiService;
-  if (service.state === "offline") return { label: "เชื่อมต่อไม่ได้", detail: service.message, tone: "warning" };
+  if (service.state === "offline") return { label: "เชื่อมต่อไม่ได้", detail: service.message === "เชื่อมต่อบริการ AI ไม่สำเร็จ" ? "กำลังลองเชื่อมต่อใหม่" : service.message, tone: "warning" };
   if (service.state === "degraded") return { label: service.retryAfterMs ? "กำลังพัก" : "บริการขัดข้อง", detail: service.message, tone: "warning" };
   if (service.state === "connecting") return { label: "กำลังเชื่อมต่อ", detail: service.message, tone: "waiting" };
   if (runtime.aiSttBusy) return { label: "กำลังแปล", detail: "กำลังประมวลผลวลีล่าสุด", tone: "ready" };
-  return { label: service.state === "ready" ? "พร้อม" : "เชื่อมต่อแล้ว", detail: service.message, tone: "ready" };
+  return { label: "พร้อม", detail: "แปลเสียงจากแอปได้", tone: "ready" };
 }
-function levelPercent(dbfs?: number | null): number { return dbfs == null ? 0 : Math.max(0, Math.min(100, ((dbfs + 60) / 60) * 100)); }

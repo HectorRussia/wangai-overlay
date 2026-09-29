@@ -23,7 +23,7 @@ services:
       - key: STT_BASE_URL
         value: https://api.groq.com/openai/v1
       - key: STT_INCOMING_MODEL
-        value: whisper-large-v3
+        value: whisper-large-v3-turbo
       - key: STT_MICROPHONE_MODEL
         value: whisper-large-v3-turbo
       - key: STT_API_KEY

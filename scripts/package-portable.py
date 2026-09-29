@@ -14,6 +14,13 @@ def digest(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
+def release_notes(version):
+    if version not in ('0.3.0', '0.3.1', '0.5.0'):
+        raise ValueError('Unsupported build version')
+    # 0.3.1 is the isolated updater test fixture, not a published release.
+    notes_version = '0.3.0' if version == '0.3.1' else version
+    return (ROOT / f'docs/releases/v{notes_version}.md').read_text(encoding='utf8')
+
 def pe_subsystem(path):
     with path.open('rb') as stream:
         dos=stream.read(64)
@@ -49,8 +56,7 @@ def build(args):
     if output.exists() and any(output.iterdir()): raise ValueError('Choose an empty artifact directory; existing artifacts are never overwritten')
     output.mkdir(parents=True,exist_ok=True)
     version=args.version or json.loads((ROOT/'package.json').read_text())['version']
-    import re
-    if not re.fullmatch(r'0\.3\.[01]',version): raise ValueError('Unsupported build version')
+    notes = release_notes(version)
     pin=json.loads((ROOT/'portable/webview2.lock.json').read_text())
     files={'WANGAI.exe':args.host.resolve(),'gamelingo.exe':args.core.resolve(),'THIRD-PARTY-NOTICES.md':ROOT/'docs/THIRD-PARTY-NOTICES.md'}
     collect(ROOT/'output/worker/wangai-worker','worker',files)
@@ -83,7 +89,6 @@ def build(args):
         sig=signature.encode('utf8');dest.write(sig)
         dest.write(struct.pack('<16sQQQ',b'WANGAI_PORTABLE1',offset,payload.stat().st_size,len(sig)))
     sign(portable,args.verifier)
-    notes=(ROOT/'docs/releases/v0.3.0.md').read_text(encoding='utf8')
     (output/'RELEASE-NOTES.md').write_text(notes,encoding='utf8')
     channel={'version':version,'notes':notes,'pub_date':datetime.now(timezone.utc).isoformat(),'platforms':{'windows-x86_64':{'url':f'{REPO}/v{version}/{payload.name}','signature':signature}}}
     (output/'latest-portable.json').write_text(json.dumps(channel,ensure_ascii=False,indent=2)+'\n',encoding='utf8')

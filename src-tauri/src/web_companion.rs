@@ -149,6 +149,8 @@ fn router(app: &AppHandle, context: WebContext) -> Result<Router> {
         .route("/api/v1/processes", get(processes_list))
         .route("/api/v1/apps", get(apps_list))
         .route("/api/v1/output-devices", get(output_devices))
+        .route("/api/v1/default-microphone", get(default_microphone_name))
+        .route("/api/v1/microphones", get(microphone_devices))
         .route("/api/v1/command", post(command))
         .route("/api/v1/events", get(events))
         .route("/api/{*path}", any(api_not_found));
@@ -281,6 +283,24 @@ async fn output_devices(State(context): State<WebContext>, headers: HeaderMap) -
     }
 }
 
+async fn default_microphone_name(State(context): State<WebContext>, headers: HeaderMap) -> Response {
+    if let Err(response) = require_session(&context, &headers) {
+        return response;
+    }
+    match audio::default_microphone_name() {
+        Ok(name) => Json(name).into_response(),
+        Err(error) => api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    }
+}
+
+async fn microphone_devices(State(context): State<WebContext>, headers: HeaderMap) -> Response {
+    if let Err(response) = require_session(&context, &headers) { return response; }
+    match audio::list_microphone_devices() {
+        Ok(devices) => Json(devices).into_response(),
+        Err(error) => api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    }
+}
+
 async fn command(
     State(context): State<WebContext>,
     headers: HeaderMap,
@@ -382,10 +402,13 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
     rename_all = "snake_case"
 )]
 pub enum WebCommand {
+    StartSession,
     ToggleListening,
     SetListening { enabled: bool },
     SelectListeningSource { source: CaptureSource },
+    ClearListeningSource,
     UpdateOutputDevice { device_id: Option<String> },
+    UpdateMicrophoneDevice { device_id: Option<String> },
     UpdateRescueScan { enabled: bool },
     ProbeRecentAudio,
     UpdateHotkeys { hotkeys: HotkeySettings },
@@ -401,6 +424,15 @@ pub enum WebCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn microphone_and_session_commands_round_trip_without_touching_ai_contracts() {
+        assert!(matches!(serde_json::from_value::<WebCommand>(json!({"command":"start_session"})).unwrap(), WebCommand::StartSession));
+        for id in [serde_json::Value::Null, json!("usb-mic")] {
+            let command = serde_json::from_value::<WebCommand>(json!({"command":"update_microphone_device","args":{"device_id":id}})).unwrap();
+            match command { WebCommand::UpdateMicrophoneDevice { device_id } => assert_eq!(serde_json::to_value(device_id).unwrap(), id), _ => panic!("wrong command") }
+        }
+    }
 
     #[test]
     fn host_parser_only_recognizes_loopback_values() {

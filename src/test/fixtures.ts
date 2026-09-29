@@ -3,7 +3,7 @@ import type { AppSnapshot } from "../types";
 export function snapshotFixture(now = Date.now()): AppSnapshot {
   return {
     settings: {
-      schemaVersion: 14,
+      schemaVersion: 16,
       listeningSource: {
         executablePath: "C:\\Games\\MistfallHunter-Win64-Shipping.exe",
         executableName: "MistfallHunter-Win64-Shipping.exe",
@@ -22,8 +22,14 @@ export function snapshotFixture(now = Date.now()): AppSnapshot {
       },
       overlay: {
         opacity: 0.94,
+        bubbleOpacity: 1,
+        textOpacity: 1,
         fontScale: 1,
-        fadeSeconds: 8,
+        incomingTranslationScale: 1,
+        incomingOriginalScale: 1,
+        outgoingTranslationScale: 1,
+        outgoingOriginalScale: 1,
+        fadeSeconds: 30,
         maxItems: 4,
         width: 420,
         height: 236,
@@ -46,7 +52,7 @@ export function snapshotFixture(now = Date.now()): AppSnapshot {
       workerModel: "silero-vad",
       aiSttBusy: false,
       aiStatus: "บริการ AI พร้อมใช้งาน",
-      aiService: { state: "ready", message: "บริการ AI พร้อมใช้งาน", incomingModel: "whisper-large-v3", microphoneModel: "whisper-large-v3-turbo", translationModel: "server-configured-model", retryAfterMs: null },
+      aiService: { state: "ready", message: "บริการ AI พร้อมใช้งาน", incomingModel: "whisper-large-v3-turbo", microphoneModel: "whisper-large-v3-turbo", translationModel: "server-configured-model", retryAfterMs: null },
       attachedSource: {
         pid: 4242,
         name: "MistfallHunter-Win64-Shipping.exe",

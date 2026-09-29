@@ -20,7 +20,7 @@ use crate::{
 
 pub struct AppState {
     pub lifecycle: crate::lifecycle::Lifecycle,
-    pub overlay_collapsed: AtomicBool,
+    pub hotkey_capture_active: AtomicBool,
     pub settings: SettingsManager,
     pub runtime: RwLock<RuntimeState>,
     pub history: RwLock<VecDeque<SubtitleItem>>,
@@ -44,7 +44,7 @@ impl AppState {
         runtime.effective_vad_gain_db = active_profile.gain_db;
         Ok(Self {
             lifecycle: crate::lifecycle::Lifecycle::default(),
-            overlay_collapsed: AtomicBool::new(true),
+            hotkey_capture_active: AtomicBool::new(false),
             settings,
             runtime: RwLock::new(runtime),
             history: RwLock::new(VecDeque::with_capacity(100)),

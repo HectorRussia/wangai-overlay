@@ -24,7 +24,7 @@ export function parseHashRoute(hash: string): AppRoute {
     return {
       view: "settings",
       tab: "advanced",
-      advancedSection: advancedSections.includes(section as AdvancedSection)
+      advancedSection: section === undefined ? undefined : advancedSections.includes(section as AdvancedSection)
         ? section as AdvancedSection
         : "audio",
     };
