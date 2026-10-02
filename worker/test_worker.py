@@ -6,13 +6,15 @@ import unittest
 
 import numpy as np
 
-from worker import main
+from worker.wangai_worker import protocol
+from worker.wangai_worker.session import StreamSession, VAD_FRAME_SAMPLES
+from worker.wangai_worker.vad import EnergyVad, SileroVad
 
 
 class ProtocolTests(unittest.TestCase):
     def test_emitted_events_match_shared_rust_contract_fixture(self):
         events = []
-        session = main.StreamSession("incoming", 12_000, main.EnergyVad(500), events.append)
+        session = StreamSession("incoming", 12_000, EnergyVad(500), events.append)
         session.ingest(np.full(1024, 0.05, dtype=np.float32), 0)
         session.finalize()
         session.reset()
@@ -40,10 +42,10 @@ class ProtocolTests(unittest.TestCase):
             def reset_states(self):
                 pass
 
-        vad = main.SileroVad(
+        vad = SileroVad(
             FakeModel(), threshold=0.2, silence_ms=500, adaptive_floor=0.05
         )
-        frame = np.zeros(main.VAD_FRAME_SAMPLES, dtype=np.float32)
+        frame = np.zeros(VAD_FRAME_SAMPLES, dtype=np.float32)
 
         self.assertIsNone(vad.process(frame))
         self.assertIsNone(vad.process(frame))
@@ -51,16 +53,16 @@ class ProtocolTests(unittest.TestCase):
 
     def test_audio_frame(self):
         samples = np.array([0.0, 0.5, -0.5], dtype="<f4")
-        body = struct.pack("<BBHQ", main.KIND_AUDIO, main.STREAM_INCOMING, 0, 640) + samples.tobytes()
-        frame = main.read_frame(io.BytesIO(struct.pack("<I", len(body)) + body))
-        self.assertEqual(frame.kind, main.KIND_AUDIO)
-        self.assertEqual(frame.stream, main.STREAM_INCOMING)
+        body = struct.pack("<BBHQ", protocol.KIND_AUDIO, protocol.STREAM_INCOMING, 0, 640) + samples.tobytes()
+        frame = protocol.read_frame(io.BytesIO(struct.pack("<I", len(body)) + body))
+        self.assertEqual(frame.kind, protocol.KIND_AUDIO)
+        self.assertEqual(frame.stream, protocol.STREAM_INCOMING)
         self.assertEqual(frame.start_sample_cursor, 640)
         np.testing.assert_allclose(frame.samples, samples)
 
     def test_rejects_large_frame(self):
         with self.assertRaises(ValueError):
-            main.read_frame(io.BytesIO(struct.pack("<I", 999_999_999)))
+            protocol.read_frame(io.BytesIO(struct.pack("<I", 999_999_999)))
 
     def test_vad_boundaries_emit_start_and_end(self):
         class FakeVad:
@@ -79,11 +81,11 @@ class ProtocolTests(unittest.TestCase):
                 pass
 
         events = []
-        session = main.StreamSession(
+        session = StreamSession(
             "incoming", 12_000, FakeVad(), events.append
         )
         session.ingest(
-            np.ones(main.VAD_FRAME_SAMPLES * 8, dtype=np.float32) * 0.05,
+            np.ones(VAD_FRAME_SAMPLES * 8, dtype=np.float32) * 0.05,
             0,
         )
         self.assertEqual(
@@ -94,38 +96,38 @@ class ProtocolTests(unittest.TestCase):
                     "stream": "incoming",
                     "active": True,
                     "utteranceId": 1,
-                    "sampleCursor": main.VAD_FRAME_SAMPLES,
+                    "sampleCursor": VAD_FRAME_SAMPLES,
                 },
                 {
                     "type": "speech_state",
                     "stream": "incoming",
                     "active": False,
                     "utteranceId": 1,
-                    "sampleCursor": main.VAD_FRAME_SAMPLES * 8,
+                    "sampleCursor": VAD_FRAME_SAMPLES * 8,
                 },
             ],
         )
 
     def test_finalize_ends_active_push_to_talk(self):
         events = []
-        vad = main.EnergyVad(500)
-        session = main.StreamSession("microphone", 12_000, vad, events.append)
-        session.ingest(np.ones(main.VAD_FRAME_SAMPLES, dtype=np.float32) * 0.05, 0)
+        vad = EnergyVad(500)
+        session = StreamSession("microphone", 12_000, vad, events.append)
+        session.ingest(np.ones(VAD_FRAME_SAMPLES, dtype=np.float32) * 0.05, 0)
         session.finalize()
         self.assertEqual([event["active"] for event in events], [True, False])
 
     def test_audio_gap_cancels_current_utterance(self):
         events = []
-        session = main.StreamSession("incoming", 12_000, main.EnergyVad(500), events.append)
-        speech = np.ones(main.VAD_FRAME_SAMPLES, dtype=np.float32) * 0.05
+        session = StreamSession("incoming", 12_000, EnergyVad(500), events.append)
+        speech = np.ones(VAD_FRAME_SAMPLES, dtype=np.float32) * 0.05
         session.ingest(speech, 0)
-        session.ingest(speech, main.VAD_FRAME_SAMPLES * 2)
+        session.ingest(speech, VAD_FRAME_SAMPLES * 2)
 
         self.assertEqual(events[0]["type"], "speech_state")
         self.assertTrue(events[0]["active"])
         self.assertEqual(events[1]["type"], "audio_gap")
-        self.assertEqual(events[1]["expectedSampleCursor"], main.VAD_FRAME_SAMPLES)
-        self.assertEqual(events[1]["actualSampleCursor"], main.VAD_FRAME_SAMPLES * 2)
+        self.assertEqual(events[1]["expectedSampleCursor"], VAD_FRAME_SAMPLES)
+        self.assertEqual(events[1]["actualSampleCursor"], VAD_FRAME_SAMPLES * 2)
         self.assertEqual(events[2]["type"], "speech_state")
         self.assertTrue(events[2]["active"])
 
@@ -144,33 +146,34 @@ class ProtocolTests(unittest.TestCase):
                 self.started = False
 
         events = []
-        session = main.StreamSession(
+        session = StreamSession(
             "incoming",
-            int(main.VAD_FRAME_SAMPLES * 2 * 1_000 / main.SAMPLE_RATE),
+            int(VAD_FRAME_SAMPLES * 2 * 1_000 / protocol.SAMPLE_RATE),
             AlwaysSpeechVad(),
             events.append,
         )
-        session.ingest(np.ones(main.VAD_FRAME_SAMPLES * 4, dtype=np.float32), 0)
+        session.ingest(np.ones(VAD_FRAME_SAMPLES * 4, dtype=np.float32), 0)
 
         states = [(event["active"], event["sampleCursor"]) for event in events]
         self.assertEqual(
             states,
             [
-                (True, main.VAD_FRAME_SAMPLES),
-                (False, main.VAD_FRAME_SAMPLES * 2),
-                (True, main.VAD_FRAME_SAMPLES * 2),
-                (False, main.VAD_FRAME_SAMPLES * 4),
-                (True, main.VAD_FRAME_SAMPLES * 4),
+                (True, VAD_FRAME_SAMPLES),
+                (False, VAD_FRAME_SAMPLES * 2),
+                (True, VAD_FRAME_SAMPLES * 2),
+                (False, VAD_FRAME_SAMPLES * 4),
+                (True, VAD_FRAME_SAMPLES * 4),
             ],
         )
 
     def test_only_incoming_and_microphone_stream_ids_remain(self):
-        self.assertEqual(main.STREAM_INCOMING, 1)
-        self.assertEqual(main.STREAM_MICROPHONE, 2)
+        self.assertEqual(protocol.STREAM_INCOMING, 1)
+        self.assertEqual(protocol.STREAM_MICROPHONE, 2)
 
     def test_worker_source_has_no_local_stt_or_cuda(self):
-        with open(main.__file__, encoding="utf-8") as source:
-            code = source.read().lower()
+        root = Path(__file__).parent
+        modules = [root / "main.py", *(root / "wangai_worker").glob("*.py")]
+        code = "\n".join(module.read_text(encoding="utf-8") for module in modules).lower()
         self.assertNotIn("faster" + "_whisper", code)
         self.assertNotIn("cuda", code)
         self.assertNotIn("langchain", code)

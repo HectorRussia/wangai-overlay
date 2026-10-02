@@ -7,7 +7,7 @@ datas = collect_data_files('silero_vad')
 for name in ('silero-vad', 'torch', 'torchaudio', 'onnxruntime', 'numpy'):
     datas += copy_metadata(name)
 a = Analysis([str(root / 'worker/main.py')], pathex=[str(root / 'worker')], datas=datas,
-             hiddenimports=['silero_vad', 'onnxruntime', 'torchaudio'],
+             hiddenimports=['wangai_worker.runtime', 'silero_vad', 'onnxruntime', 'torchaudio'],
              excludes=['faster_whisper', 'ctranslate2', 'transformers', 'IPython',
                        'matplotlib', 'pytest', 'tensorboard', 'tkinter'])
 pyz = PYZ(a.pure)
