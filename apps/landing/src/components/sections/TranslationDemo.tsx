@@ -31,13 +31,13 @@ const steps = [
     quote: "อยู่ด้วยกันไว้ เดี๋ยวฉันคุ้มกันให้",
   },
   {
-    title: "พูดไทย",
+    title: "พูดสิ่งที่อยากตอบ",
     detail: "พูดสิ่งที่อยากตอบผ่านไมโครโฟนของคุณ",
     quote: "โอเค ฉันจะตามไป",
   },
   {
-    title: "แปลเป็นข้อความ",
-    detail: "ว่าไงเตรียมข้อความอังกฤษจากสิ่งที่คุณพูด",
+    title: "ดูคำตอบอังกฤษ",
+    detail: "ดูว่าสิ่งที่คุณอยากบอก ตอบเป็นอังกฤษว่าอะไร",
     quote: "Okay, I'll follow you.",
   },
   {
@@ -122,9 +122,9 @@ export function TranslationDemo() {
           ฟังเพื่อนพูด
         </button>
         <ArrowRight size={16} aria-hidden="true" />
-        <button aria-pressed={replying} onClick={() => selectStep(3)}>
+        <button aria-pressed={replying} onClick={() => selectStep(4)}>
           <Mic size={17} />
-          เราพูดตอบ
+          พูดไทย ดูคำตอบอังกฤษ
         </button>
       </div>
       <div className={`flow-scene scene-${scene.id}`}>
@@ -170,9 +170,23 @@ export function TranslationDemo() {
           onCopy={copy}
         />
       </div>
-      <p className="flow-explanation" aria-live="polite" aria-atomic="true">
-        {current.detail}
-      </p>
+      {replying && step >= 4 ? (
+        <div className="reply-answer" aria-live="polite">
+          <div>
+            <span>คุณอยากบอกว่า</span>
+            <p>{scene.replyThai}</p>
+          </div>
+          <ArrowRight size={20} aria-hidden="true" />
+          <div>
+            <span>ตอบเป็นอังกฤษว่า</span>
+            <p lang="en">{scene.replyEnglish}</p>
+          </div>
+        </div>
+      ) : (
+        <p className="flow-explanation" aria-live="polite" aria-atomic="true">
+          {current.detail}
+        </p>
+      )}
       <ol
         className="flow-steps"
         aria-label={replying ? "ขั้นตอนตอบกลับ" : "ขั้นตอนฟังคำแปล"}

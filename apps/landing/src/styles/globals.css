@@ -2066,3 +2066,48 @@ h2 {
     font-size: 1.18em;
   }
 }
+
+.reply-answer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  margin: 24px auto 8px;
+  padding: 0 12px;
+}
+.reply-answer > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.reply-answer span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.reply-answer p {
+  margin-top: 6px;
+  font-size: 20px;
+  color: var(--brand-cream);
+}
+.reply-answer > div:last-child p {
+  color: var(--accent);
+}
+@media (max-width: 600px) {
+  .reply-answer {
+    gap: 12px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .reply-answer > svg {
+    transform: rotate(90deg);
+  }
+  .reply-answer p {
+    font-size: 18px;
+  }
+  .flow-modes {
+    gap: 10px;
+  }
+  .flow-modes button {
+    font-size: 12px;
+    gap: 6px;
+  }
+}

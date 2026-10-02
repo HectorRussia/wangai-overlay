@@ -154,17 +154,12 @@ export default function Home() {
               <span>02</span> พูดแล้วตอบ
             </p>
             <h2 id="reply-title">
-              คิดเป็นไทย
+              อยากตอบอะไร
               <br />
-              <span className="accent">ตอบเป็นอังกฤษ</span>
+              <span className="accent">ลองพูดเป็นไทย</span>
             </h2>
-            <p>
-              พูดสิ่งที่อยากบอกเป็นภาษาไทย
-              แล้วรับข้อความอังกฤษสำหรับคัดลอกไปวางในแชตด้วยตัวเอง
-            </p>
-            <p className="story-note">
-              คุณเป็นคนส่งข้อความ ว่าไงช่วยเตรียมคำแปล
-            </p>
+            <p>ว่าไงช่วยให้รู้ว่าประโยคที่อยากตอบ พูดเป็นอังกฤษว่าอะไร</p>
+            <p className="story-note">อ่านคำแปลก่อน แล้วคัดลอกไปตอบในแชต</p>
             <a className="text-link" href="#demo">
               ดูตัวอย่างการแปล <ArrowUpRight size={17} aria-hidden="true" />
             </a>
