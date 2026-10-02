@@ -2088,6 +2088,67 @@ h2 {
   font-size: 13px !important;
   color: var(--muted) !important;
 }
+
+/* Keep the demo explanation and step controls on one shared surface. */
+.flow-panel {
+  margin-top: 16px;
+  padding: 22px;
+  border-radius: 18px;
+  background: #111b18;
+}
+.flow-panel .flow-explanation {
+  margin: 0 0 18px;
+  min-height: 27px;
+}
+.flow-panel .reply-answer {
+  margin: 0 auto 20px;
+}
+.flow-panel .flow-steps {
+  gap: 8px;
+}
+.flow-panel .flow-steps button {
+  padding: 14px 16px;
+  border-radius: 12px;
+  transition: background 180ms ease, color 180ms ease;
+}
+.flow-panel .flow-steps button:hover {
+  background: #1a2923;
+  color: var(--brand-cream);
+}
+.flow-panel .flow-steps button[aria-current="step"] {
+  background: #244438;
+  color: var(--accent);
+}
+.flow-panel .flow-number {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #203029;
+}
+.flow-panel button[aria-current="step"] .flow-number {
+  color: #09241a;
+  background: var(--accent);
+}
+@media (max-width: 600px) {
+  .flow-panel {
+    padding: 16px 10px;
+    border-radius: 14px;
+  }
+  .flow-panel .flow-steps {
+    gap: 4px;
+  }
+  .flow-panel .flow-steps button {
+    padding: 12px 8px;
+    gap: 8px;
+  }
+  .flow-panel .flow-explanation {
+    min-height: 50px;
+    margin-bottom: 12px;
+  }
+}
 @media (max-width: 600px) {
   .reply-use-note {
     text-align: left;

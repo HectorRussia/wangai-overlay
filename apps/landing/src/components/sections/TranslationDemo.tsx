@@ -165,52 +165,54 @@ export function TranslationDemo() {
           onCopy={copy}
         />
       </div>
-      {replying && step >= 4 ? (
-        <div className="reply-answer" aria-live="polite">
-          <div>
-            <span>คุณอยากบอกว่า</span>
-            <p>{scene.replyThai}</p>
+      <div className="flow-panel">
+        {replying && step >= 4 ? (
+          <div className="reply-answer" aria-live="polite">
+            <div>
+              <span>คุณอยากบอกว่า</span>
+              <p>{scene.replyThai}</p>
+            </div>
+            <ArrowRight size={20} aria-hidden="true" />
+            <div>
+              <span>ตอบเป็นอังกฤษว่า</span>
+              <p lang="en">{scene.replyEnglish}</p>
+            </div>
+            <p className="reply-use-note">
+              อ่านแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต
+            </p>
           </div>
-          <ArrowRight size={20} aria-hidden="true" />
-          <div>
-            <span>ตอบเป็นอังกฤษว่า</span>
-            <p lang="en">{scene.replyEnglish}</p>
-          </div>
-          <p className="reply-use-note">
-            อ่านแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต
+        ) : (
+          <p className="flow-explanation" aria-live="polite" aria-atomic="true">
+            {current.detail}
           </p>
-        </div>
-      ) : (
-        <p className="flow-explanation" aria-live="polite" aria-atomic="true">
-          {current.detail}
+        )}
+        <ol
+          className="flow-steps"
+          aria-label={replying ? "ขั้นตอนตอบกลับ" : "ขั้นตอนฟังคำแปล"}
+        >
+          {steps.slice(replying ? 3 : 0, replying ? 6 : 3).map((item, i) => {
+            const index = i + (replying ? 3 : 0);
+            return (
+              <li key={index}>
+                <button
+                  aria-current={step === index ? "step" : undefined}
+                  onClick={() => selectStep(index)}
+                >
+                  <span className="flow-number">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span>{item.title}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="flow-feedback" role="status">
+          {copied === "error"
+            ? "คัดลอกไม่สำเร็จ เลือกข้อความอังกฤษด้านบนเพื่อคัดลอกได้"
+            : ""}
         </p>
-      )}
-      <ol
-        className="flow-steps"
-        aria-label={replying ? "ขั้นตอนตอบกลับ" : "ขั้นตอนฟังคำแปล"}
-      >
-        {steps.slice(replying ? 3 : 0, replying ? 6 : 3).map((item, i) => {
-          const index = i + (replying ? 3 : 0);
-          return (
-            <li key={index}>
-              <button
-                aria-current={step === index ? "step" : undefined}
-                onClick={() => selectStep(index)}
-              >
-                <span className="flow-number">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span>{item.title}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-      <p className="flow-feedback" role="status">
-        {copied === "error"
-          ? "คัดลอกไม่สำเร็จ เลือกข้อความอังกฤษด้านบนเพื่อคัดลอกได้"
-          : ""}
-      </p>
+      </div>
       <p className="demo-caption">
         หน้าตา overlay อิงจากโปรแกรมจริง · ฉากเกมและบทสนทนาเป็นตัวอย่างประกอบ
       </p>
