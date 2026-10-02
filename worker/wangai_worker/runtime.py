@@ -1,4 +1,5 @@
 """Worker lifecycle and CLI; all model loading remains inside run()."""
+
 from __future__ import annotations
 import argparse
 import io
@@ -6,11 +7,20 @@ import queue
 import struct
 import numpy as np
 from .protocol import (
-    KIND_AUDIO, KIND_FINALIZE, KIND_RESET, KIND_SHUTDOWN, STREAM_INCOMING,
-    Frame, FrameReader, emit, read_exact, read_frame,
+    KIND_AUDIO,
+    KIND_FINALIZE,
+    KIND_RESET,
+    KIND_SHUTDOWN,
+    STREAM_INCOMING,
+    Frame,
+    FrameReader,
+    emit,
+    read_exact,
+    read_frame,
 )
 from .session import StreamSession, VAD_FRAME_SAMPLES
 from .vad import EnergyVad, SileroVad
+
 
 def run(args) -> int:
     try:
@@ -60,7 +70,10 @@ def run(args) -> int:
 
 
 def self_test() -> int:
-    payload = struct.pack("<BBHQ", KIND_AUDIO, STREAM_INCOMING, 0, 123) + np.zeros(320, dtype="<f4").tobytes()
+    payload = (
+        struct.pack("<BBHQ", KIND_AUDIO, STREAM_INCOMING, 0, 123)
+        + np.zeros(320, dtype="<f4").tobytes()
+    )
     frame = read_frame(io.BytesIO(struct.pack("<I", len(payload)) + payload))
     assert frame is not None and frame.kind == KIND_AUDIO
     assert frame.start_sample_cursor == 123 and frame.samples.shape == (320,)
@@ -79,5 +92,3 @@ def parse_args():
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--model-self-check", action="store_true")
     return parser.parse_args()
-
-

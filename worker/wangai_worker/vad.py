@@ -1,8 +1,10 @@
 """Silero detection and deterministic developer/test VAD."""
+
 from __future__ import annotations
 import math
 import numpy as np
 from .protocol import SAMPLE_RATE
+
 
 class SileroVad:
     def __init__(
@@ -36,9 +38,7 @@ class SileroVad:
     def process(self, samples: np.ndarray) -> dict | None:
         import torch
 
-        probability = float(
-            self.model(torch.from_numpy(samples), SAMPLE_RATE).item()
-        )
+        probability = float(self.model(torch.from_numpy(samples), SAMPLE_RATE).item())
         strong_speech = probability >= self.threshold
         if probability >= self.adaptive_floor:
             self.weak_speech_frames += 1
@@ -89,5 +89,3 @@ class EnergyVad:
                 self.silent_samples = 0
                 return {"end": 0}
         return None
-
-

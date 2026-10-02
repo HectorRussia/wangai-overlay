@@ -1,4 +1,5 @@
 """Binary stdin frames and JSONL stdout events shared with the Rust decoder."""
+
 from __future__ import annotations
 import json
 import queue
@@ -18,7 +19,9 @@ SAMPLE_RATE = 16_000
 
 
 def emit(event: dict) -> None:
-    sys.stdout.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
+    sys.stdout.write(
+        json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
+    )
     sys.stdout.flush()
 
 
@@ -77,5 +80,3 @@ class FrameReader(threading.Thread):
         except Exception as exc:
             emit({"type": "error", "message": f"อ่าน audio frame ไม่สำเร็จ: {exc}"})
             self.output.put(None)
-
-

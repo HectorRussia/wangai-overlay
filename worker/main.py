@@ -1,4 +1,5 @@
 """Stable source/PyInstaller entrypoint for the local VAD worker."""
+
 import sys
 
 if hasattr(sys.stdout, "reconfigure"):

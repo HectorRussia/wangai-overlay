@@ -1,10 +1,12 @@
 """Per-stream cursor tracking, speech boundaries and phrase splitting."""
+
 from __future__ import annotations
 from typing import Callable
 import numpy as np
 from .protocol import SAMPLE_RATE, emit
 
 VAD_FRAME_SAMPLES = 512
+
 
 class StreamSession:
     def __init__(
@@ -29,7 +31,10 @@ class StreamSession:
     def ingest(self, samples: np.ndarray, start_sample_cursor: int) -> None:
         if samples.size == 0:
             return
-        if self.expected_cursor is not None and start_sample_cursor != self.expected_cursor:
+        if (
+            self.expected_cursor is not None
+            and start_sample_cursor != self.expected_cursor
+        ):
             self.emit_event(
                 {
                     "type": "audio_gap",
@@ -65,7 +70,9 @@ class StreamSession:
 
     def finalize(self) -> None:
         if self.speaking:
-            self._finish_speech(self.expected_cursor or self.pending_start_cursor, reset_vad=True)
+            self._finish_speech(
+                self.expected_cursor or self.pending_start_cursor, reset_vad=True
+            )
         else:
             self.reset()
 
@@ -110,5 +117,3 @@ class StreamSession:
                 "sampleCursor": sample_cursor,
             }
         )
-
-
