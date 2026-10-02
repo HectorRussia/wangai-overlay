@@ -6,7 +6,6 @@ import {
   Gamepad2,
   Headphones,
   MessageCircle,
-  Mic,
   Monitor,
   Plus,
 } from "lucide-react";
@@ -61,7 +60,7 @@ export default function Home() {
         >
           <div className="story-copy">
             <p className="eyebrow">
-              <span>01</span> เลือกแหล่งเสียง
+              เลือกแหล่งเสียง
             </p>
             <h2 id="listen-title">
               เลือกแอป
@@ -114,74 +113,6 @@ export default function Home() {
               <span>เริ่มฟังเสียง</span>
             </div>
           </div>
-        </section>
-        <section
-          className="feature-story reply-story section-wrap"
-          aria-labelledby="reply-title"
-        >
-          <div className="reply-visual">
-            <div className="visual-topline">
-              <Mic size={18} aria-hidden="true" />
-              <span>คำตอบของคุณ</span>
-              <span className="visual-tag">ตัวอย่าง</span>
-            </div>
-            <p className="reply-thai">“รอด้วย กำลังตามไป”</p>
-            <div className="reply-flow" aria-hidden="true">
-              <span />
-              TH <ArrowRight size={15} /> EN
-              <span />
-            </div>
-            <p className="reply-english" lang="en">
-              Wait for me.
-              <br />
-              I’m on my way.
-            </p>
-            <div className="reply-caption">
-              <span>ตอบเป็นอังกฤษว่าอะไร</span>
-              <span>อ่านแล้วพูดตามได้</span>
-            </div>
-          </div>
-          <div className="story-copy">
-            <p className="eyebrow">
-              <span>02</span> แปลคำตอบเป็นอังกฤษ
-            </p>
-            <h2 id="reply-title">
-              อยากตอบอะไร
-              <br />
-              <span className="accent">ลองพูดเป็นไทย</span>
-            </h2>
-            <p>พูดสิ่งที่อยากบอกเป็นไทย ว่าไงจะแปลเป็นประโยคอังกฤษให้ดู</p>
-            <p className="story-note">อ่านแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต</p>
-            <a className="text-link" href="#demo">
-              ดูตัวอย่างการแปล <ArrowUpRight size={17} aria-hidden="true" />
-            </a>
-          </div>
-        </section>
-        <section className="setup section-wrap" aria-labelledby="setup-title">
-          <div className="setup-heading">
-            <p className="eyebrow">เริ่มใช้งาน</p>
-            <h2 id="setup-title">ตั้งค่าก่อนเล่น</h2>
-            <a className="text-link" href={site.guide}>
-              อ่านคู่มือ <ArrowUpRight size={16} aria-hidden="true" />
-            </a>
-          </div>
-          <ol className="steps">
-            <li>
-              <span>01</span>
-              <h3>ดาวน์โหลดและตั้งค่า</h3>
-              <p>ติดตั้งว่าไงบน Windows แล้วตั้งค่าบริการแปลตามคู่มือ</p>
-            </li>
-            <li>
-              <span>02</span>
-              <h3>เลือกแอปที่จะฟัง</h3>
-              <p>เลือกเกมหรือแอปที่ใช้คุย แล้วเปิดการฟังเสียง</p>
-            </li>
-            <li>
-              <span>03</span>
-              <h3>เปิดหน้าต่างคำแปล</h3>
-              <p>ใช้เกมในโหมด Borderless หรือ Windowed เพื่ออ่านซับบนจอ</p>
-            </li>
-          </ol>
         </section>
         <section className="faq section-wrap" aria-labelledby="faq-title">
           <div>
