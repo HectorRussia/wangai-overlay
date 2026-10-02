@@ -1,201 +1,244 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   AudioLines,
   Check,
   Copy,
-  Gamepad2,
   Headphones,
-  MessageCircle,
   Mic,
+  Pause,
   Play,
+  RotateCcw,
 } from "lucide-react";
-import { scenarios } from "@/content/home";
 
-const icons = [Gamepad2, MessageCircle, Play];
+const steps = [
+  {
+    title: "รับเสียง",
+    detail: "เพื่อนพูดอังกฤษจากเกมหรือแอปที่คุณเลือก",
+    quote: "Stay together. I'll cover you.",
+    lang: "en",
+    label: "เสียงเพื่อนร่วมทีม",
+    icon: Headphones,
+  },
+  {
+    title: "ถอดเสียงและแปล",
+    detail: "เมื่อจบวลี AI ถอดเสียงเป็นข้อความ แล้วแปลเป็นไทย",
+    quote: "Stay together. I'll cover you.",
+    lang: "en",
+    label: "WANGAI กำลังแปลเป็นไทย",
+    icon: AudioLines,
+  },
+  {
+    title: "อ่านซับไทย",
+    detail: "คำแปลปรากฏบน overlay ระหว่างเล่นเกม",
+    quote: "อยู่ด้วยกันไว้ เดี๋ยวฉันคุ้มกันให้",
+    lang: "th",
+    label: "คำแปลบนหน้าจอ",
+    icon: Check,
+  },
+  {
+    title: "พูดไทย",
+    detail: "พูดสิ่งที่อยากตอบผ่านไมโครโฟนของคุณ",
+    quote: "โอเค ฉันจะตามไป",
+    lang: "th",
+    label: "เสียงของคุณ",
+    icon: Mic,
+  },
+  {
+    title: "แปลเป็นข้อความ",
+    detail: "ว่าไงเตรียมข้อความอังกฤษจากสิ่งที่คุณพูด",
+    quote: "Okay, I'll follow you.",
+    lang: "en",
+    label: "ข้อความอังกฤษพร้อมใช้",
+    icon: AudioLines,
+  },
+  {
+    title: "คัดลอกไปตอบ",
+    detail: "คุณคัดลอกคำแปล ไปวางและกดส่งในแชตเอง",
+    quote: "Okay, I'll follow you.",
+    lang: "en",
+    label: "พร้อมให้คุณนำไปวางในแชต",
+    icon: Copy,
+  },
+];
 
 export function TranslationDemo() {
-  const [selected, setSelected] = useState(0);
-  const [reply, setReply] = useState(false);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
-    "idle",
-  );
-  const example = scenarios[selected];
+  const [step, setStep] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [copied, setCopied] = useState<"idle" | "done" | "error">("idle");
+  const current = steps[step];
+  const replying = step >= 3;
+  const Icon = current.icon;
 
-  async function copyReply() {
+  useEffect(() => {
+    if (!playing) return;
+    const timer = window.setTimeout(() => {
+      if (step === steps.length - 1) setPlaying(false);
+      else setStep(step + 1);
+    }, 2600);
+    return () => window.clearTimeout(timer);
+  }, [step, playing]);
+
+  function selectStep(index: number) {
+    setStep(index);
+    setPlaying(false);
+    setCopied("idle");
+  }
+
+  async function copy() {
     try {
-      await navigator.clipboard.writeText(example.translatedReply);
-      setCopyState("copied");
+      await navigator.clipboard.writeText(steps[5].quote);
+      setCopied("done");
     } catch {
-      setCopyState("error");
+      setCopied("error");
     }
   }
 
   return (
-    <div
-      className="demo-section"
+    <section
+      className="demo-section flow-demo"
       id="demo"
-      role="region"
-      aria-label="ตัวอย่างการแปลด้วยข้อความจำลอง"
+      aria-label="ตัวอย่างลำดับการแปลเสียงและตอบกลับ"
     >
-      <div className="demo-toolbar">
-        <span className="demo-label">
-          <AudioLines size={17} aria-hidden="true" /> ดูว่าไงทำงาน
-        </span>
-        <div
-          className="scenario-picker"
-          role="group"
-          aria-label="เลือกสถานการณ์"
-        >
-          {scenarios.map((scenario, index) => {
-            const Icon = icons[index];
-            return (
-              <button
-                key={scenario.id}
-                aria-pressed={selected === index}
-                onClick={() => {
-                  setSelected(index);
-                  setReply(false);
-                  setCopyState("idle");
-                }}
-              >
-                <Icon size={15} aria-hidden="true" />
-                {scenario.label}
-              </button>
-            );
-          })}
+      <div className="flow-header">
+        <div>
+          <p className="eyebrow">WANGAI ทำงานอย่างไร</p>
+          <h2>
+            จากเสียงที่ได้ยิน
+            <br className="flow-mobile-break" /> สู่บทสนทนาที่เข้าใจ
+          </h2>
         </div>
+        <button
+          className="flow-play"
+          onClick={() => {
+            if (step === 5 && !playing) {
+              setStep(0);
+              setCopied("idle");
+            }
+            setPlaying(!playing);
+          }}
+        >
+          {playing ? (
+            <Pause size={17} />
+          ) : step === 5 ? (
+            <RotateCcw size={17} />
+          ) : (
+            <Play size={17} />
+          )}
+          {playing ? "หยุดชั่วคราว" : step === 5 ? "ดูอีกครั้ง" : "เล่นให้ดู"}
+        </button>
       </div>
-      <div className={`demo-stage ${reply ? "is-reply" : ""}`}>
+      <div className="flow-modes" role="group" aria-label="เลือกฝั่งการสนทนา">
+        <button aria-pressed={!replying} onClick={() => selectStep(0)}>
+          <Headphones size={17} />
+          ฟังเพื่อนพูด
+        </button>
+        <ArrowRight size={16} aria-hidden="true" />
+        <button aria-pressed={replying} onClick={() => selectStep(3)}>
+          <Mic size={17} />
+          เราพูดตอบ
+        </button>
+      </div>
+      <div className="flow-scene">
         <Image
-          className="game-scene"
           src="/images/wangai-game-scene.webp"
-          alt="ฉากเกมจำลอง นักสำรวจในโรงเก็บยานมืดที่เปิดออกสู่ภูเขา"
+          alt=""
           fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1400px) 90vw, 1240px"
+          sizes="(max-width: 768px) 100vw, 1200px"
+          className="game-scene"
           preload
         />
-        <div className="scene-shade" />
-        <div className="stage-topline">
-          <span>
-            <span className="status-dot" /> WANGAI OVERLAY
-          </span>
-          <span>ภาพประกอบการใช้งาน</span>
-        </div>
-        <div
-          className="demo-content"
-          aria-live="polite"
-          aria-atomic="true"
-          key={`${example.id}-${reply}`}
-        >
-          <div className="source-voice">
-            <span className="voice-avatar">
-              {reply ? (
-                <Mic size={20} aria-hidden="true" />
-              ) : (
-                <Headphones size={20} aria-hidden="true" />
-              )}
-            </span>
-            <div>
-              <p className="micro-label">
-                {reply ? "เสียงของคุณ · ภาษาไทย" : example.person}
-              </p>
-              <p className="source-quote" lang={reply ? "th" : "en"}>
-                {reply ? example.reply : example.english}
-              </p>
-            </div>
-            <div className="waveform" aria-hidden="true">
-              {Array.from({ length: 11 }, (_, i) => (
-                <i
-                  key={i}
-                  style={{
-                    height: `${9 + ((i * 13 + 7) % 22)}px`,
-                    animationDelay: `${i * 60}ms`,
-                  }}
-                />
-              ))}
-            </div>
+        <div className="flow-scrim" />
+        <span className="flow-scene-label">
+          {replying ? "คุณ → ข้อความตอบกลับ" : "เพื่อนร่วมทีม → ซับไทยบนจอ"}
+        </span>
+        <div className="flow-message" key={step}>
+          <div className="flow-message-label">
+            <Icon size={20} aria-hidden="true" />
+            {current.label}
           </div>
-          <div className="overlay-preview">
-            <div className="overlay-top">
-              <span>
-                <AudioLines size={16} aria-hidden="true" /> ว่าไง
-              </span>
-              <span>
-                {reply ? "ไทย" : "อังกฤษ"}{" "}
-                <ArrowRight size={12} aria-hidden="true" />{" "}
-                {reply ? "อังกฤษ" : "ไทย"}
-              </span>
+          <div
+            className={`flow-wave ${step === 0 || step === 3 ? "has-voice" : ""} ${playing && (step === 0 || step === 3) ? "is-speaking" : ""}`}
+            aria-hidden="true"
+          >
+            {Array.from({ length: 19 }, (_, i) => (
+              <i
+                key={i}
+                style={{
+                  height: `${8 + ((i * 17) % 28)}px`,
+                  animationDelay: `${i * 55}ms`,
+                }}
+              />
+            ))}
+          </div>
+          <p className="flow-quote" lang={current.lang}>
+            {current.quote}
+          </p>
+          {step === 1 && (
+            <div
+              className={`flow-processing ${playing ? "is-processing" : ""}`}
+              aria-hidden="true"
+            >
+              <span />
+              <span />
+              <span />
             </div>
-            <p className="translated-quote" lang={reply ? "en" : "th"}>
-              {reply ? example.translatedReply : example.thai}
+          )}
+          {step === 2 && (
+            <p className="flow-original" lang="en">
+              Stay together. I’ll cover you.
             </p>
-            <div className="overlay-bottom">
-              <span>
-                <span className="status-dot" />{" "}
-                {reply ? "ข้อความอังกฤษสำหรับตอบกลับ" : "แสดงคำแปลเมื่อจบวลี"}
-              </span>
-              {reply && (
-                <button onClick={copyReply}>
-                  {copyState === "copied" ? (
-                    <Check size={14} aria-hidden="true" />
-                  ) : (
-                    <Copy size={14} aria-hidden="true" />
-                  )}
-                  {copyState === "copied" ? "คัดลอกแล้ว" : "คัดลอกตัวอย่าง"}
-                </button>
-              )}
-            </div>
-            {copyState === "error" && reply && (
-              <p className="copy-error" role="status">
-                คัดลอกไม่สำเร็จ เลือกข้อความด้านบนเพื่อคัดลอกได้
-              </p>
-            )}
-          </div>
+          )}
+          {step === 5 && (
+            <button className="flow-copy" onClick={copy}>
+              {copied === "done" ? <Check size={16} /> : <Copy size={16} />}
+              {copied === "done" ? "คัดลอกแล้ว" : "คัดลอกตัวอย่าง"}
+            </button>
+          )}
         </div>
-        <div className="stage-bottomline">
-          <span>
-            {reply
-              ? "คัดลอกข้อความ แล้ววางในแชตด้วยตัวเอง"
-              : "อ่านคำแปลบนจอ ระหว่างที่เล่นเกม"}
-          </span>
-          <span>{example.source}</span>
-        </div>
-      </div>
-      <div className="demo-controls">
-        <p>
-          ลองสลับดูทั้งสองฝั่ง <ArrowRight size={15} aria-hidden="true" />
+        <p className="flow-explanation" aria-live="polite" aria-atomic="true">
+          {current.detail}
         </p>
-        <div role="group" aria-label="โหมดตัวอย่างการแปล">
-          <button
-            aria-pressed={!reply}
-            onClick={() => {
-              setReply(false);
-              setCopyState("idle");
-            }}
-          >
-            <Headphones size={16} aria-hidden="true" />
-            ฟังอังกฤษ → อ่านไทย
-          </button>
-          <button
-            aria-pressed={reply}
-            onClick={() => {
-              setReply(true);
-              setCopyState("idle");
-            }}
-          >
-            <Mic size={16} aria-hidden="true" />
-            พูดไทย → ข้อความอังกฤษ
-          </button>
-        </div>
       </div>
-      <p className="demo-caption">
-        ตัวอย่างด้วยข้อความจำลอง · ภาพเกมประกอบ
-        ไม่ได้บันทึกเสียงจากเบราว์เซอร์ของคุณ
+      <ol
+        className="flow-steps"
+        aria-label={replying ? "ขั้นตอนตอบกลับ" : "ขั้นตอนฟังคำแปล"}
+      >
+        {steps.slice(replying ? 3 : 0, replying ? 6 : 3).map((item, i) => {
+          const index = i + (replying ? 3 : 0);
+          return (
+            <li key={index}>
+              <button
+                aria-current={step === index ? "step" : undefined}
+                onClick={() => selectStep(index)}
+              >
+                <span className="flow-number">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span>{item.title}</span>
+                <span className="flow-track" aria-hidden="true">
+                  <i
+                    className={
+                      step === index && playing ? "is-progressing" : ""
+                    }
+                  />
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="flow-feedback" role="status">
+        {copied === "error"
+          ? "คัดลอกไม่สำเร็จ เลือกข้อความอังกฤษด้านบนเพื่อคัดลอกได้"
+          : ""}
       </p>
-    </div>
+      <p className="demo-caption">
+        ตัวอย่างจำลอง · ไม่เปิดไมโครโฟน · คำตอบเป็นข้อความสำหรับนำไปส่งเอง
+      </p>
+    </section>
   );
 }

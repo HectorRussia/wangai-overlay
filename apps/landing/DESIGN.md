@@ -15,7 +15,7 @@ Research and main page rework delegated to GPT Astra as requested. Runtime and r
 
 ## Visual thesis
 
-Graphite-black canvas, readable off-white Thai typography, lime accent, and a cinematic co-op game scene with real HTML subtitle UI. Noto Sans Thai is a local variable font (weight 100–900); strong hierarchy comes from scale and spacing, not thick display type everywhere.
+Graphite-black canvas, readable off-white Thai typography, mint/cyan accent from the original WANGAI logo, and a cinematic co-op game scene with real HTML subtitle UI. Noto Sans Thai is a local variable font (weight 100–900); strong hierarchy comes from scale and spacing, not thick display type everywhere.
 
 ## Content plan
 
@@ -28,3 +28,7 @@ Generated with the built-in image generation tool for this project. Not a screen
 Final generation prompt:
 
 > Use case: stylized-concept. Asset: cinematic background for an interactive product demonstration on Wangai, a speech-translation overlay for PC gamers. Create an original generic cooperative sci-fi video-game environment, landscape 16:9, 1536x864 or similar. A vast weathered industrial hangar/corridor at blue hour, deep graphite slate and muted teal, wet dark metallic floor, distant white daylight through a monumental doorway, two small distant human explorers seen from behind near the right third moving toward the light, restrained atmospheric haze and realistic premium game-engine lighting, subtle warm utility lamps as tiny highlights. Composition wide cinematic establishing shot with broad dark uncluttered center and lower area where real HTML subtitle UI will later be placed. Interesting architectural depth across the upper half, very dark soft perimeter edges for integration into a dark website. Image should feel like an actual sophisticated cooperative game environment, not a marketing gradient or illustration. No lettering, text, HUD, UI, subtitles, windows, computer screens, borders, logos, watermarks, recognizable game franchise, or recognizable characters. No violence. Natural realistic material detail, restrained saturation, elegant and immersive.
+
+## Brand and workflow refinement
+
+Uses the existing W chat-bubble app icon, mint #5ff0bd, cyan #65d8ed and cream #fbebcf. The central demo is a user-controlled, six-step sequence: English app audio, phrase-end transcription/translation, Thai overlay, Thai microphone reply, English text, manual copy/paste into chat. It plays once per activation, supports pause/replay and direct step selection, and honors reduced motion. Timing is illustrative, not a latency claim. No microphone capture, voice synthesis, or automatic message sending occurs.

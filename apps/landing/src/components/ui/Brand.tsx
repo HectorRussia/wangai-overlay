@@ -1,10 +1,8 @@
-import { AudioLines } from "lucide-react";
+import Image from "next/image";
 export function Brand() {
   return (
     <span className="brand">
-      <span className="brand-symbol">
-        <AudioLines size={23} aria-hidden="true" />
-      </span>
+      <Image src="/images/wangai-icon.png" alt="" width={38} height={38} />
       <span>
         ว่าไง<span className="brand-dot">.</span>
       </span>
