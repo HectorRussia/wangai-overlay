@@ -28,29 +28,18 @@ export default function Home() {
       <main id="main">
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-intro">
-            <p className="hero-eyebrow">
-              <span className="status-dot" /> ว่าไง —
-              ผู้ช่วยแปลภาษาสำหรับเกมเมอร์
-            </p>
             <h1 id="hero-title">
               AI แปลเสียงพูด
               <br />
               <span>ระหว่างเล่นเกม</span>
             </h1>
-            <p className="hero-copy">
-              ฟังเพื่อนพูดอังกฤษ อ่านคำแปลไทยบนจอ
-              <br />
-              พูดไทยให้เป็นข้อความอังกฤษ แล้วคัดลอกไปตอบในแชต
-            </p>
             <div className="hero-actions">
               <DownloadLink />
               <a href="#demo" className="text-link">
                 ดูตัวอย่างการแปล <ArrowDown size={16} aria-hidden="true" />
               </a>
             </div>
-            <p className="platform-note">
-              Windows 10 / 11 x64 · แปลเมื่อพูดจบวลี
-            </p>
+            <p className="platform-note">Windows 10 / 11</p>
           </div>
           <TranslationDemo />
         </section>

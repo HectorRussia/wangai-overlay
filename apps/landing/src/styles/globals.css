@@ -1917,3 +1917,38 @@ h2 {
     animation: none;
   }
 }
+
+/* Keep the product name prominent at every viewport. */
+.brand-wordmark {
+  font-family: var(--font-body), sans-serif;
+  font-size: 23px;
+  font-weight: 750;
+  letter-spacing: 1.4px;
+  line-height: 1;
+}
+.hero-intro {
+  padding-top: 48px;
+  padding-bottom: 40px;
+}
+.hero-actions {
+  margin-top: 28px;
+}
+@media (max-width: 600px) {
+  .brand-wordmark {
+    font-size: 18px;
+    letter-spacing: 0.7px;
+  }
+  .hero-intro {
+    padding-top: 34px;
+    padding-bottom: 34px;
+  }
+}
+@media (max-width: 360px) {
+  .brand-wordmark {
+    font-size: 16px;
+  }
+  .brand > img {
+    width: 28px;
+    height: 28px;
+  }
+}
