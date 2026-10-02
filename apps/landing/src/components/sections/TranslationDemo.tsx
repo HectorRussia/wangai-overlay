@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { gameScenes } from "@/content/gameScenes";
 import { ProductOverlayPreview } from "./ProductOverlayPreview";
 import { useEffect, useState } from "react";
 import {
@@ -46,6 +47,9 @@ const steps = [
 ];
 
 export function TranslationDemo() {
+  const [sceneIndex, setSceneIndex] = useState(0);
+  const [cycling, setCycling] = useState(false);
+  const scene = gameScenes[sceneIndex];
   const [step, setStep] = useState(2);
   const [initialPreview, setInitialPreview] = useState(true);
   const [playing, setPlaying] = useState(false);
@@ -62,6 +66,15 @@ export function TranslationDemo() {
     return () => window.clearTimeout(timer);
   }, [step, playing]);
 
+  useEffect(() => {
+    if (!cycling) return;
+    const timer = window.setInterval(() => {
+      setSceneIndex((index) => (index + 1) % gameScenes.length);
+      setCopied("idle");
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [cycling]);
+
   function selectStep(index: number) {
     setInitialPreview(false);
     setStep(index);
@@ -71,7 +84,7 @@ export function TranslationDemo() {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(steps[5].quote);
+      await navigator.clipboard.writeText(scene.replyEnglish);
       setCopied("done");
     } catch {
       setCopied("error");
@@ -124,19 +137,52 @@ export function TranslationDemo() {
           เราพูดตอบ
         </button>
       </div>
-      <div className="flow-scene">
+      <div className="scene-picker" role="group" aria-label="เลือกแนวเกม">
+        {gameScenes.map((item, index) => (
+          <button
+            key={item.id}
+            aria-pressed={sceneIndex === index}
+            onClick={() => {
+              setSceneIndex(index);
+              setCycling(false);
+              setCopied("idle");
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+        <button
+          className="scene-autoplay"
+          aria-pressed={cycling}
+          onClick={() => setCycling(!cycling)}
+        >
+          {cycling ? <Pause size={14} /> : <Play size={14} />}
+          {cycling ? "หยุดเปลี่ยนฉาก" : "สลับฉากอัตโนมัติ"}
+        </button>
+      </div>
+      <div className={`flow-scene scene-${scene.id}`}>
         <Image
-          src="/images/wangai-game-scene.webp"
-          alt=""
+          key={scene.id}
+          src={`/images/${scene.image}`}
+          alt={scene.alt}
           fill
           sizes="(max-width: 768px) 100vw, 1200px"
           className="game-scene"
-          preload
+          preload={sceneIndex === 0}
         />
         <div className="game-window-label">
-          <span /> GAME · Windowed
+          <span /> {scene.label} · Gameplay example
         </div>
+        {["fps", "fantasy", "survival"].includes(scene.id) && (
+          <span className="game-crosshair" aria-hidden="true" />
+        )}
+        {scene.id === "fps" && (
+          <span className="game-teammate" aria-hidden="true">
+            <Headphones size={13} /> TEAMMATE
+          </span>
+        )}
         <ProductOverlayPreview
+          dialogue={scene}
           step={step}
           copied={copied === "done"}
           onCopy={copy}

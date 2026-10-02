@@ -1,5 +1,13 @@
 # Dark landing rework — research and direction
 
+## Current gameplay background
+
+The atmospheric hangar background is replaced by `public/images/wangai-first-person.webp`. Built-in image generation produced the original first-person gameplay illustration, then Sharp encoded it as WebP. HTML adds a crosshair and teammate indicator. The source-derived WANGAI overlay sits bottom-left, keeping the weapon and reticle clear. This remains an illustrative scene, not a screenshot of a released game.
+
+Final generation prompt:
+
+> Use case: stylized-concept. Create an original FIRST PERSON PC cooperative tactical video game gameplay frame, wide landscape 16:9. Clearly an active player's eye-level view, NOT a cinematic establishing shot or wallpaper. Foreground lower RIGHT: large visible gloved hands holding a compact fictional sci-fi carbine at low ready, strong recognizable first-person weapon silhouette covering lower-right 25 percent. Midground center-left: a nearby teammate 5 meters ahead in blue-gray tactical gear running around a waist-high concrete barricade into an industrial courtyard, body full visible. Eye-level 85-degree game camera, ordinary utilitarian loading yard with shipping containers, concrete doorway and catwalk, daylight, realistic crisp game-engine shading, readable midtones, muted colors, no film depth-of-field, no dramatic vista, no mountains, no fog wall, no oversized architecture. Leave lower LEFT quarter relatively uncluttered (plain concrete foreground) where actual HTML software overlay will be placed later. Gameplay action and immediate spatial context, not promotional key art. No shooting, blood or injury. NO text, letters, logos, UI, HUD, crosshair, watermark or recognizable existing game franchise; crosshair and teammate indicator will be added in HTML. Both hands anatomically correct. Strong first-person perspective is the most important requirement.
+
 ## Brief
 
 Rework requested 2026-10-02: dark-first, clean game-focused presentation, literal Thai product positioning, top-right Download and Login only. Avoid vague team metaphors and hardcoded keyboard shortcuts. Google sign-in is a mock until authentication is implemented.
@@ -36,3 +44,7 @@ Uses the existing W chat-bubble app icon, mint #5ff0bd, cyan #65d8ed and cream #
 ## Desktop overlay fidelity
 
 The product preview now derives its markup from `src/OverlayApp.tsx` and its scoped presentation rules from the overlay section of `src/styles.css`. It uses the actual W sensor, status row, incoming left-aligned gray bubble, outgoing right-aligned amber bubble, original/translated text hierarchy, and edit-mode copy affordance. The 420 × 236 presentation sits over the illustrative game scene. Configurable shortcut labels are omitted per the marketing brief; toolbar icons are illustrative and do not control desktop settings. Explanation and playback controls remain outside the product window. This is a source-derived interactive preview, not a captured game session.
+
+## Six gameplay scenes
+
+The demo now offers FPS, fantasy, survival, farming, racing and space, with genre-specific bilingual examples. Scene switching is manual by default; optional cycling advances every eight seconds and can be stopped. Selecting a scene stops cycling. The desktop-derived overlay remains consistent. Asset paths and generation prompts are in [SCENE-ASSETS.md](SCENE-ASSETS.md).

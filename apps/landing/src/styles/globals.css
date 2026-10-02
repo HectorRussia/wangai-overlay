@@ -1775,3 +1775,145 @@ h2 {
     min-height: 50px;
   }
 }
+
+/* First-person composition: the overlay leaves the weapon and reticle clear. */
+.flow-scene {
+  aspect-ratio: 16 / 9;
+  min-height: 540px;
+}
+.game-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  height: 15px;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 1px 2px #000);
+}
+.game-crosshair::before,
+.game-crosshair::after {
+  content: "";
+  position: absolute;
+  background: #ffffffd9;
+  border-radius: 1px;
+}
+.game-crosshair::before {
+  width: 15px;
+  height: 2px;
+  top: 6px;
+  left: 0;
+}
+.game-crosshair::after {
+  width: 2px;
+  height: 15px;
+  top: 0;
+  left: 6px;
+}
+.game-teammate {
+  position: absolute;
+  left: 36%;
+  top: 27%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #b9f6e5;
+  font:
+    600 10px var(--font-body),
+    sans-serif;
+  text-shadow: 0 1px 4px #000;
+  letter-spacing: 0.08em;
+}
+@media (max-width: 600px) {
+  .flow-scene {
+    aspect-ratio: auto;
+    min-height: 510px;
+  }
+  .flow-scene .game-scene {
+    object-position: 65% center;
+  }
+  .game-crosshair {
+    top: 30%;
+  }
+  .game-teammate {
+    top: 16%;
+    left: 15%;
+  }
+}
+@media (max-width: 600px) {
+  .flow-scene {
+    min-height: 445px;
+  }
+  .flow-scene .game-scene {
+    top: 34px !important;
+    bottom: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    object-position: center;
+  }
+  .game-crosshair {
+    top: 125px;
+  }
+  .game-teammate {
+    top: 83px;
+    left: 35%;
+    font-size: 8px;
+  }
+}
+
+.scene-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 15px;
+}
+.scene-picker button {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+.scene-picker button[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: #5ff0bd44;
+  background: #17312a;
+}
+.scene-picker .scene-autoplay {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.flow-scene .game-scene {
+  animation: scene-arrive 0.45s ease-out;
+}
+@keyframes scene-arrive {
+  from {
+    opacity: 0.3;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 600px) {
+  .scene-picker {
+    gap: 3px;
+  }
+  .scene-picker button {
+    font-size: 12px;
+    padding: 9px 11px;
+  }
+  .scene-picker .scene-autoplay {
+    margin-left: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-scene .game-scene {
+    animation: none;
+  }
+}

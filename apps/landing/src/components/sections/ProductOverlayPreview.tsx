@@ -10,10 +10,17 @@ import "./ProductOverlayPreview.css";
 
 // Presentation mirrors src/OverlayApp.tsx. No desktop APIs run on the website.
 export function ProductOverlayPreview({
+  dialogue,
   step,
   copied,
   onCopy,
 }: {
+  dialogue: {
+    english: string;
+    thai: string;
+    replyThai: string;
+    replyEnglish: string;
+  };
   step: number;
   copied: boolean;
   onCopy: () => void;
@@ -63,17 +70,15 @@ export function ProductOverlayPreview({
             >
               <small className="overlay-source-badge">GAME</small>
               <strong lang="th">
-                {step === 1
-                  ? "กำลังแปล…"
-                  : "อยู่ด้วยกันไว้ เดี๋ยวฉันคุ้มกันให้"}
+                {step === 1 ? "กำลังแปล…" : dialogue.thai}
               </strong>
-              <span lang="en">Stay together. I’ll cover you.</span>
+              <span lang="en">{dialogue.english}</span>
             </article>
           )}
           {step >= 4 && (
             <article className="overlay-bubble is-outgoing">
-              <strong lang="en">Okay, I’ll follow you.</strong>
-              <span lang="th">โอเค ฉันจะตามไป</span>
+              <strong lang="en">{dialogue.replyEnglish}</strong>
+              <span lang="th">{dialogue.replyThai}</span>
               {editing && (
                 <button
                   className="overlay-copy"
