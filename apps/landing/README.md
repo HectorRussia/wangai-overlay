@@ -64,4 +64,3 @@ Vercel: Root Directory `apps/landing`, Framework Preset `Next.js`, Install `npm 
 7. Console ไม่มี error และไม่มีชื่อปุ่มลัดบนหน้า
 
 Desktop engine และระบบแปลจริงอยู่นอกขอบเขตการทดสอบของ landing นี้
-
