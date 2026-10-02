@@ -33,8 +33,8 @@ const steps = [
     quote: "Okay, I'll follow you.",
   },
   {
-    title: "คัดลอกไปตอบ",
-    detail: "คุณคัดลอกคำแปล ไปวางและกดส่งในแชตเอง",
+    title: "นำไปตอบคู่สนทนา",
+    detail: "อ่านประโยคอังกฤษแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต",
     quote: "Okay, I'll follow you.",
   },
 ];
@@ -176,6 +176,9 @@ export function TranslationDemo() {
             <span>ตอบเป็นอังกฤษว่า</span>
             <p lang="en">{scene.replyEnglish}</p>
           </div>
+          <p className="reply-use-note">
+            อ่านแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต
+          </p>
         </div>
       ) : (
         <p className="flow-explanation" aria-live="polite" aria-atomic="true">

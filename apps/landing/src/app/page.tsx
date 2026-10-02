@@ -145,8 +145,8 @@ export default function Home() {
               I’m on my way.
             </p>
             <div className="reply-caption">
-              <span>ข้อความอังกฤษพร้อมใช้</span>
-              <span>คัดลอก → วางในแชต</span>
+              <span>รู้ว่าจะตอบอังกฤษว่าอะไร</span>
+              <span>อ่านแล้วพูดตามได้</span>
             </div>
           </div>
           <div className="story-copy">
@@ -159,7 +159,7 @@ export default function Home() {
               <span className="accent">ลองพูดเป็นไทย</span>
             </h2>
             <p>ว่าไงช่วยให้รู้ว่าประโยคที่อยากตอบ พูดเป็นอังกฤษว่าอะไร</p>
-            <p className="story-note">อ่านคำแปลก่อน แล้วคัดลอกไปตอบในแชต</p>
+            <p className="story-note">อ่านแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต</p>
             <a className="text-link" href="#demo">
               ดูตัวอย่างการแปล <ArrowUpRight size={17} aria-hidden="true" />
             </a>

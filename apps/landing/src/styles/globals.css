@@ -2078,3 +2078,19 @@ h2 {
     gap: 6px;
   }
 }
+
+.reply-answer {
+  flex-wrap: wrap;
+}
+.reply-use-note {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 13px !important;
+  color: var(--muted) !important;
+}
+@media (max-width: 600px) {
+  .reply-use-note {
+    text-align: left;
+    flex-basis: auto;
+  }
+}
