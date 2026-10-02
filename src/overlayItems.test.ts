@@ -1,23 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { overlayPresentation, visibleOverlayItems } from "./overlayPresentation";
+import { visibleOverlayItems } from "./overlayItems";
 import type { SubtitleItem } from "./types";
 
-describe("overlay presentation", () => {
-  const idle = { hasPartial: false, visibleItems: 0, microphoneActive: false, editMode: false };
-
-  it("collapses while idle", () => {
-    expect(overlayPresentation(idle)).toBe("collapsed");
-  });
-
-  it.each([
-    ["partial transcript", { ...idle, hasPartial: true }],
-    ["recent final", { ...idle, visibleItems: 1 }],
-    ["push to talk", { ...idle, microphoneActive: true }],
-    ["edit mode", { ...idle, editMode: true }],
-  ])("expands for %s", (_label, state) => {
-    expect(overlayPresentation(state)).toBe("expanded");
-  });
-
+describe("visible overlay items", () => {
   it("keeps the latest four messages until the conversation becomes idle", () => {
     const now = 1_000_000;
     const item = (segmentId: string, createdAtMs: number): SubtitleItem => ({

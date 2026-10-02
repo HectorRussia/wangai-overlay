@@ -78,22 +78,15 @@ export const api = {
     return unavailableOnWeb("การเปิดหน้าตั้งค่า Desktop");
   },
   quitApp: () => tauriRuntime ? invoke<void>("quit_app") : unavailableOnWeb("การออกจากโปรแกรม Desktop"),
-  setOverlayPresentation: (_presentation: "collapsed" | "expanded") => Promise.resolve(),
   listRunningApps: () => tauriRuntime
     ? invoke<RunningApp[]>("list_running_apps")
     : webJson<RunningApp[]>("/api/v1/apps"),
   snapshot: () => tauriRuntime
     ? invoke<AppSnapshot>("get_snapshot")
     : webJson<AppSnapshot>("/api/v1/snapshot"),
-  listProcesses: () => tauriRuntime
-    ? invoke<CaptureSource[]>("list_capture_sources")
-    : webJson<CaptureSource[]>("/api/v1/processes"),
   listOutputDevices: () => tauriRuntime
     ? invoke<AudioOutputDevice[]>("list_output_devices")
     : webJson<AudioOutputDevice[]>("/api/v1/output-devices"),
-  defaultMicrophoneName: () => tauriRuntime
-    ? invoke<string | null>("default_microphone_name")
-    : webJson<string | null>("/api/v1/default-microphone"),
   listMicrophoneDevices: () => tauriRuntime
     ? invoke<AudioOutputDevice[]>("list_microphone_devices")
     : webJson<AudioOutputDevice[]>("/api/v1/microphones"),
@@ -112,9 +105,6 @@ export const api = {
   startSession: () => tauriRuntime
     ? invoke<boolean>("start_session")
     : webCommand<boolean>("start_session"),
-  setListening: (enabled: boolean) => tauriRuntime
-    ? invoke<boolean>("set_listening", { enabled })
-    : webCommand<boolean>("set_listening", { enabled }),
   probeRecentAudio: () => tauriRuntime
     ? invoke<void>("probe_recent_audio")
     : webCommand<void>("probe_recent_audio"),
@@ -153,7 +143,6 @@ export const api = {
   restartWorker: () => tauriRuntime
     ? invoke<void>("restart_worker")
     : webCommand<void>("restart_worker"),
-  injectDemo: () => tauriRuntime ? invoke<void>("inject_demo_transcript") : unavailableOnWeb("ข้อความทดลอง Overlay"),
   getWebCompanionInfo: () => tauriRuntime
     ? invoke<WebCompanionInfo>("get_web_companion_info")
     : Promise.resolve({ origin: window.location.origin, running: true }),
