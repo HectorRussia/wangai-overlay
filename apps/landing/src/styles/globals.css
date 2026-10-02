@@ -1587,28 +1587,6 @@ h2 {
 .flow-steps button[aria-current="step"] {
   color: var(--accent);
 }
-.flow-track {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  overflow: hidden;
-  background: #2b3c35;
-}
-.flow-track i {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left;
-}
-.flow-steps button[aria-current="step"] .flow-track i {
-  transform: scaleX(1);
-}
-.flow-track i.is-progressing {
-  animation: flow-progress 2.6s linear both;
-}
 .flow-feedback {
   text-align: center;
   color: #fbebcf;
@@ -1642,14 +1620,6 @@ h2 {
   to {
     opacity: 0.25;
     transform: translateY(-3px);
-  }
-}
-@keyframes flow-progress {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
   }
 }
 @media (max-width: 600px) {
@@ -1724,9 +1694,6 @@ h2 {
 .flow-header h2,
 .brand {
   color: var(--brand-cream);
-}
-.flow-track i {
-  background: linear-gradient(90deg, var(--accent), var(--accent-cyan));
 }
 .flow-wave:not(.has-voice) {
   visibility: hidden;

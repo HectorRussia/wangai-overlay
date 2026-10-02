@@ -198,13 +198,6 @@ export function TranslationDemo() {
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span>{item.title}</span>
-                <span className="flow-track" aria-hidden="true">
-                  <i
-                    className={
-                      step === index && playing ? "is-progressing" : ""
-                    }
-                  />
-                </span>
               </button>
             </li>
           );
