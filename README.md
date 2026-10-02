@@ -11,6 +11,8 @@ WANGAI เป็น Windows overlay สำหรับแปลเสียง�
 
 ## โครงสร้าง
 
+ดู [แผนผังโมดูลและจุดเพิ่มฟีเจอร์](docs/architecture.md) และ [ผลตรวจ refactor / compatibility / ข้อจำกัด](docs/refactor-verification.md) สำหรับการพัฒนาและส่งต่องาน
+
 ```text
 React/TypeScript UI
        ↕ Tauri commands หรือ loopback REST/WebSocket
