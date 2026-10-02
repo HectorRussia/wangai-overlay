@@ -35,11 +35,11 @@ def fixture_sign(path, _verifier):
 class PackageLayoutTests(unittest.TestCase):
     def test_payload_manifest_embedded_bytes_and_release_metadata_agree(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary) / "apps" / "desktop"
             inputs = {
                 "package.json": b'{"version":"0.5.0"}',
-                "docs/releases/v0.5.0.md": b"Fixture release notes",
-                "docs/THIRD-PARTY-NOTICES.md": b"Fixture notices",
+                "../../docs/releases/v0.5.0.md": b"Fixture release notes",
+                "../../docs/THIRD-PARTY-NOTICES.md": b"Fixture notices",
                 "portable/webview2.lock.json": b'{"version":"1.2.3"}',
                 "portable/legacy-0.2.2.json": b'{"version":"0.2.2"}',
                 "host.exe": fake_pe(2),

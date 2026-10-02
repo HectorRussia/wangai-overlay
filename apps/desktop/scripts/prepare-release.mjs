@@ -27,7 +27,7 @@ for (const file of ['wangai-worker.exe', '_internal/python312.dll', '_internal/s
 const config = {
   bundle: {
     active: false, createUpdaterArtifacts: false,
-    resources: { '../dist/': 'web/', '../output/worker/wangai-worker/': 'worker/', '../docs/THIRD-PARTY-NOTICES.md': 'THIRD-PARTY-NOTICES.md' },
+    resources: { '../dist/': 'web/', '../output/worker/wangai-worker/': 'worker/', '../../../docs/THIRD-PARTY-NOTICES.md': 'THIRD-PARTY-NOTICES.md' },
   },
   plugins: { updater: { pubkey } },
 };

@@ -21,7 +21,7 @@ base64 = "0.22"
 
 [dependencies]
 wangai-portable = { path = "../portable" }
-wangai-ai-protocol = { path = "../ai-protocol" }
+wangai-ai-protocol = { path = "../../../ai-protocol" }
 anyhow = "1.0"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["ws"] }

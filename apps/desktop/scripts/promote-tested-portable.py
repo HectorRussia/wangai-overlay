@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 SOURCE = 'fc369ef501beff140b1bdeefca322bc8032e88bc'
 TAG_COMMIT = '2d3d929e340d0c3ac8bcc331e3f20a6bd099d9f0'
 RUN = '34682590667'

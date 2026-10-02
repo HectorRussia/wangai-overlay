@@ -1,5 +1,7 @@
 # ผลตรวจ refactor WANGAI — 2026-10-02
 
+หมายเหตุหลังจัดโฟลเดอร์: Desktop source, scripts และ local artifacts ในรายงานประวัตินี้ถูกย้ายจาก repository root ไป `apps/desktop/` แล้ว เช่น `output/...` อยู่ที่ `apps/desktop/output/...` ผลทดสอบในหน้านี้เป็นของชุด refactor ก่อนย้าย; ดูผลตรวจการย้ายแยกที่ [Desktop layout](desktop-layout.md)
+
 ฐานก่อนแก้คือ `4cd4694` บน branch `ponkritwo/ove-1-refactor-code-and-clean-code` งานนี้คง settings schema 16 และไม่มี migration ใหม่ อ่าน [แผนผังและแนวทางพัฒนาต่อ](architecture.md) สำหรับตำแหน่งโมดูลปัจจุบัน
 
 ## ชุด commit และการย้อนกลับ

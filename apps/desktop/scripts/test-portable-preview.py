@@ -83,7 +83,7 @@ class PreviewTests(unittest.TestCase):
             promotion.validate({**record, 'commit': 'b' * 40}, manifest, [], promotion.TAG_COMMIT, promotion.EXE_HASH)
 
     def test_release_stays_draft_prerelease_and_verifies_before_creation(self):
-        workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/release.yml').read_text()
+        workflow = (Path(__file__).resolve().parents[3] / '.github/workflows/release.yml').read_text()
         create = next(line for line in workflow.splitlines() if 'gh release create ' in line)
         for flag in ('--verify-tag', '--draft', '--prerelease', '--latest=false'):
             self.assertIn(flag, create)

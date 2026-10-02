@@ -1,4 +1,4 @@
-# Run from the repository root. Keep console=True: stdout is the wire protocol.
+# Run from apps/desktop. Keep console=True: stdout is the wire protocol.
 from PyInstaller.utils.hooks import collect_data_files, copy_metadata
 from pathlib import Path
 root = Path(SPECPATH).parents[1]

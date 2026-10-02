@@ -2,6 +2,8 @@
 
 เอกสารนี้อธิบายโครงสร้างหลัง refactor วันที่ 2026-10-02 ใช้คู่กับ [ผลตรวจและข้อจำกัด](refactor-verification.md) และ [คู่มือ Portable](windows-portable.md) ไม่มีการเปลี่ยน schema หรือเพิ่ม migration ในรอบนี้
 
+Desktop อยู่ใน `apps/desktop/` แล้ว: paths `src/`, `src-tauri/`, `portable/`, `worker/`, `assets/` และ `scripts/` ในส่วน Desktop ด้านล่างอ้างอิงจากโฟลเดอร์นี้ ส่วน `server/`, `ai-protocol/`, `.github/` และ `docs/` ยังอ้างอิงจาก repository root ดู [คู่มือ Desktop](../apps/desktop/README.md) สำหรับคำสั่งเริ่มต้น
+
 ## Dependency map
 
 ```mermaid
@@ -104,19 +106,20 @@ Worker เข้าได้ที่ `worker/main.py` เหมือนเด�
 | เปลี่ยน AI provider | server upstream/services/config | timeout/rate limit, redaction, strict protocol, container smoke |
 | เปลี่ยน Portable | portable package/transaction หรือ named packaging stage | signed package tests, preview provenance, real upgrade/rollback |
 
-รันจาก repository root บน Windows:
+จาก repository root บน Windows ให้เข้าโฟลเดอร์ Desktop ก่อน:
 
 ```powershell
+cd apps/desktop
 pnpm test
 pnpm format:check
 pnpm build # รวม noUnusedLocals/noUnusedParameters
 cargo test --locked --manifest-path src-tauri/Cargo.toml
-cargo test --locked --manifest-path server/Cargo.toml
+cargo test --locked --manifest-path ../../server/Cargo.toml
 cargo test --locked --manifest-path portable/Cargo.toml --features host
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo fmt --manifest-path server/Cargo.toml --check
+cargo fmt --manifest-path ../../server/Cargo.toml --check
 cargo fmt --manifest-path portable/Cargo.toml --check
-cargo fmt --manifest-path ai-protocol/Cargo.toml --check
+cargo fmt --manifest-path ../../ai-protocol/Cargo.toml --check
 .packaging-venv/Scripts/python.exe -m unittest discover -s worker -v
 .packaging-venv/Scripts/python.exe scripts/test-portable-preview.py
 .packaging-venv/Scripts/python.exe scripts/test-package-portable.py
@@ -125,6 +128,6 @@ $env:WANGAI_TEST_WORKER_EXE = (Resolve-Path output/worker/wangai-worker/wangai-w
 cargo test --locked --manifest-path src-tauri/Cargo.toml packaged_worker_events_follow_rust_contract -- --ignored --nocapture
 ```
 
-Container smoke: `python scripts/test-server-container.py` ต้องมี Docker daemon และ build Linux container ได้ CI `verify.yml` รันรายการนี้ด้วย สำหรับ real Portable upgrade/rollback ใช้ `build-test-portables.ps1` และ `test-portable-upgrade.py` ตาม workflow `installer-qa.yml` ซึ่งใช้ disposable signing key, loopback updater และข้อมูลทดสอบแยก; ห้ามเผยแพร่ artifacts/key เหล่านี้
+Container smoke รันจาก repository root: `python scripts/test-server-container.py` ต้องมี Docker daemon และ build Linux container ได้ CI `verify.yml` รันรายการนี้ด้วย สำหรับ real Portable upgrade/rollback รันจาก `apps/desktop` ใช้ `scripts/build-test-portables.ps1` และ `scripts/test-portable-upgrade.py` ตาม workflow `installer-qa.yml` ซึ่งใช้ disposable signing key, loopback updater และข้อมูลทดสอบแยก; ห้ามเผยแพร่ artifacts/key เหล่านี้
 
 แยก commit จัดรูปแบบออกจาก behavior/structure ทุกครั้ง และใส่ผลตรวจจริงกับข้อจำกัดไว้ใน PR อย่าอ้างว่า test ที่ผ่านด้วย mock ยืนยันอุปกรณ์เสียงหรือ hotkey ระดับ OS แล้ว

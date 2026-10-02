@@ -22,7 +22,7 @@ def release_notes(version):
         raise ValueError("Unsupported build version")
     # 0.3.1 is the isolated updater test fixture, not a published release.
     notes_version = "0.3.0" if version == "0.3.1" else version
-    return (ROOT / f"docs/releases/v{notes_version}.md").read_text(encoding="utf8")
+    return (ROOT.parents[1] / f"docs/releases/v{notes_version}.md").read_text(encoding="utf8")
 
 
 def pe_subsystem(path):
@@ -97,7 +97,7 @@ def collect_inputs(args):
     files = {
         "WANGAI.exe": args.host.resolve(),
         "gamelingo.exe": args.core.resolve(),
-        "THIRD-PARTY-NOTICES.md": ROOT / "docs/THIRD-PARTY-NOTICES.md",
+        "THIRD-PARTY-NOTICES.md": ROOT.parents[1] / "docs/THIRD-PARTY-NOTICES.md",
     }
     collect(ROOT / "output/worker/wangai-worker", "worker", files)
     collect(ROOT / "dist", "web", files)
