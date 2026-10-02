@@ -11,12 +11,13 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Volume2,
 } from "lucide-react";
 
 const steps = [
   {
     title: "รับเสียง",
-    detail: "เพื่อนพูดอังกฤษจากเกมหรือแอปที่คุณเลือก",
+    detail: "เพื่อนพูดในเกม → WANGAI รับเสียงจากเกม",
     quote: "Stay together. I'll cover you.",
   },
   {
@@ -26,7 +27,7 @@ const steps = [
   },
   {
     title: "อ่านซับไทย",
-    detail: "คำแปลปรากฏบน overlay ระหว่างเล่นเกม",
+    detail: "เสียงอังกฤษจากเพื่อน → คำแปลไทยใน WANGAI",
     quote: "อยู่ด้วยกันไว้ เดี๋ยวฉันคุ้มกันให้",
   },
   {
@@ -47,9 +48,7 @@ const steps = [
 ];
 
 export function TranslationDemo() {
-  const [sceneIndex, setSceneIndex] = useState(0);
-  const [cycling, setCycling] = useState(false);
-  const scene = gameScenes[sceneIndex];
+  const scene = gameScenes[0];
   const [step, setStep] = useState(2);
   const [initialPreview, setInitialPreview] = useState(true);
   const [playing, setPlaying] = useState(false);
@@ -65,15 +64,6 @@ export function TranslationDemo() {
     }, 2600);
     return () => window.clearTimeout(timer);
   }, [step, playing]);
-
-  useEffect(() => {
-    if (!cycling) return;
-    const timer = window.setInterval(() => {
-      setSceneIndex((index) => (index + 1) % gameScenes.length);
-      setCopied("idle");
-    }, 8000);
-    return () => window.clearInterval(timer);
-  }, [cycling]);
 
   function selectStep(index: number) {
     setInitialPreview(false);
@@ -137,29 +127,6 @@ export function TranslationDemo() {
           เราพูดตอบ
         </button>
       </div>
-      <div className="scene-picker" role="group" aria-label="เลือกแนวเกม">
-        {gameScenes.map((item, index) => (
-          <button
-            key={item.id}
-            aria-pressed={sceneIndex === index}
-            onClick={() => {
-              setSceneIndex(index);
-              setCycling(false);
-              setCopied("idle");
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
-        <button
-          className="scene-autoplay"
-          aria-pressed={cycling}
-          onClick={() => setCycling(!cycling)}
-        >
-          {cycling ? <Pause size={14} /> : <Play size={14} />}
-          {cycling ? "หยุดเปลี่ยนฉาก" : "สลับฉากอัตโนมัติ"}
-        </button>
-      </div>
       <div className={`flow-scene scene-${scene.id}`}>
         <Image
           key={scene.id}
@@ -168,18 +135,33 @@ export function TranslationDemo() {
           fill
           sizes="(max-width: 768px) 100vw, 1200px"
           className="game-scene"
-          preload={sceneIndex === 0}
+          preload
         />
         <div className="game-window-label">
           <span /> {scene.label} · Gameplay example
         </div>
-        {["fps", "fantasy", "survival"].includes(scene.id) && (
-          <span className="game-crosshair" aria-hidden="true" />
-        )}
-        {scene.id === "fps" && (
-          <span className="game-teammate" aria-hidden="true">
-            <Headphones size={13} /> TEAMMATE
+        <span className="game-crosshair" aria-hidden="true" />
+        <div
+          className={`teammate-speech ${playing && step === 0 ? "is-speaking" : ""}`}
+        >
+          <span className="speech-source">
+            <Volume2 size={16} aria-hidden="true" />
+            เสียงเพื่อนในเกม <span>EN</span>
           </span>
+          <p lang="en">“{scene.english}”</p>
+          <span className="speech-bars" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
+        {replying && (
+          <div className="player-speech">
+            <Mic size={15} aria-hidden="true" />
+            <span>คุณพูด: {scene.replyThai}</span>
+          </div>
         )}
         <ProductOverlayPreview
           dialogue={scene}

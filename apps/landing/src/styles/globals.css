@@ -1952,3 +1952,109 @@ h2 {
     height: 28px;
   }
 }
+
+.teammate-speech {
+  position: absolute;
+  left: 25%;
+  top: 7%;
+  width: 275px;
+  padding: 13px 16px;
+  border: 1px solid #b7ffe46b;
+  border-radius: 10px;
+  background: #10231eef;
+  color: #fff;
+  box-shadow: 0 4px 20px #0004;
+}
+.teammate-speech::after {
+  content: "";
+  position: absolute;
+  left: 44%;
+  top: 100%;
+  width: 1px;
+  height: 30px;
+  background: #b7ffe4;
+}
+.speech-source {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #9feaca;
+  font-size: 12px;
+}
+.speech-source > span {
+  margin-left: auto;
+  font-size: 10px;
+}
+.teammate-speech p {
+  font-size: 17px;
+  line-height: 1.5;
+  margin-top: 9px;
+}
+.speech-bars {
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  display: none;
+  height: 14px;
+  align-items: center;
+  gap: 2px;
+}
+.speech-bars i {
+  width: 2px;
+  height: 12px;
+  background: #a0f4d6;
+  animation: flow-voice 0.5s ease-in-out infinite alternate;
+}
+.speech-bars i:nth-child(2n) {
+  height: 7px;
+  animation-delay: 0.2s;
+}
+.is-speaking .speech-bars {
+  display: flex;
+}
+.is-speaking .speech-source > span {
+  visibility: hidden;
+}
+.player-speech {
+  position: absolute;
+  right: 28px;
+  top: 43%;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 16px;
+  background: #10231eef;
+  color: #fbebcf;
+  border-radius: 9px;
+  font-size: 14px;
+}
+@media (max-width: 600px) {
+  .teammate-speech {
+    top: 42px;
+    left: 16px;
+    width: 190px;
+    padding: 8px 10px;
+  }
+  .speech-source {
+    font-size: 10px;
+    gap: 5px;
+  }
+  .teammate-speech p {
+    font-size: 12px;
+    margin-top: 5px;
+  }
+  .teammate-speech::after {
+    height: 13px;
+  }
+  .player-speech {
+    right: 12px;
+    top: 160px;
+    font-size: 11px;
+    padding: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .speech-bars i {
+    animation: none;
+  }
+}

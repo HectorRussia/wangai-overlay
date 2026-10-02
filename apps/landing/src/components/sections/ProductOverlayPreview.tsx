@@ -39,7 +39,9 @@ export function ProductOverlayPreview({
                 <path d="M2 3 L8 17 L15 5 L22 17 L28 3" />
               </svg>
             </span>
-            <span>{step === 3 ? "กำลังฟังภาษาไทย" : "กำลังฟัง Game"}</span>
+            <span>
+              {step === 3 ? "กำลังฟังภาษาไทย" : "กำลังฟังเสียงจากเกม"}
+            </span>
           </div>
           <div className="overlay-header-actions" aria-hidden="true">
             <span className="overlay-key">

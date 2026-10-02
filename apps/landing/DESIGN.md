@@ -48,3 +48,7 @@ The product preview now derives its markup from `src/OverlayApp.tsx` and its sco
 ## Six gameplay scenes
 
 The demo now offers FPS, fantasy, survival, farming, racing and space, with genre-specific bilingual examples. Scene switching is manual by default; optional cycling advances every eight seconds and can be stopped. Selecting a scene stops cycling. The desktop-derived overlay remains consistent. Asset paths and generation prompts are in [SCENE-ASSETS.md](SCENE-ASSETS.md).
+
+## FPS-only refinement
+
+The current landing demo uses only FPS; genre selection and automatic scene cycling were removed. A separate explanatory voice annotation points to the teammate and shows the incoming English line. Playback animates its voice indicator before pending translation and the Thai bubble. This annotation belongs to the demonstration, not the desktop overlay. Reply mode identifies the player's Thai microphone speech separately.
