@@ -29,9 +29,9 @@ export default function Home() {
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-intro">
             <h1 id="hero-title">
-              AI แปลเสียงพูด
+              <span className="hero-app-name">ว่าไง</span> AI แปลเสียงพูด
               <br />
-              <span>ระหว่างเล่นเกม</span>
+              ระหว่างเล่นเกม
             </h1>
             <div className="hero-actions">
               <DownloadLink />

@@ -237,7 +237,7 @@ a svg {
   line-height: 1.25;
   letter-spacing: -1.7px;
 }
-.hero h1 > span {
+.hero h1 > .hero-app-name {
   color: var(--accent);
 }
 .hero-copy {
@@ -2056,5 +2056,13 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .speech-bars i {
     animation: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero-app-name {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.18em;
   }
 }
