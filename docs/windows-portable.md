@@ -1,5 +1,7 @@
 # WANGAI Portable 0.3.0
 
+คำสั่งพัฒนา/build ในคู่มือนี้รันจาก `apps/desktop` (`cd apps/desktop` จาก repository root); source, config และ packaging scripts ของ Desktop อยู่ใต้โฟลเดอร์นี้ ส่วนเอกสาร `docs/` และ GitHub workflows ยังอยู่ที่ repository root
+
 ## สำหรับผู้ใช้
 
 ดาวน์โหลด `WANGAI_0.3.0_x64-portable.exe` จาก GitHub Releases หลังเผยแพร่

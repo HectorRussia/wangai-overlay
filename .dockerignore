@@ -3,10 +3,10 @@
 **/target
 **/node_modules
 .git
+apps/desktop
 .venv
 .packaging-venv
 **/*.key
 **/*.key.pub
 dist
 output
-prototype

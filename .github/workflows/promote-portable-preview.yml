@@ -11,6 +11,9 @@ jobs:
   draft:
     if: github.repository == 'HectorRussia/wangai-overlay' && github.ref == 'refs/heads/main'
     runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: apps/desktop
     timeout-minutes: 20
     permissions:
       contents: write
@@ -44,7 +47,7 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: WANGAI-portable-preview-34682590667-1
-          path: output/tested-preview
+          path: apps/desktop/output/tested-preview
           run-id: 34682590667
           github-token: ${{ github.token }}
       - name: Test metadata guards and build public-key verifier only
