@@ -1,4 +1,5 @@
 //! Operations shared by native commands and the authenticated local HTTP adapter.
+pub(crate) mod transcripts;
 pub(crate) mod listening;
 pub(crate) mod settings;
 pub(crate) type CommandResult<T> = Result<T, String>;
