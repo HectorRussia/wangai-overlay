@@ -1,4 +1,6 @@
 //! Compiled only into the explicitly isolated release-test product. No production IPC.
+mod command_parity;
+
 use crate::{state::AppState, updater};
 use std::{
     sync::{
@@ -71,6 +73,7 @@ pub fn start(app: AppHandle) {
         }
         app.unlisten(listener);
         let ui_ready = ui_ready.load(Ordering::SeqCst);
+        let command_parity = command_parity::verify(&app).await;
         let state = app.state::<AppState>();
         let ready = state.runtime.read().unwrap().worker_ready;
         // Wait for the startup check to release the shared operation lock.
@@ -110,6 +113,7 @@ pub fn start(app: AppHandle) {
         let report = serde_json::json!({
             "version": version, "pid": std::process::id(), "workerReady": ready,
             "uiReady": ui_ready,
+            "commandParity": command_parity.is_ok(), "commandParityError": command_parity.as_ref().err().map(ToString::to_string),
             "workerPid": state.worker.test_pid(), "settings": state.settings.snapshot(), "update": status,
             "runtimeFolder":std::env::var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER").ok(),
             "profileFolder":std::env::var("WEBVIEW2_USER_DATA_FOLDER").ok(),"childPaths":child_paths,
@@ -127,7 +131,7 @@ pub fn start(app: AppHandle) {
             serde_json::to_vec_pretty(&report).unwrap(),
         )
         .unwrap();
-        if ready && ui_ready && upgrade && status.can_install {
+        if ready && ui_ready && command_parity.is_ok() && upgrade && status.can_install {
             let result = updater::download_and_install_update(window, app.clone()).await;
             // Successful Windows install exits before reaching here.
             std::fs::write(
@@ -137,7 +141,11 @@ pub fn start(app: AppHandle) {
             .unwrap();
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
-        app.exit(if ready && ui_ready { 0 } else { 1 });
+        app.exit(if ready && ui_ready && command_parity.is_ok() {
+            0
+        } else {
+            1
+        });
     });
 }
 

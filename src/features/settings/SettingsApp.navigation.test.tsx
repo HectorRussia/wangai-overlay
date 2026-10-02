@@ -314,7 +314,8 @@ describe("settings with nullable desktop audio diagnostics", () => {
       name: "เปลี่ยนปุ่มลัด คัดลอกคำตอบล่าสุด",
     });
     expect(copy).toHaveTextContent("F10");
-    fireEvent.click(copy);
+    // Flush the async native capture request and the keyboard-listener effect.
+    await act(async () => fireEvent.click(copy));
     await screen.findByText("กดปุ่มที่ต้องการ…");
     fireEvent.keyDown(window, { key: "F6", code: "F6" });
     fireEvent.click(screen.getByRole("button", { name: "บันทึกปุ่มลัด" }));

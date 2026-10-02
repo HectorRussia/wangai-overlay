@@ -77,6 +77,7 @@ def main():
         wait(lambda:not alive(before['pid']) and not alive(before['workerPid']))
         baseline=read(root/'Data/settings.json')
         assert before['workerReady'] and before['uiReady']
+        assert before['commandParity'], before.get('commandParityError')
         assert any(p.lower().endswith('webview2\\msedgewebview2.exe') for p in before['childPaths']),'Bundled WebView2 was not observed'
         # MSIX-hosted development shells can expose the same directory through
         # a virtualized LocalAppData path. Compare file identity, not spelling.
@@ -111,6 +112,7 @@ def main():
             assert read(root/'App/active.json')=={'format':1,'current':'0.3.1','previous':'0.3.0'}
         wait(lambda:not alive(after['pid']) and not alive(after['workerPid']))
         assert after['workerReady'] and after['uiReady']
+        assert after['commandParity'], after.get('commandParityError')
         assert read(root/'Data/settings.json')==baseline,'Settings/installation ID changed'
         expected_launcher=launcher_hashes['0.3.0' if args.rollback else '0.3.1']
         assert file_hash(root/'WANGAI.exe')==expected_launcher,'Launcher was not replaced/restored correctly'
