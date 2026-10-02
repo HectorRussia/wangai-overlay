@@ -1,5 +1,4 @@
 import {
-  ArrowDown,
   ArrowRight,
   ArrowUpRight,
   AudioLines,
@@ -35,9 +34,6 @@ export default function Home() {
             </h1>
             <div className="hero-actions">
               <DownloadLink />
-              <a href="#demo" className="text-link">
-                ดูตัวอย่างการแปล <ArrowDown size={16} aria-hidden="true" />
-              </a>
             </div>
             <p className="platform-note">Windows 10 / 11</p>
           </div>
