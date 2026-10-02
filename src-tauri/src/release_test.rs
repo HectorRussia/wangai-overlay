@@ -11,7 +11,9 @@ use tauri::{AppHandle, Listener, Manager};
 
 pub fn checkpoint(app: &AppHandle, stage: &str) {
     let portable = app.state::<crate::portable_runtime::PortableRuntime>();
-    let Some(layout) = &portable.layout else { return; };
+    let Some(layout) = &portable.layout else {
+        return;
+    };
     let path = layout.data().join("test-startup.json");
     let value = serde_json::json!({"stage":stage,"pid":std::process::id(),"version":app.package_info().version.to_string()});
     let _ = wangai_portable::atomic_json(&path, &value);
@@ -43,9 +45,11 @@ const READY_ROOM_PROBE: &str = r#"
 "#;
 
 pub fn start(app: AppHandle) {
-    let action=portable_action(&app);
-    let upgrade = action.as_deref()==Some("upgrade") || std::env::args().any(|a| a == "--release-test-upgrade");
-    let smoke = action.as_deref()==Some("smoke") || std::env::args().any(|a| a == "--release-test-smoke");
+    let action = portable_action(&app);
+    let upgrade = action.as_deref() == Some("upgrade")
+        || std::env::args().any(|a| a == "--release-test-upgrade");
+    let smoke =
+        action.as_deref() == Some("smoke") || std::env::args().any(|a| a == "--release-test-smoke");
     if !upgrade && !smoke {
         return;
     }
@@ -79,14 +83,30 @@ pub fn start(app: AppHandle) {
             status = updater::get_update_status(window.clone(), app.clone()).unwrap();
         }
         let version = app.package_info().version.to_string();
-        let mut processes=sysinfo::System::new();processes.refresh_processes(sysinfo::ProcessesToUpdate::All,true);
-        let mut descendants=std::collections::HashSet::from([sysinfo::Pid::from_u32(std::process::id())]);
+        let mut processes = sysinfo::System::new();
+        processes.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        let mut descendants =
+            std::collections::HashSet::from([sysinfo::Pid::from_u32(std::process::id())]);
         loop {
-            let before=descendants.len();
-            for (pid,process) in processes.processes() {if process.parent().is_some_and(|p|descendants.contains(&p)){descendants.insert(*pid);}}
-            if descendants.len()==before {break;}
+            let before = descendants.len();
+            for (pid, process) in processes.processes() {
+                if process.parent().is_some_and(|p| descendants.contains(&p)) {
+                    descendants.insert(*pid);
+                }
+            }
+            if descendants.len() == before {
+                break;
+            }
         }
-        let child_paths:Vec<_>=descendants.iter().filter_map(|id|processes.process(*id).and_then(|p|p.exe()).map(|p|p.to_string_lossy().into_owned())).collect();
+        let child_paths: Vec<_> = descendants
+            .iter()
+            .filter_map(|id| {
+                processes
+                    .process(*id)
+                    .and_then(|p| p.exe())
+                    .map(|p| p.to_string_lossy().into_owned())
+            })
+            .collect();
         let report = serde_json::json!({
             "version": version, "pid": std::process::id(), "workerReady": ready,
             "uiReady": ui_ready,
@@ -95,7 +115,12 @@ pub fn start(app: AppHandle) {
             "profileFolder":std::env::var("WEBVIEW2_USER_DATA_FOLDER").ok(),"childPaths":child_paths,
             "runtime":state.runtime.read().unwrap().clone(),
         });
-        let directory = app.state::<crate::portable_runtime::PortableRuntime>().layout.as_ref().map(|p|p.data()).unwrap_or_else(||app.path().app_config_dir().unwrap());
+        let directory = app
+            .state::<crate::portable_runtime::PortableRuntime>()
+            .layout
+            .as_ref()
+            .map(|p| p.data())
+            .unwrap_or_else(|| app.path().app_config_dir().unwrap());
         std::fs::create_dir_all(&directory).unwrap();
         std::fs::write(
             directory.join(format!("test-report-{version}.json")),
@@ -116,9 +141,11 @@ pub fn start(app: AppHandle) {
     });
 }
 
-pub fn portable_action(app:&AppHandle)->Option<String> {
-    let portable=app.state::<crate::portable_runtime::PortableRuntime>();
-    let path=portable.layout.as_ref()?.data().join("test-control.json");
-    let control:serde_json::Value=wangai_portable::read_json(&path).ok()?;
-    control[app.package_info().version.to_string()].as_str().map(str::to_owned)
+pub fn portable_action(app: &AppHandle) -> Option<String> {
+    let portable = app.state::<crate::portable_runtime::PortableRuntime>();
+    let path = portable.layout.as_ref()?.data().join("test-control.json");
+    let control: serde_json::Value = wangai_portable::read_json(&path).ok()?;
+    control[app.package_info().version.to_string()]
+        .as_str()
+        .map(str::to_owned)
 }

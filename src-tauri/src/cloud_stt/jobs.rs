@@ -48,7 +48,12 @@ impl AiSttManager {
             set_stt_busy(&app, busy > 0, "กำลังส่งเสียงให้ บริการ AI");
             let result = match manager.process_job(&app, utterance).await {
                 Ok(Some(completed)) => {
-                    crate::application::transcripts::handle_transcript_event(app.clone(), completed.transcript, completed.generation).await;
+                    crate::application::transcripts::handle_transcript_event(
+                        app.clone(),
+                        completed.transcript,
+                        completed.generation,
+                    )
+                    .await;
                     Ok(())
                 }
                 Ok(None) => Ok(()),
@@ -69,7 +74,11 @@ impl AiSttManager {
         true
     }
 
-    pub(super) async fn process_job(&self, app: &AppHandle, job: SttJob) -> Result<Option<CompletedTranscription>> {
+    pub(super) async fn process_job(
+        &self,
+        app: &AppHandle,
+        job: SttJob,
+    ) -> Result<Option<CompletedTranscription>> {
         let state = app.state::<AppState>();
         if !state.gateway.accepts_started_at(job.started_at_ms) {
             return Ok(None);
@@ -153,6 +162,9 @@ impl AiSttManager {
             started_at_ms: job.started_at_ms,
             ended_at_ms,
         };
-        Ok(Some(CompletedTranscription { transcript, generation: job.generation }))
+        Ok(Some(CompletedTranscription {
+            transcript,
+            generation: job.generation,
+        }))
     }
 }

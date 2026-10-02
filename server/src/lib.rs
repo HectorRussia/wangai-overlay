@@ -1,10 +1,10 @@
 //! AI gateway composition. HTTP contracts remain exported from this crate root.
 pub mod config;
-pub mod metrics;
 mod error;
 mod gateway;
 mod health;
 mod http;
+pub mod metrics;
 mod services;
 mod upstream;
 mod wav;

@@ -105,8 +105,14 @@ pub fn set_capture_mode(app: &AppHandle, state: &AppState, enabled: bool) -> Res
     use std::sync::atomic::Ordering;
     let _operation = state.lifecycle.operation()?;
     if enabled {
-        anyhow::ensure!(!state.runtime.read().expect("runtime lock poisoned").microphone_active,
-            "ปล่อยปุ่มพูดก่อนเปลี่ยนปุ่มลัด");
+        anyhow::ensure!(
+            !state
+                .runtime
+                .read()
+                .expect("runtime lock poisoned")
+                .microphone_active,
+            "ปล่อยปุ่มพูดก่อนเปลี่ยนปุ่มลัด"
+        );
         state.hotkey_capture_active.store(true, Ordering::Relaxed);
         if let Err(error) = app.global_shortcut().unregister_all() {
             state.hotkey_capture_active.store(false, Ordering::Relaxed);

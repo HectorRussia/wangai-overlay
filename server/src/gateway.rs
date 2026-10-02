@@ -1,6 +1,9 @@
 use crate::{config::Config, health::Health, metrics, Failure};
 use serde_json::Value;
-use std::{sync::{Arc, Mutex}, time::{Duration, Instant}};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 use tokio::sync::{mpsc, Semaphore};
 
 pub struct Gateway {
@@ -101,7 +104,6 @@ impl Gateway {
         }
     }
 }
-
 
 impl Gateway {
     pub(crate) fn check(&self, stage: usize) -> Result<(), Failure> {

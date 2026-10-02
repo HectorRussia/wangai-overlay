@@ -1,4 +1,4 @@
-use crate::{Failure, error::fail, UPLOAD_LIMIT};
+use crate::{error::fail, Failure, UPLOAD_LIMIT};
 use wangai_ai_protocol::ErrorCode;
 
 pub fn validate_wav(bytes: &[u8]) -> Result<u64, Failure> {
@@ -54,4 +54,3 @@ pub fn validate_wav(bytes: &[u8]) -> Result<u64, Failure> {
     }
     Ok(size as u64 * 1000 / 32_000)
 }
-

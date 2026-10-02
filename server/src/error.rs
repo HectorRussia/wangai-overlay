@@ -1,6 +1,10 @@
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
-use wangai_ai_protocol::{ApiError, ErrorCode};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
 use uuid::Uuid;
+use wangai_ai_protocol::{ApiError, ErrorCode};
 
 #[derive(Debug)]
 pub struct Failure(pub ApiError);
@@ -54,4 +58,3 @@ impl IntoResponse for Failure {
         response
     }
 }
-

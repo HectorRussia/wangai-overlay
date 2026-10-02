@@ -5,7 +5,12 @@ pub(super) struct VadAutoLeveler {
 }
 
 impl VadAutoLeveler {
-    pub(super) fn process(&mut self, samples: &[f32], manual_gain_db: f32, enabled: bool) -> Vec<f32> {
+    pub(super) fn process(
+        &mut self,
+        samples: &[f32],
+        manual_gain_db: f32,
+        enabled: bool,
+    ) -> Vec<f32> {
         let manual_gain_db = manual_gain_db.clamp(0.0, 18.0);
         if !enabled {
             self.auto_gain_db = 0.0;
@@ -35,7 +40,12 @@ impl VadAutoLeveler {
     }
 }
 
-pub(super) fn accumulate_levels(samples: &[f32], sum_squares: &mut f64, peak: &mut f32, count: &mut u64) {
+pub(super) fn accumulate_levels(
+    samples: &[f32],
+    sum_squares: &mut f64,
+    peak: &mut f32,
+    count: &mut u64,
+) {
     for sample in samples.iter().copied() {
         let sample = sample.clamp(-1.0, 1.0);
         *sum_squares += f64::from(sample) * f64::from(sample);
@@ -94,4 +104,3 @@ pub(super) fn amplitude_to_dbfs(amplitude: f32) -> f32 {
         (20.0 * amplitude.log10()).clamp(-96.0, 0.0)
     }
 }
-

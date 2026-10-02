@@ -1,5 +1,10 @@
-use super::{CommandResult, settings::reattach_if_listening};
-use crate::{desktop_windows::hide_main_for_session, pipeline, processes, models::{AppSettings, CaptureSource}, state::AppState};
+use super::{settings::reattach_if_listening, CommandResult};
+use crate::{
+    desktop_windows::hide_main_for_session,
+    models::{AppSettings, CaptureSource},
+    pipeline, processes,
+    state::AppState,
+};
 use tauri::{AppHandle, Emitter, Manager};
 
 pub(crate) fn runtime_is_listening(state: &AppState) -> bool {
@@ -15,11 +20,9 @@ pub(crate) fn listening_toggle_target(state: &AppState) -> bool {
 }
 
 pub(crate) async fn apply_listening_state(app: AppHandle, enabled: bool) -> CommandResult<bool> {
-    tauri::async_runtime::spawn_blocking(move || {
-        set_listening_sync(&app, enabled)
-    })
-    .await
-    .map_err(|error| format!("งานควบคุมการฟังหยุดทำงาน: {error}"))?
+    tauri::async_runtime::spawn_blocking(move || set_listening_sync(&app, enabled))
+        .await
+        .map_err(|error| format!("งานควบคุมการฟังหยุดทำงาน: {error}"))?
 }
 
 pub async fn select_listening_source(

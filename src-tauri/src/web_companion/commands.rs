@@ -1,5 +1,10 @@
 use super::WebCommand;
-use crate::{application::{self, CommandResult}, application::listening::*, application::settings::*, state::AppState};
+use crate::{
+    application::listening::*,
+    application::settings::*,
+    application::{self, CommandResult},
+    state::AppState,
+};
 use tauri::{AppHandle, Emitter, Manager};
 
 pub async fn dispatch_web_command(
@@ -37,28 +42,32 @@ pub async fn dispatch_web_command(
             serde_json::to_value(settings).map_err(|error| error.to_string())?
         }
         WebCommand::UpdateRescueScan { enabled } => {
-            serde_json::to_value(update_rescue_scan_inner(app, &state, enabled)?).map_err(|error| error.to_string())?
+            serde_json::to_value(update_rescue_scan_inner(app, &state, enabled)?)
+                .map_err(|error| error.to_string())?
         }
         WebCommand::ProbeRecentAudio => {
             probe_recent_audio(app.clone(), &state)?;
             serde_json::Value::Null
         }
         WebCommand::UpdateHotkeys { hotkeys: next } => {
-            serde_json::to_value(update_hotkeys_inner(app, &state, next, false)?).map_err(|error| error.to_string())?
+            serde_json::to_value(update_hotkeys_inner(app, &state, next, false)?)
+                .map_err(|error| error.to_string())?
         }
         WebCommand::UpdateOverlaySettings { overlay } => {
-            serde_json::to_value(update_overlay_settings(app.clone(), &state, overlay)?).map_err(|error| error.to_string())?
+            serde_json::to_value(update_overlay_settings(app.clone(), &state, overlay)?)
+                .map_err(|error| error.to_string())?
         }
         WebCommand::UpdateVadSettings { vad } => {
             let settings = update_vad_inner(app, &state, vad)?;
             serde_json::to_value(settings).map_err(|error| error.to_string())?
         }
         WebCommand::UpdateGlossary { glossary } => {
-            serde_json::to_value(update_glossary_inner(app, &state, glossary)?).map_err(|error| error.to_string())?
+            serde_json::to_value(update_glossary_inner(app, &state, glossary)?)
+                .map_err(|error| error.to_string())?
         }
-        WebCommand::SetOverlayEditMode { enabled } => serde_json::json!(
-            application::set_overlay_edit_mode(app.clone(), enabled)?
-        ),
+        WebCommand::SetOverlayEditMode { enabled } => {
+            serde_json::json!(application::set_overlay_edit_mode(app.clone(), enabled)?)
+        }
         WebCommand::CopyLatestReply => {
             serde_json::json!(application::copy_latest_reply(app.clone())?)
         }

@@ -8,10 +8,14 @@ export { isDesktopRuntime, isWebCompanion } from "./transport/runtime";
 export { connectWebSnapshot } from "./transport/webSnapshots";
 
 // Preview keeps the existing visual-only navigation override. It is not an engine.
-export const api: AppApi = tauriRuntime ? desktopApi : previewRuntime ? {
-  ...webApi,
-  openSettingsWindow: () => {
-    window.location.hash = "#/settings/advanced";
-    return Promise.resolve();
-  },
-} : webApi;
+export const api: AppApi = tauriRuntime
+  ? desktopApi
+  : previewRuntime
+    ? {
+        ...webApi,
+        openSettingsWindow: () => {
+          window.location.hash = "#/settings/advanced";
+          return Promise.resolve();
+        },
+      }
+    : webApi;

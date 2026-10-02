@@ -1,6 +1,9 @@
-use std::{collections::VecDeque, sync::{Arc, atomic::AtomicU64}};
-use crate::models::StreamKind;
 use super::constants::*;
+use crate::models::StreamKind;
+use std::{
+    collections::VecDeque,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 pub(super) struct CaptureState {
     pub(super) pre_roll_samples: usize,
@@ -76,7 +79,11 @@ pub(super) fn truncate_ring(buffer: &mut StreamBuffer, cap: usize) {
     }
 }
 
-pub(super) fn slice_ring(buffer: &StreamBuffer, start_cursor: u64, end_cursor: u64) -> Option<Vec<i16>> {
+pub(super) fn slice_ring(
+    buffer: &StreamBuffer,
+    start_cursor: u64,
+    end_cursor: u64,
+) -> Option<Vec<i16>> {
     if start_cursor < buffer.ring_start_cursor
         || end_cursor < start_cursor
         || end_cursor > buffer.next_sample_cursor
@@ -122,4 +129,3 @@ pub(super) fn millis_to_samples(millis: u64) -> usize {
 pub(super) fn samples_to_millis(samples: usize) -> u64 {
     (samples as u64).saturating_mul(1_000) / SAMPLE_RATE as u64
 }
-

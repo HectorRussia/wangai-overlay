@@ -18,15 +18,22 @@ export function parseHashRoute(hash: string): AppRoute {
   const tab = match?.[1] ?? "overview";
   const section = match?.[2];
   if (advancedSections.includes(tab as AdvancedSection)) {
-    return { view: "settings", tab: "advanced", advancedSection: tab as AdvancedSection };
+    return {
+      view: "settings",
+      tab: "advanced",
+      advancedSection: tab as AdvancedSection,
+    };
   }
   if (tab === "advanced") {
     return {
       view: "settings",
       tab: "advanced",
-      advancedSection: section === undefined ? undefined : advancedSections.includes(section as AdvancedSection)
-        ? section as AdvancedSection
-        : "audio",
+      advancedSection:
+        section === undefined
+          ? undefined
+          : advancedSections.includes(section as AdvancedSection)
+            ? (section as AdvancedSection)
+            : "audio",
     };
   }
   if (settingsTabs.includes(tab as SettingsTab)) {
@@ -45,15 +52,21 @@ export function advancedHref(section: AdvancedSection): string {
 
 function isValidHash(hash: string): boolean {
   const normalized = hash.toLowerCase().replace(/\/$/, "");
-  return normalized === "#/overlay"
-    || settingsTabs.some((tab) => normalized === settingsHref(tab))
-    || advancedSections.some((section) =>
-      normalized === advancedHref(section) || normalized === `#/settings/${section}`,
-    );
+  return (
+    normalized === "#/overlay" ||
+    settingsTabs.some((tab) => normalized === settingsHref(tab)) ||
+    advancedSections.some(
+      (section) =>
+        normalized === advancedHref(section) ||
+        normalized === `#/settings/${section}`,
+    )
+  );
 }
 
 export function useHashRoute(): AppRoute {
-  const [route, setRoute] = useState(() => parseHashRoute(window.location.hash));
+  const [route, setRoute] = useState(() =>
+    parseHashRoute(window.location.hash),
+  );
 
   useEffect(() => {
     if (!isValidHash(window.location.hash)) {

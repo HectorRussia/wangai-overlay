@@ -1,6 +1,8 @@
 use crate::{hotkeys, models::AppSettings, state::AppState};
 use anyhow::Context;
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewWindow,
+};
 type CommandResult<T> = Result<T, String>;
 
 pub fn open_settings_window(app: AppHandle) -> CommandResult<()> {

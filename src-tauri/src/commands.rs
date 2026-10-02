@@ -1,7 +1,14 @@
 //! Tauri IPC adapter. Business operations live in application; native windows in desktop_windows.
-use crate::{application::{self, CommandResult}, desktop_windows, hotkeys,
-    models::{AppSettings, AppSnapshot, AudioOutputDevice, CaptureMode, CaptureSource, GlossaryTerm, HotkeySettings, OverlaySettings, VadSettings},
-    state::AppState, web_companion::{WebCompanionInfo, WebCompanionManager}};
+use crate::{
+    application::{self, CommandResult},
+    desktop_windows, hotkeys,
+    models::{
+        AppSettings, AppSnapshot, AudioOutputDevice, CaptureMode, CaptureSource, GlossaryTerm,
+        HotkeySettings, OverlaySettings, VadSettings,
+    },
+    state::AppState,
+    web_companion::{WebCompanionInfo, WebCompanionManager},
+};
 use tauri::{AppHandle, State, WebviewWindow};
 
 // Legacy discovery/default-device and demo commands remain registered for existing clients.
@@ -36,7 +43,11 @@ pub fn list_microphone_devices() -> CommandResult<Vec<AudioOutputDevice>> {
 }
 
 #[tauri::command]
-pub fn update_microphone_device(app: AppHandle, state: State<'_, AppState>, device_id: Option<String>) -> CommandResult<AppSettings> {
+pub fn update_microphone_device(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    device_id: Option<String>,
+) -> CommandResult<AppSettings> {
     application::settings::update_microphone_device(app, &state, device_id)
 }
 
@@ -195,13 +206,17 @@ pub fn inject_demo_transcript(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn set_overlay_presentation(presentation: crate::models::OverlayPresentation) -> CommandResult<()> {
+pub fn set_overlay_presentation(
+    presentation: crate::models::OverlayPresentation,
+) -> CommandResult<()> {
     let _ = presentation;
     Ok(())
 }
 
 #[tauri::command]
-pub fn quit_app(app: AppHandle) { app.exit(0); }
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
 
 #[cfg(test)]
 mod overlay_geometry_tests {
@@ -209,12 +224,27 @@ mod overlay_geometry_tests {
     fn microphone_changes_are_rejected_during_push_to_talk_and_default_is_persisted() {
         let temp = tempfile::tempdir().unwrap();
         let state = crate::state::AppState::new(temp.path().join("settings.json")).unwrap();
-        state.settings.update_microphone_device(Some("saved-device".into())).unwrap();
+        state
+            .settings
+            .update_microphone_device(Some("saved-device".into()))
+            .unwrap();
         state.update_runtime(|runtime| runtime.microphone_active = true);
-        assert!(application::settings::update_microphone_device_inner(&state, None).unwrap_err().contains("ปล่อยปุ่มพูด"));
-        assert_eq!(state.settings.snapshot().microphone_device_id.as_deref(), Some("saved-device"));
+        assert!(
+            application::settings::update_microphone_device_inner(&state, None)
+                .unwrap_err()
+                .contains("ปล่อยปุ่มพูด")
+        );
+        assert_eq!(
+            state.settings.snapshot().microphone_device_id.as_deref(),
+            Some("saved-device")
+        );
         state.update_runtime(|runtime| runtime.microphone_active = false);
-        assert_eq!(application::settings::update_microphone_device_inner(&state, None).unwrap().microphone_device_id, None);
+        assert_eq!(
+            application::settings::update_microphone_device_inner(&state, None)
+                .unwrap()
+                .microphone_device_id,
+            None
+        );
     }
 
     #[test]
@@ -223,8 +253,8 @@ mod overlay_geometry_tests {
         super::set_overlay_presentation(crate::models::OverlayPresentation::Expanded).unwrap();
     }
     use super::*;
-    use crate::desktop_windows::{centered_settings_position, anchored_overlay_position};
-    use tauri::{PhysicalSize, PhysicalPosition};
+    use crate::desktop_windows::{anchored_overlay_position, centered_settings_position};
+    use tauri::{PhysicalPosition, PhysicalSize};
     use tempfile::tempdir;
 
     #[test]
@@ -289,4 +319,3 @@ mod overlay_geometry_tests {
         );
     }
 }
-

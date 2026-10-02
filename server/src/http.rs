@@ -1,9 +1,18 @@
-use crate::{Gateway, Failure, error::fail, services, UPLOAD_LIMIT};
-use axum::{extract::{multipart::MultipartRejection, rejection::JsonRejection, DefaultBodyLimit, Multipart, State}, http::{HeaderMap, StatusCode}, routing::{get,post}, Json, Router};
+use crate::{error::fail, services, Failure, Gateway, UPLOAD_LIMIT};
+use axum::{
+    extract::{
+        multipart::MultipartRejection, rejection::JsonRejection, DefaultBodyLimit, Multipart, State,
+    },
+    http::{HeaderMap, StatusCode},
+    routing::{get, post},
+    Json, Router,
+};
 use serde_json::json;
 use std::{sync::Arc, time::Instant};
 use uuid::Uuid;
-use wangai_ai_protocol::{ErrorCode, ServiceStatus, TranscriptionResponse, TranslationRequest, TranslationResponse};
+use wangai_ai_protocol::{
+    ErrorCode, ServiceStatus, TranscriptionResponse, TranslationRequest, TranslationResponse,
+};
 
 pub fn router(state: Arc<Gateway>) -> Router {
     Router::new()
@@ -85,7 +94,9 @@ async fn transcribe(
         }
     }
     let audio = audio.ok_or_else(|| fail(ErrorCode::InvalidRequest))?;
-    services::transcribe(&state, id, start, audio, stream).await.map(Json)
+    services::transcribe(&state, id, start, audio, stream)
+        .await
+        .map(Json)
 }
 
 async fn translate(
@@ -112,4 +123,3 @@ fn multipart_error(error: axum::extract::multipart::MultipartError) -> Failure {
         ErrorCode::InvalidRequest
     })
 }
-

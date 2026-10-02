@@ -1,27 +1,22 @@
 mod migration;
 mod persistence;
 mod validation;
+#[cfg(test)]
+use crate::models::CaptureMode;
 use migration::migrate_serialized_settings;
 use validation::normalize;
 pub use validation::validate_portable_import;
-#[cfg(test)]
-use crate::models::CaptureMode;
 
 use std::{fs, path::PathBuf, sync::RwLock};
 
 use anyhow::{Context, Result};
 
-use crate::models::{
-    AppSettings, HotkeySettings, OverlaySettings, VadSettings,
-};
+use crate::models::{AppSettings, HotkeySettings, OverlaySettings, VadSettings};
 
 pub struct SettingsManager {
     path: PathBuf,
     inner: RwLock<AppSettings>,
 }
-
-
-
 
 impl SettingsManager {
     pub fn load(path: PathBuf) -> Result<Self> {
@@ -36,7 +31,12 @@ impl SettingsManager {
                 .unwrap_or(0)
                 < 16
             {
-                let backup = path.with_extension(if value["schemaVersion"].as_u64().unwrap_or(0) < 14 { "pre-v14.json" } else { "pre-v16.json" });
+                let backup =
+                    path.with_extension(if value["schemaVersion"].as_u64().unwrap_or(0) < 14 {
+                        "pre-v14.json"
+                    } else {
+                        "pre-v16.json"
+                    });
                 if !backup.exists() {
                     fs::copy(&path, &backup).context("สำรอง settings ก่อน migration ไม่สำเร็จ")?;
                 }
@@ -113,7 +113,10 @@ impl SettingsManager {
     }
 
     pub fn update_microphone_device(&self, device_id: Option<String>) -> Result<AppSettings> {
-        self.update(|settings| { settings.microphone_device_id = device_id; Ok(()) })
+        self.update(|settings| {
+            settings.microphone_device_id = device_id;
+            Ok(())
+        })
     }
 
     pub fn update_rescue_scan(&self, enabled: bool) -> Result<AppSettings> {
@@ -123,10 +126,6 @@ impl SettingsManager {
         })
     }
 }
-
-
-
-
 
 #[cfg(test)]
 mod tests;

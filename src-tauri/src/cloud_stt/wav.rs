@@ -28,4 +28,3 @@ pub fn encode_wav_pcm16(samples: &[i16], sample_rate: u32) -> Vec<u8> {
     }
     wav
 }
-

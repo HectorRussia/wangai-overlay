@@ -1,7 +1,7 @@
 use crate::Failure;
-use wangai_ai_protocol::{ApiError, ErrorCode};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
+use wangai_ai_protocol::{ApiError, ErrorCode};
 
 #[derive(Default)]
 pub(crate) struct Health {
@@ -22,7 +22,6 @@ impl Health {
         }
         Ok(())
     }
-
 
     pub(crate) fn record_result<T>(&mut self, result: &Result<T, Failure>) {
         match result {

@@ -8,7 +8,9 @@ class Socket {
   onmessage?: (event: { data: string }) => void;
   onclose?: () => void;
   close = vi.fn(() => this.onclose?.());
-  constructor(public url: string) { Socket.instances.push(this); }
+  constructor(public url: string) {
+    Socket.instances.push(this);
+  }
 }
 
 describe("Web Companion reconnect lifecycle", () => {
@@ -16,9 +18,15 @@ describe("Web Companion reconnect lifecycle", () => {
     vi.useFakeTimers();
     Socket.instances = [];
     vi.stubGlobal("WebSocket", Socket);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(snapshotFixture()))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(snapshotFixture()))),
+    );
   });
-  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it("polls during disconnection, stops polling on reconnect and cancels all timers on cleanup", async () => {
     const received = vi.fn();

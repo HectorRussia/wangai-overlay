@@ -15,10 +15,16 @@ export function useRunningApps(open: boolean) {
     pending.current = current;
     setLoading(true);
     try {
-      const result = isPreviewMode() ? previewRunningApps : await api.listRunningApps();
-      if (generation.current === current) { setApps(result); setError(undefined); }
+      const result = isPreviewMode()
+        ? previewRunningApps
+        : await api.listRunningApps();
+      if (generation.current === current) {
+        setApps(result);
+        setError(undefined);
+      }
     } catch (error) {
-      if (generation.current === current) setError(error instanceof Error ? error.message : String(error));
+      if (generation.current === current)
+        setError(error instanceof Error ? error.message : String(error));
     } finally {
       if (pending.current === current) pending.current = undefined;
       if (generation.current === current) setLoading(false);
@@ -28,7 +34,10 @@ export function useRunningApps(open: boolean) {
     if (!open) return;
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5000);
-    return () => { generation.current += 1; window.clearInterval(timer); };
+    return () => {
+      generation.current += 1;
+      window.clearInterval(timer);
+    };
   }, [open, refresh]);
   return { apps, loading, error, refresh };
 }

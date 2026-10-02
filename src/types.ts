@@ -1,6 +1,11 @@
 export type StreamKind = "incoming" | "microphone";
 export type TranscriptKind = "partial" | "final";
-export type TranslationStatus = "pending" | "success" | "error" | "quota" | "source_only";
+export type TranslationStatus =
+  | "pending"
+  | "success"
+  | "error"
+  | "quota"
+  | "source_only";
 export type CaptureMode = "process_tree" | "system_output";
 
 export interface CaptureSource {

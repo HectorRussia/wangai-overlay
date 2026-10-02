@@ -1,5 +1,13 @@
-use super::{CommandResult, listening::runtime_is_listening};
-use crate::{audio, hotkeys, pipeline, models::{AppSettings, CaptureMode, GlossaryTerm, HotkeySettings, OverlaySettings, StreamKind, VadSettings}, state::AppState};
+use super::{listening::runtime_is_listening, CommandResult};
+use crate::{
+    audio, hotkeys,
+    models::{
+        AppSettings, CaptureMode, GlossaryTerm, HotkeySettings, OverlaySettings, StreamKind,
+        VadSettings,
+    },
+    pipeline,
+    state::AppState,
+};
 use tauri::{AppHandle, Emitter};
 
 pub(crate) fn sync_active_vad_runtime(app: &AppHandle, state: &AppState, settings: &AppSettings) {
@@ -20,19 +28,40 @@ pub(crate) fn reattach_if_listening(app: &AppHandle, state: &AppState) -> Comman
     Ok(())
 }
 
-pub(crate) fn update_microphone_device_inner(state: &AppState, device_id: Option<String>) -> CommandResult<AppSettings> {
-    let _operation = state.lifecycle.operation().map_err(|error| error.to_string())?;
-    if state.runtime.read().expect("runtime lock poisoned").microphone_active {
+pub(crate) fn update_microphone_device_inner(
+    state: &AppState,
+    device_id: Option<String>,
+) -> CommandResult<AppSettings> {
+    let _operation = state
+        .lifecycle
+        .operation()
+        .map_err(|error| error.to_string())?;
+    if state
+        .runtime
+        .read()
+        .expect("runtime lock poisoned")
+        .microphone_active
+    {
         return Err("ปล่อยปุ่มพูดก่อนเปลี่ยนไมโครโฟน".into());
     }
-    let device_id = device_id.and_then(|id| { let id = id.trim(); (!id.is_empty()).then(|| id.to_string()) });
+    let device_id = device_id.and_then(|id| {
+        let id = id.trim();
+        (!id.is_empty()).then(|| id.to_string())
+    });
     if let Some(id) = device_id.as_deref() {
         audio::resolve_microphone_device(id).map_err(|error| error.to_string())?;
     }
-    state.settings.update_microphone_device(device_id).map_err(|error| error.to_string())
+    state
+        .settings
+        .update_microphone_device(device_id)
+        .map_err(|error| error.to_string())
 }
 
-pub fn update_microphone_device(app: AppHandle, state: &AppState, device_id: Option<String>) -> CommandResult<AppSettings> {
+pub fn update_microphone_device(
+    app: AppHandle,
+    state: &AppState,
+    device_id: Option<String>,
+) -> CommandResult<AppSettings> {
     let settings = update_microphone_device_inner(&state, device_id)?;
     let _ = app.emit("settings-updated", settings.clone());
     Ok(settings)
@@ -180,10 +209,17 @@ pub fn restart_worker(app: AppHandle, state: &AppState) -> CommandResult<()> {
 
 // Desktop historically restores the previous registration even when registration fails;
 // HTTP restores only when settings persistence fails. Preserve both policies.
-pub(crate) fn update_hotkeys_inner(app: &AppHandle, state: &AppState, next: HotkeySettings, restore_on_registration_error: bool) -> CommandResult<AppSettings> {
+pub(crate) fn update_hotkeys_inner(
+    app: &AppHandle,
+    state: &AppState,
+    next: HotkeySettings,
+    restore_on_registration_error: bool,
+) -> CommandResult<AppSettings> {
     let old = state.settings.snapshot().hotkeys;
     hotkeys::register_hotkeys(app, &next).map_err(|error| {
-        if restore_on_registration_error { let _ = hotkeys::register_hotkeys(app, &old); }
+        if restore_on_registration_error {
+            let _ = hotkeys::register_hotkeys(app, &old);
+        }
         error.to_string()
     })?;
     let settings = state.settings.update_hotkeys(next).map_err(|error| {
@@ -193,7 +229,11 @@ pub(crate) fn update_hotkeys_inner(app: &AppHandle, state: &AppState, next: Hotk
     Ok(settings)
 }
 
-pub(crate) fn update_rescue_scan_inner(app: &AppHandle, state: &AppState, enabled: bool) -> CommandResult<AppSettings> {
+pub(crate) fn update_rescue_scan_inner(
+    app: &AppHandle,
+    state: &AppState,
+    enabled: bool,
+) -> CommandResult<AppSettings> {
     let settings = state
         .settings
         .update_rescue_scan(enabled)
@@ -202,7 +242,11 @@ pub(crate) fn update_rescue_scan_inner(app: &AppHandle, state: &AppState, enable
     Ok(settings)
 }
 
-pub(crate) fn update_glossary_inner(_app: &AppHandle, state: &AppState, glossary: Vec<GlossaryTerm>) -> CommandResult<AppSettings> {
+pub(crate) fn update_glossary_inner(
+    _app: &AppHandle,
+    state: &AppState,
+    glossary: Vec<GlossaryTerm>,
+) -> CommandResult<AppSettings> {
     let settings = state
         .settings
         .update(|settings| {
@@ -213,7 +257,10 @@ pub(crate) fn update_glossary_inner(_app: &AppHandle, state: &AppState, glossary
     Ok(settings)
 }
 
-pub(crate) fn restart_worker_inner(app: &AppHandle, state: &AppState) -> CommandResult<AppSettings> {
+pub(crate) fn restart_worker_inner(
+    app: &AppHandle,
+    state: &AppState,
+) -> CommandResult<AppSettings> {
     let settings = state.settings.snapshot();
     state
         .worker

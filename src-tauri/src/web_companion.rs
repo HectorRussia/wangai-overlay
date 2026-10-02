@@ -285,7 +285,10 @@ async fn output_devices(State(context): State<WebContext>, headers: HeaderMap) -
     }
 }
 
-async fn default_microphone_name(State(context): State<WebContext>, headers: HeaderMap) -> Response {
+async fn default_microphone_name(
+    State(context): State<WebContext>,
+    headers: HeaderMap,
+) -> Response {
     if let Err(response) = require_session(&context, &headers) {
         return response;
     }
@@ -296,7 +299,9 @@ async fn default_microphone_name(State(context): State<WebContext>, headers: Hea
 }
 
 async fn microphone_devices(State(context): State<WebContext>, headers: HeaderMap) -> Response {
-    if let Err(response) = require_session(&context, &headers) { return response; }
+    if let Err(response) = require_session(&context, &headers) {
+        return response;
+    }
     match audio::list_microphone_devices() {
         Ok(devices) => Json(devices).into_response(),
         Err(error) => api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
@@ -429,10 +434,21 @@ mod tests {
 
     #[test]
     fn microphone_and_session_commands_round_trip_without_touching_ai_contracts() {
-        assert!(matches!(serde_json::from_value::<WebCommand>(json!({"command":"start_session"})).unwrap(), WebCommand::StartSession));
+        assert!(matches!(
+            serde_json::from_value::<WebCommand>(json!({"command":"start_session"})).unwrap(),
+            WebCommand::StartSession
+        ));
         for id in [serde_json::Value::Null, json!("usb-mic")] {
-            let command = serde_json::from_value::<WebCommand>(json!({"command":"update_microphone_device","args":{"device_id":id}})).unwrap();
-            match command { WebCommand::UpdateMicrophoneDevice { device_id } => assert_eq!(serde_json::to_value(device_id).unwrap(), id), _ => panic!("wrong command") }
+            let command = serde_json::from_value::<WebCommand>(
+                json!({"command":"update_microphone_device","args":{"device_id":id}}),
+            )
+            .unwrap();
+            match command {
+                WebCommand::UpdateMicrophoneDevice { device_id } => {
+                    assert_eq!(serde_json::to_value(device_id).unwrap(), id)
+                }
+                _ => panic!("wrong command"),
+            }
         }
     }
 

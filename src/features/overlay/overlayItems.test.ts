@@ -22,12 +22,9 @@ describe("visible overlay items", () => {
       item("message-1", now - 40_000),
     ];
 
-    expect(visibleOverlayItems(history, 4, 8, now).map((entry) => entry.segmentId)).toEqual([
-      "message-2",
-      "message-3",
-      "message-4",
-      "message-5",
-    ]);
+    expect(
+      visibleOverlayItems(history, 4, 8, now).map((entry) => entry.segmentId),
+    ).toEqual(["message-2", "message-3", "message-4", "message-5"]);
     expect(visibleOverlayItems(history, 4, 8, now + 8_000)).toEqual([]);
   });
 });

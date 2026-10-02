@@ -1,4 +1,8 @@
-use crate::{models::{StreamKind, TranscriptEvent, TranscriptKind}, state::AppState, translator::Translator};
+use crate::{
+    models::{StreamKind, TranscriptEvent, TranscriptKind},
+    state::AppState,
+    translator::Translator,
+};
 use tauri::{AppHandle, Emitter, Manager};
 
 pub async fn handle_transcript_event(

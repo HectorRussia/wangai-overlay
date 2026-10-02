@@ -24,13 +24,18 @@ export function useSnapshotController() {
     setLoadingError(undefined);
     try {
       // Web Companion already has its own websocket/polling reconnect loop.
-      const next = await loadSnapshot(api.snapshot, request.signal, isWebCompanion() ? 1 : 5);
+      const next = await loadSnapshot(
+        api.snapshot,
+        request.signal,
+        isWebCompanion() ? 1 : 5,
+      );
       if (mounted.current && !request.signal.aborted) {
         setSnapshot(next);
         setLoadingError(undefined);
       }
     } catch (error) {
-      if (mounted.current && !request.signal.aborted) setLoadingError(errorText(error));
+      if (mounted.current && !request.signal.aborted)
+        setLoadingError(errorText(error));
     } finally {
       if (activeRequest.current === request) activeRequest.current = undefined;
     }
@@ -55,11 +60,17 @@ export function useSnapshotController() {
           setSnapshot(next);
           setLoadingError(undefined);
         },
-        message => { if (!cancelled) setLoadingError(message); },
-      ).then((stop) => {
-        if (cancelled) stop();
-        else cleanup = stop;
-      }).catch((error) => { if (!cancelled) setLoadingError(errorText(error)); });
+        (message) => {
+          if (!cancelled) setLoadingError(message);
+        },
+      )
+        .then((stop) => {
+          if (cancelled) stop();
+          else cleanup = stop;
+        })
+        .catch((error) => {
+          if (!cancelled) setLoadingError(errorText(error));
+        });
       return () => {
         cancelled = true;
         cancelRequest();
@@ -67,8 +78,8 @@ export function useSnapshotController() {
       };
     }
     const stop = connectDesktopSnapshot(
-      event => setSnapshot(value => reduceSnapshot(value, event)),
-      error => setLoadingError(errorText(error)),
+      (event) => setSnapshot((value) => reduceSnapshot(value, event)),
+      (error) => setLoadingError(errorText(error)),
     );
     return () => {
       cancelRequest();

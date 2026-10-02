@@ -19,7 +19,10 @@ pub fn create_tray(app: &AppHandle) -> Result<()> {
     let stop = MenuItem::with_id(app, "stop", "หยุดใช้งาน", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "ออกจากโปรแกรม", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &stop, &quit])?;
-    let icon = app.default_window_icon().cloned().context("ไม่พบไอคอน WANGAI สำหรับ system tray")?;
+    let icon = app
+        .default_window_icon()
+        .cloned()
+        .context("ไม่พบไอคอน WANGAI สำหรับ system tray")?;
     TrayIconBuilder::new()
         .icon(icon)
         .tooltip("WANGAI")
@@ -30,7 +33,9 @@ pub fn create_tray(app: &AppHandle) -> Result<()> {
             "stop" => {
                 let handle = app.clone();
                 tauri::async_runtime::spawn_blocking(move || {
-                    if let Err(error) = crate::application::listening::set_listening_sync(&handle, false) {
+                    if let Err(error) =
+                        crate::application::listening::set_listening_sync(&handle, false)
+                    {
                         eprintln!("หยุด WANGAI จาก tray ไม่สำเร็จ: {error}");
                     }
                 });

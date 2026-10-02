@@ -9,13 +9,24 @@ export function useHotkeyRecorder(
   setHotkeys: (value: HotkeySettings) => void,
   onError: (message: string) => void,
 ) {
-  const [recordingHotkey, setRecordingHotkey] = useState<keyof HotkeySettings | null>(null);
+  const [recordingHotkey, setRecordingHotkey] = useState<
+    keyof HotkeySettings | null
+  >(null);
   const [hotkeyError, setHotkeyError] = useState<string>();
   useEffect(() => {
     if (!recordingHotkey || !hotkeys) return;
-    const cancel = () => { setRecordingHotkey(null); setHotkeyError(undefined); };
+    const cancel = () => {
+      setRecordingHotkey(null);
+      setHotkeyError(undefined);
+    };
     const record = (shortcut: string) => {
-      if (Object.entries(hotkeys).some(([key, value]) => key !== recordingHotkey && value.toLowerCase() === shortcut.toLowerCase())) {
+      if (
+        Object.entries(hotkeys).some(
+          ([key, value]) =>
+            key !== recordingHotkey &&
+            value.toLowerCase() === shortcut.toLowerCase(),
+        )
+      ) {
         setHotkeyError("ปุ่มลัดนี้ถูกใช้แล้ว เลือกปุ่มอื่น");
         return;
       }
@@ -27,10 +38,35 @@ export function useHotkeyRecorder(
       event.preventDefault();
       event.stopPropagation();
       if (event.repeat) return;
-      if (event.code === "Escape" || event.key === "Escape" || event.key === "Esc") { cancel(); return; }
-      if (["ControlLeft", "ControlRight", "AltLeft", "AltRight", "ShiftLeft", "ShiftRight", "MetaLeft", "MetaRight"].includes(event.code) || ["Control", "Alt", "Shift", "Meta"].includes(event.key)) return;
+      if (
+        event.code === "Escape" ||
+        event.key === "Escape" ||
+        event.key === "Esc"
+      ) {
+        cancel();
+        return;
+      }
+      if (
+        [
+          "ControlLeft",
+          "ControlRight",
+          "AltLeft",
+          "AltRight",
+          "ShiftLeft",
+          "ShiftRight",
+          "MetaLeft",
+          "MetaRight",
+        ].includes(event.code) ||
+        ["Control", "Alt", "Shift", "Meta"].includes(event.key)
+      )
+        return;
       const shortcut = shortcutFromKeydown(event);
-      if (!shortcut) { setHotkeyError("ปุ่มนี้ใช้เป็นปุ่มลัดไม่ได้ ลอง F1–F12 หรือ Ctrl/Alt ร่วมกับปุ่มอื่น"); return; }
+      if (!shortcut) {
+        setHotkeyError(
+          "ปุ่มนี้ใช้เป็นปุ่มลัดไม่ได้ ลอง F1–F12 หรือ Ctrl/Alt ร่วมกับปุ่มอื่น",
+        );
+        return;
+      }
       record(shortcut);
     };
     window.addEventListener("keydown", capture, true);
@@ -43,7 +79,11 @@ export function useHotkeyRecorder(
   }, [recordingHotkey, hotkeys]);
 
   const beginHotkeyCapture = async (key: keyof HotkeySettings) => {
-    if (recordingHotkey) { setRecordingHotkey(null); setHotkeyError(undefined); return; }
+    if (recordingHotkey) {
+      setRecordingHotkey(null);
+      setHotkeyError(undefined);
+      return;
+    }
     setHotkeyError(undefined);
     try {
       await api.setHotkeyCaptureMode(true);

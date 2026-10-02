@@ -1,9 +1,14 @@
 //! Operations shared by native commands and the authenticated local HTTP adapter.
-pub(crate) mod transcripts;
 pub(crate) mod listening;
 pub(crate) mod settings;
+pub(crate) mod transcripts;
 pub(crate) type CommandResult<T> = Result<T, String>;
-use crate::{audio, hotkeys, pipeline, processes, models::{AppSnapshot, CaptureSource, AudioOutputDevice}, state::AppState};
+use crate::{
+    audio, hotkeys,
+    models::{AppSnapshot, AudioOutputDevice, CaptureSource},
+    pipeline, processes,
+    state::AppState,
+};
 use tauri::AppHandle;
 
 pub fn get_snapshot(state: &AppState) -> AppSnapshot {

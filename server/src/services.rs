@@ -1,9 +1,17 @@
-use crate::{Gateway, Failure, error::fail, validate_wav};
+use crate::{error::fail, validate_wav, Failure, Gateway};
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
-use wangai_ai_protocol::{ErrorCode, TranscriptionResponse, TranslationRequest, TranslationResponse};
+use wangai_ai_protocol::{
+    ErrorCode, TranscriptionResponse, TranslationRequest, TranslationResponse,
+};
 
-pub(crate) async fn transcribe(state: &Gateway, id: String, start: Instant, audio: Vec<u8>, stream: Option<String>) -> Result<TranscriptionResponse, Failure> {
+pub(crate) async fn transcribe(
+    state: &Gateway,
+    id: String,
+    start: Instant,
+    audio: Vec<u8>,
+    stream: Option<String>,
+) -> Result<TranscriptionResponse, Failure> {
     let duration = validate_wav(&audio)?;
     let (model, language) = match stream.as_deref() {
         Some("incoming") => (&state.config.incoming_model, "en"),
@@ -50,7 +58,6 @@ pub(crate) async fn transcribe(state: &Gateway, id: String, start: Instant, audi
     Ok(parsed.unwrap())
 }
 
-
 pub(crate) fn valid_transcription(value: &TranscriptionResponse) -> bool {
     (value.text.trim().is_empty() || !value.segments.is_empty())
         && value.segments.iter().all(|s| {
@@ -66,7 +73,12 @@ pub(crate) fn valid_transcription(value: &TranscriptionResponse) -> bool {
         })
 }
 
-pub(crate) async fn translate(state: &Gateway, id: String, start: Instant, body: TranslationRequest) -> Result<TranslationResponse, Failure> {
+pub(crate) async fn translate(
+    state: &Gateway,
+    id: String,
+    start: Instant,
+    body: TranslationRequest,
+) -> Result<TranslationResponse, Failure> {
     if !matches!(
         (body.from.as_str(), body.to.as_str()),
         ("en", "th") | ("th", "en")
@@ -133,7 +145,6 @@ pub(crate) async fn translate(state: &Gateway, id: String, start: Instant, body:
     Ok(TranslationResponse { text })
 }
 
-
 pub(crate) fn protect_glossary(body: &TranslationRequest) -> (String, Vec<(String, String)>) {
     let mut text = body.text.clone();
     let mut replacements = Vec::new();
@@ -158,4 +169,3 @@ pub(crate) fn protect_glossary(body: &TranslationRequest) -> (String, Vec<(Strin
     }
     (text, replacements)
 }
-

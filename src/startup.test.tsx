@@ -1,11 +1,19 @@
 import { StrictMode } from "react";
-import { act, cleanup, fireEvent, render as renderView, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as renderView,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSnapshot } from "./types";
 import { snapshotFixture } from "./test/fixtures";
 
 const mocks = vi.hoisted(() => ({
-  snapshot: vi.fn(), web: vi.fn(() => false), connect: vi.fn(),
+  snapshot: vi.fn(),
+  web: vi.fn(() => false),
+  connect: vi.fn(),
   unlisten: [] as ReturnType<typeof vi.fn>[],
 }));
 vi.mock("./api", () => ({
@@ -13,40 +21,65 @@ vi.mock("./api", () => ({
     snapshot: mocks.snapshot,
     listOutputDevices: vi.fn(async () => []),
     defaultMicrophoneName: vi.fn(async () => "Microphone (Default)"),
-    getWebCompanionInfo: vi.fn(async () => ({ origin: "http://127.0.0.1", running: true })),
+    getWebCompanionInfo: vi.fn(async () => ({
+      origin: "http://127.0.0.1",
+      running: true,
+    })),
   },
   isWebCompanion: mocks.web,
   connectWebSnapshot: mocks.connect,
 }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => {
-    const stop = vi.fn(); mocks.unlisten.push(stop); return stop;
+    const stop = vi.fn();
+    mocks.unlisten.push(stop);
+    return stop;
   }),
 }));
-vi.mock("./features/updates/updates", () => ({ desktopUpdates: { available: () => false } }));
+vi.mock("./features/updates/updates", () => ({
+  desktopUpdates: { available: () => false },
+}));
 import { SettingsApp } from "./features/settings/SettingsApp";
 
 import { SnapshotProvider } from "./state/SnapshotProvider";
-const render = (ui: React.ReactNode) => renderView(ui, { wrapper: SnapshotProvider });
+const render = (ui: React.ReactNode) =>
+  renderView(ui, { wrapper: SnapshotProvider });
 
-const notReady = "state not managed for field `state` on command `get_snapshot`";
-const readyRoom = () => screen.queryByRole("region", { name: /กำลังแปลเสียง|แปลเสียงสด|เลือกแอปเพื่อเริ่ม/ });
-const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+const notReady =
+  "state not managed for field `state` on command `get_snapshot`";
+const readyRoom = () =>
+  screen.queryByRole("region", {
+    name: /กำลังแปลเสียง|แปลเสียงสด|เลือกแอปเพื่อเริ่ม/,
+  });
+const advance = (ms: number) =>
+  act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
 
 describe("real SettingsApp bootstrap (without mocking useSnapshot)", () => {
   beforeEach(() => {
-    vi.useFakeTimers(); mocks.snapshot.mockReset(); mocks.web.mockReturnValue(false);
-    mocks.connect.mockReset(); mocks.unlisten.length = 0;
+    vi.useFakeTimers();
+    mocks.snapshot.mockReset();
+    mocks.web.mockReturnValue(false);
+    mocks.connect.mockReset();
+    mocks.unlisten.length = 0;
     window.history.replaceState(null, "", "/#/settings/overview");
-    Object.defineProperty(window, "__TAURI_INTERNALS__", { configurable: true, value: {} });
+    Object.defineProperty(window, "__TAURI_INTERNALS__", {
+      configurable: true,
+      value: {},
+    });
   });
   afterEach(() => {
-    cleanup(); vi.useRealTimers();
+    cleanup();
+    vi.useRealTimers();
     Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   });
 
   it("recovers from early missing state and actually renders Ready Room", async () => {
-    mocks.snapshot.mockRejectedValueOnce(notReady).mockRejectedValueOnce(notReady).mockResolvedValue(snapshotFixture());
+    mocks.snapshot
+      .mockRejectedValueOnce(notReady)
+      .mockRejectedValueOnce(notReady)
+      .mockResolvedValue(snapshotFixture());
     render(<SettingsApp activeTab="overview" />);
     expect(screen.getByText("กำลังเปิด WANGAI")).toBeInTheDocument();
     await advance(2_000);
@@ -57,13 +90,17 @@ describe("real SettingsApp bootstrap (without mocking useSnapshot)", () => {
 
   it("shares one bootstrap and event subscription with nested advanced settings", async () => {
     mocks.snapshot.mockResolvedValue(snapshotFixture());
-    const view = render(<SettingsApp activeTab="advanced" advancedSection="audio" />);
+    const view = render(
+      <SettingsApp activeTab="advanced" advancedSection="audio" />,
+    );
     await advance(0);
     expect(screen.getByText("Incoming audio diagnostics")).toBeInTheDocument();
     expect(mocks.snapshot).toHaveBeenCalledOnce();
     expect(mocks.unlisten).toHaveLength(8);
     view.unmount();
-    expect(mocks.unlisten.every(stop => stop.mock.calls.length === 1)).toBe(true);
+    expect(mocks.unlisten.every((stop) => stop.mock.calls.length === 1)).toBe(
+      true,
+    );
   });
 
   it("stops automatic retries and offers a working keyboard-accessible retry button", async () => {
@@ -71,7 +108,9 @@ describe("real SettingsApp bootstrap (without mocking useSnapshot)", () => {
     render(<SettingsApp activeTab="overview" />);
     await advance(20_000);
     expect(mocks.snapshot).toHaveBeenCalledTimes(5);
-    expect(screen.getByRole("alert")).toHaveTextContent("ยังเปิด WANGAI ไม่สำเร็จ");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "ยังเปิด WANGAI ไม่สำเร็จ",
+    );
     const retry = screen.getByRole("button", { name: "ลองใหม่" });
     expect(retry).toHaveFocus();
     expect(document.querySelector(".animate-spin")).toBeNull();
@@ -85,13 +124,21 @@ describe("real SettingsApp bootstrap (without mocking useSnapshot)", () => {
 
   it("bounds hung IPC calls and ignores their late results", async () => {
     let resolveOld!: (value: AppSnapshot) => void;
-    mocks.snapshot.mockImplementationOnce(() => new Promise<AppSnapshot>(resolve => { resolveOld = resolve; }))
+    mocks.snapshot
+      .mockImplementationOnce(
+        () =>
+          new Promise<AppSnapshot>((resolve) => {
+            resolveOld = resolve;
+          }),
+      )
       .mockImplementation(() => new Promise(() => {}));
     render(<SettingsApp activeTab="overview" />);
     await advance(20_000);
     expect(screen.getByRole("button", { name: "ลองใหม่" })).toBeInTheDocument();
     expect(mocks.snapshot).toHaveBeenCalledTimes(5);
-    await act(async () => { resolveOld(snapshotFixture()); });
+    await act(async () => {
+      resolveOld(snapshotFixture());
+    });
     expect(readyRoom()).not.toBeInTheDocument();
     mocks.snapshot.mockResolvedValue(snapshotFixture());
     fireEvent.click(screen.getByRole("button", { name: "ลองใหม่" }));
@@ -108,17 +155,27 @@ describe("real SettingsApp bootstrap (without mocking useSnapshot)", () => {
     await advance(20_000);
     expect(mocks.snapshot).toHaveBeenCalledTimes(calls);
     expect(vi.getTimerCount()).toBe(0);
-    expect(mocks.unlisten.every(stop => stop.mock.calls.length === 1)).toBe(true);
+    expect(mocks.unlisten.every((stop) => stop.mock.calls.length === 1)).toBe(
+      true,
+    );
   });
 
   it("survives StrictMode cleanup/remount without a stale bootstrap winning", async () => {
-    mocks.snapshot.mockRejectedValueOnce(notReady).mockResolvedValue(snapshotFixture());
-    const view = render(<StrictMode><SettingsApp activeTab="overview" /></StrictMode>);
+    mocks.snapshot
+      .mockRejectedValueOnce(notReady)
+      .mockResolvedValue(snapshotFixture());
+    const view = render(
+      <StrictMode>
+        <SettingsApp activeTab="overview" />
+      </StrictMode>,
+    );
     await advance(2_000);
     expect(readyRoom()).toBeInTheDocument();
     view.unmount();
     expect(vi.getTimerCount()).toBe(0);
-    expect(mocks.unlisten.every(stop => stop.mock.calls.length === 1)).toBe(true);
+    expect(mocks.unlisten.every((stop) => stop.mock.calls.length === 1)).toBe(
+      true,
+    );
   });
 
   it("cancels the retry delay when the page closes", async () => {
@@ -137,14 +194,27 @@ describe("real SettingsApp bootstrap (without mocking useSnapshot)", () => {
     let resolveOld!: (value: AppSnapshot) => void;
     let connected!: (value: AppSnapshot) => void;
     const stop = vi.fn();
-    mocks.snapshot.mockImplementation(() => new Promise<AppSnapshot>(resolve => { resolveOld = resolve; }));
-    mocks.connect.mockImplementation(async onSnapshot => { connected = onSnapshot; return stop; });
+    mocks.snapshot.mockImplementation(
+      () =>
+        new Promise<AppSnapshot>((resolve) => {
+          resolveOld = resolve;
+        }),
+    );
+    mocks.connect.mockImplementation(async (onSnapshot) => {
+      connected = onSnapshot;
+      return stop;
+    });
     const view = render(<SettingsApp activeTab="overview" />);
     await advance(0);
-    await act(async () => { connected(snapshotFixture()); });
+    await act(async () => {
+      connected(snapshotFixture());
+    });
     expect(readyRoom()).toBeInTheDocument();
-    const stale = snapshotFixture(); stale.settings.listeningSource = undefined;
-    await act(async () => { resolveOld(stale); });
+    const stale = snapshotFixture();
+    stale.settings.listeningSource = undefined;
+    await act(async () => {
+      resolveOld(stale);
+    });
     expect(readyRoom()).toBeInTheDocument();
     view.unmount();
     expect(stop).toHaveBeenCalledOnce();

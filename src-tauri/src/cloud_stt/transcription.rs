@@ -45,4 +45,3 @@ pub(super) struct TranscriptionSegment {
     #[serde(default)]
     pub(super) compression_ratio: Option<f32>,
 }
-

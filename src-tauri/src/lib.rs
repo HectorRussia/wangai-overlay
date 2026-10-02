@@ -1,9 +1,9 @@
-mod application;
-mod desktop_windows;
 mod app_metadata;
+mod application;
 mod audio;
 mod cloud_stt;
 mod commands;
+mod desktop_windows;
 mod gateway;
 mod hotkeys;
 mod lifecycle;
@@ -16,8 +16,8 @@ mod release_test;
 mod settings;
 mod startup;
 mod state;
-mod tray;
 mod translator;
+mod tray;
 mod updater;
 mod web_companion;
 mod worker;
@@ -29,13 +29,20 @@ use state::AppState;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Validation is an internal, read-only host operation, before any GUI/state/server.
-    if let Some(path) = std::env::args_os().skip(1).collect::<Vec<_>>().windows(2)
-        .find(|pair| pair[0] == "--validate-portable-settings").map(|pair| pair[1].clone())
+    if let Some(path) = std::env::args_os()
+        .skip(1)
+        .collect::<Vec<_>>()
+        .windows(2)
+        .find(|pair| pair[0] == "--validate-portable-settings")
+        .map(|pair| pair[1].clone())
     {
-        let valid = std::fs::read(path).ok().is_some_and(|bytes| settings::validate_portable_import(&bytes).is_ok());
+        let valid = std::fs::read(path)
+            .ok()
+            .is_some_and(|bytes| settings::validate_portable_import(&bytes).is_ok());
         std::process::exit(if valid { 0 } else { 1 });
     }
-    let portable = portable_runtime::PortableRuntime::discover().expect("เปิดผ่าน WANGAI.exe ในโฟลเดอร์ Portable");
+    let portable = portable_runtime::PortableRuntime::discover()
+        .expect("เปิดผ่าน WANGAI.exe ในโฟลเดอร์ Portable");
     portable.configure_webview();
     let app = tauri::Builder::default()
         .manage(portable)
@@ -57,7 +64,9 @@ pub fn run() {
         .setup(|app| {
             #[cfg(feature = "release-test")]
             release_test::delay_startup(app.handle());
-            let settings_path = app.state::<portable_runtime::PortableRuntime>().settings_path(app.handle())?;
+            let settings_path = app
+                .state::<portable_runtime::PortableRuntime>()
+                .settings_path(app.handle())?;
             let state = AppState::new(settings_path)?;
             let settings = state.settings.snapshot();
             app.manage(state);
@@ -118,7 +127,10 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Focused(false)) {
                 let state = window.state::<AppState>();
-                if state.hotkey_capture_active.load(std::sync::atomic::Ordering::Relaxed) {
+                if state
+                    .hotkey_capture_active
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                {
                     let _ = hotkeys::set_capture_mode(window.app_handle(), &state, false);
                 }
             }

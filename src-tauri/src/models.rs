@@ -208,8 +208,12 @@ impl Default for OverlaySettings {
     }
 }
 
-fn fully_opaque() -> f64 { 1.0 }
-fn default_text_scale() -> f64 { 1.0 }
+fn fully_opaque() -> f64 {
+    1.0
+}
+fn default_text_scale() -> f64 {
+    1.0
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
@@ -514,4 +518,7 @@ mod worker_contract_tests {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum OverlayPresentation { Collapsed, Expanded }
+pub enum OverlayPresentation {
+    Collapsed,
+    Expanded,
+}

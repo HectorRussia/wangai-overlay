@@ -1,7 +1,7 @@
-mod jobs;
 mod buffer;
 mod constants;
 mod dedupe;
+mod jobs;
 mod queue;
 mod signal;
 mod transcription;
@@ -14,11 +14,9 @@ use signal::*;
 use transcription::TranscriptionResponse;
 use wav::*;
 
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -387,8 +385,6 @@ impl AiSttManager {
         self.enqueue_job(app, job)
     }
 
-
-
     pub fn reset_stream(&self, stream: StreamKind) {
         let mut inner = self
             .inner
@@ -413,8 +409,6 @@ impl AiSttManager {
             StreamKind::Microphone => {}
         }
     }
-
-
 
     fn queue(&self, stream: StreamKind) -> Arc<StreamQueue> {
         match stream {
@@ -514,8 +508,6 @@ fn report_probe_result(app: &AppHandle, stream: StreamKind, message: &str) {
     let _ = app.emit("pipeline-status", message.to_string());
 }
 
-
-
 fn source_display_name(state: &AppState, stream: StreamKind) -> Option<String> {
     let settings = state.settings.snapshot();
     let runtime = state.runtime.read().expect("runtime lock poisoned");
@@ -533,30 +525,6 @@ fn source_display_name(state: &AppState, stream: StreamKind) -> Option<String> {
         StreamKind::Microphone => Some("F9 REPLY".into()),
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[cfg(test)]
 mod tests;

@@ -1,11 +1,16 @@
-use anyhow::{anyhow, Result};
 use crate::models::{AppSettings, CaptureMode, OverlaySettings};
+use anyhow::{anyhow, Result};
 
 pub fn validate_portable_import(bytes: &[u8]) -> Result<()> {
     anyhow::ensure!(bytes.len() <= 8 * 1024 * 1024, "Settings file is too large");
     let value: serde_json::Value = serde_json::from_slice(bytes)?;
-    anyhow::ensure!((14..=16).contains(&value["schemaVersion"].as_u64().unwrap_or(0)), "Only schema v14, v15 or v16 settings can be imported");
-    let id = value["installationId"].as_str().ok_or_else(|| anyhow!("Missing installation ID"))?;
+    anyhow::ensure!(
+        (14..=16).contains(&value["schemaVersion"].as_u64().unwrap_or(0)),
+        "Only schema v14, v15 or v16 settings can be imported"
+    );
+    let id = value["installationId"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Missing installation ID"))?;
     uuid::Uuid::parse_str(id)?;
     for key in ["captureMode", "hotkeys", "overlay", "vad", "glossary"] {
         anyhow::ensure!(value.get(key).is_some(), "Missing settings field: {key}");
@@ -14,7 +19,10 @@ pub fn validate_portable_import(bytes: &[u8]) -> Result<()> {
     settings.schema_version = 16;
     let mut normalized = settings.clone();
     normalize(&mut normalized)?;
-    anyhow::ensure!(normalized == settings, "Settings need repair in the installed app before importing");
+    anyhow::ensure!(
+        normalized == settings,
+        "Settings need repair in the installed app before importing"
+    );
     Ok(())
 }
 
@@ -41,10 +49,14 @@ pub(super) fn normalize(settings: &mut AppSettings) -> Result<()> {
     settings.overlay.bubble_opacity = settings.overlay.bubble_opacity.clamp(0.6, 1.0);
     settings.overlay.text_opacity = settings.overlay.text_opacity.clamp(0.8, 1.0);
     settings.overlay.font_scale = settings.overlay.font_scale.clamp(0.7, 1.8);
-    settings.overlay.incoming_translation_scale = settings.overlay.incoming_translation_scale.clamp(0.8, 1.6);
-    settings.overlay.incoming_original_scale = settings.overlay.incoming_original_scale.clamp(0.8, 1.6);
-    settings.overlay.outgoing_translation_scale = settings.overlay.outgoing_translation_scale.clamp(0.8, 1.6);
-    settings.overlay.outgoing_original_scale = settings.overlay.outgoing_original_scale.clamp(0.8, 1.6);
+    settings.overlay.incoming_translation_scale =
+        settings.overlay.incoming_translation_scale.clamp(0.8, 1.6);
+    settings.overlay.incoming_original_scale =
+        settings.overlay.incoming_original_scale.clamp(0.8, 1.6);
+    settings.overlay.outgoing_translation_scale =
+        settings.overlay.outgoing_translation_scale.clamp(0.8, 1.6);
+    settings.overlay.outgoing_original_scale =
+        settings.overlay.outgoing_original_scale.clamp(0.8, 1.6);
     settings.overlay.fade_seconds = settings.overlay.fade_seconds.clamp(2, 60);
     settings.overlay.max_items = settings.overlay.max_items.clamp(1, 5);
     settings.overlay.width = settings.overlay.width.clamp(340, 1920);
@@ -76,7 +88,8 @@ pub(super) fn normalize(settings: &mut AppSettings) -> Result<()> {
         return Err(anyhow!("hotkey ต้องไม่ว่าง"));
     }
     for (index, hotkey) in hotkeys.iter().enumerate() {
-        hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>()
+        hotkey
+            .parse::<tauri_plugin_global_shortcut::Shortcut>()
             .map_err(|error| anyhow!("ปุ่มลัด {hotkey} ไม่ถูกต้อง: {error}"))?;
         if hotkeys
             .iter()
@@ -88,4 +101,3 @@ pub(super) fn normalize(settings: &mut AppSettings) -> Result<()> {
     }
     Ok(())
 }
-

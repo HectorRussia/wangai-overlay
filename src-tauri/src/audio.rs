@@ -68,7 +68,11 @@ pub(crate) fn list_microphone_devices() -> Result<Vec<AudioOutputDevice>> {
             channels: device.channels,
         })
         .collect();
-    inputs.sort_by(|a, b| b.is_default.cmp(&a.is_default).then_with(|| a.name.cmp(&b.name)));
+    inputs.sort_by(|a, b| {
+        b.is_default
+            .cmp(&a.is_default)
+            .then_with(|| a.name.cmp(&b.name))
+    });
     Ok(inputs)
 }
 
@@ -170,7 +174,12 @@ impl AudioManager {
         }
     }
 
-    pub fn start_microphone(&self, app: AppHandle, ai_stt: AiSttManager, device_id: Option<String>) -> Result<()> {
+    pub fn start_microphone(
+        &self,
+        app: AppHandle,
+        ai_stt: AiSttManager,
+        device_id: Option<String>,
+    ) -> Result<()> {
         let mut guard = self.microphone.lock().expect("mic capture lock poisoned");
         if guard.is_some() {
             return Ok(());
@@ -219,7 +228,11 @@ fn spawn_capture(
         .spawn(move || {
             let (source_kind, target_pid) =
                 capture_source_config(stream_kind, incoming_config.as_ref());
-            let device_id = if stream_kind == StreamKind::Microphone { microphone_device_id } else { capture_device_id(stream_kind, incoming_config.as_ref()) };
+            let device_id = if stream_kind == StreamKind::Microphone {
+                microphone_device_id
+            } else {
+                capture_device_id(stream_kind, incoming_config.as_ref())
+            };
             let config = StreamConfig {
                 kind: source_kind,
                 device_id,
@@ -235,7 +248,8 @@ fn spawn_capture(
             let mut stream = match open(config) {
                 Ok(stream) => stream,
                 Err(error) => {
-                    let _ = startup_tx.send(Err(format!("เปิด {stream_kind:?} capture ไม่สำเร็จ: {error}")));
+                    let _ = startup_tx
+                        .send(Err(format!("เปิด {stream_kind:?} capture ไม่สำเร็จ: {error}")));
                     capture_failed(
                         &app,
                         stream_kind,
@@ -245,7 +259,8 @@ fn spawn_capture(
                 }
             };
             if let Err(error) = stream.start() {
-                let _ = startup_tx.send(Err(format!("เริ่ม {stream_kind:?} capture ไม่สำเร็จ: {error}")));
+                let _ =
+                    startup_tx.send(Err(format!("เริ่ม {stream_kind:?} capture ไม่สำเร็จ: {error}")));
                 capture_failed(
                     &app,
                     stream_kind,
@@ -429,8 +444,6 @@ fn capture_failed(app: &AppHandle, stream_kind: StreamKind, message: String) {
     let _ = app.emit("runtime-state", runtime);
 }
 
-
-
 fn emit_microphone_audio_diagnostics(
     app: &AppHandle,
     sum_squares: f64,
@@ -445,8 +458,8 @@ fn emit_microphone_audio_diagnostics(
     let runtime = state.update_runtime(|runtime| {
         runtime.microphone_rms_dbfs = levels.map(|value| value.0);
         runtime.microphone_peak_dbfs = levels.map(|value| value.1);
-        runtime.microphone_last_seen_at_ms = (sample_count > 0)
-            .then(|| chrono::Utc::now().timestamp_millis());
+        runtime.microphone_last_seen_at_ms =
+            (sample_count > 0).then(|| chrono::Utc::now().timestamp_millis());
     });
     let _ = app.emit("runtime-state", runtime);
 }
@@ -499,16 +512,6 @@ fn capture_output_channels(stream_kind: StreamKind) -> u16 {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
 #[allow(clippy::too_many_arguments)]
 fn emit_playback_audio_diagnostics(
     app: &AppHandle,
@@ -539,9 +542,7 @@ fn emit_playback_audio_diagnostics(
         ))
     } else if no_audio_for >= Duration::from_secs(3) {
         Some(match config.capture_mode {
-            CaptureMode::ProcessTree => {
-                "ยังไม่พบเสียงจากแอปที่เลือก ลองตรวจแอปหรือฟังเสียงทั้งเครื่อง".into()
-            }
+            CaptureMode::ProcessTree => "ยังไม่พบเสียงจากแอปที่เลือก ลองตรวจแอปหรือฟังเสียงทั้งเครื่อง".into(),
             CaptureMode::SystemOutput => format!(
                 "ยังไม่ได้รับเสียงจาก {} ลองเลือกอุปกรณ์ที่แอปใช้อยู่",
                 config
@@ -552,9 +553,7 @@ fn emit_playback_audio_diagnostics(
         })
     } else if no_audible_for >= Duration::from_secs(3) {
         Some(match config.capture_mode {
-            CaptureMode::ProcessTree => {
-                "แอปที่เลือกยังไม่มีเสียง ลองตรวจแอปหรือฟังเสียงทั้งเครื่อง".into()
-            }
+            CaptureMode::ProcessTree => "แอปที่เลือกยังไม่มีเสียง ลองตรวจแอปหรือฟังเสียงทั้งเครื่อง".into(),
             CaptureMode::SystemOutput => {
                 format!(
                     "{} ยังไม่มีเสียง ลองตรวจว่าแอปใช้อุปกรณ์นี้อยู่",
@@ -603,7 +602,10 @@ mod tests {
     #[test]
     #[ignore = "Read-only check against the current Windows input devices"]
     fn live_default_microphone_discovery() {
-        println!("Windows default microphone: {:?}", default_microphone_name().unwrap());
+        println!(
+            "Windows default microphone: {:?}",
+            default_microphone_name().unwrap()
+        );
     }
 
     #[test]

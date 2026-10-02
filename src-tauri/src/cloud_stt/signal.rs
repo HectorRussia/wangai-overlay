@@ -73,4 +73,3 @@ pub(super) fn rms_dbfs(samples: &[i16]) -> f32 {
 pub(super) fn automatic_scan_samples(samples: Vec<i16>) -> Vec<i16> {
     samples
 }
-

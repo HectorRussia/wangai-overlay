@@ -7,7 +7,8 @@ import "./desktop-theme.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <SnapshotProvider><App /></SnapshotProvider>
+    <SnapshotProvider>
+      <App />
+    </SnapshotProvider>
   </React.StrictMode>,
 );
-

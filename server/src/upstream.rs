@@ -1,4 +1,4 @@
-use crate::{Gateway, Failure, error::fail};
+use crate::{error::fail, Failure, Gateway};
 use axum::http::{HeaderMap, StatusCode};
 use serde_json::Value;
 use std::time::SystemTime;
@@ -67,7 +67,6 @@ impl Gateway {
         self.health[stage].lock().unwrap().record_result(&result);
         result
     }
-
 }
 
 fn network_error(error: reqwest::Error) -> Failure {
@@ -97,4 +96,3 @@ fn retry_after(headers: &HeaderMap) -> u64 {
         .unwrap_or(5_000)
         .clamp(1, 86_400_000)
 }
-

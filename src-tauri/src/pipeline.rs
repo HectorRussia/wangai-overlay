@@ -97,8 +97,6 @@ pub fn handle_worker_event(app: AppHandle, event: WorkerEvent) {
     }
 }
 
-
-
 fn clear_incoming_runtime(runtime: &mut crate::models::RuntimeState) {
     runtime.attached_source = None;
     runtime.effective_capture_pid = None;
@@ -271,9 +269,10 @@ pub fn start_push_to_talk(app: &AppHandle) -> Result<()> {
     }
     state.ai_stt.reset_stream(StreamKind::Microphone);
     state.ai_stt.start_microphone(app);
-    if let Err(error) = state
-        .audio
-        .start_microphone(app.clone(), state.ai_stt.clone(), selected_mic)
+    if let Err(error) =
+        state
+            .audio
+            .start_microphone(app.clone(), state.ai_stt.clone(), selected_mic)
     {
         state.ai_stt.reset_stream(StreamKind::Microphone);
         return Err(error);
