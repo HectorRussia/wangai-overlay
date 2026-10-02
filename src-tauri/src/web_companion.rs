@@ -1,3 +1,5 @@
+mod commands;
+
 use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
@@ -26,7 +28,7 @@ use tokio::sync::oneshot;
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::{
-    audio, commands,
+    audio,
     models::{
         CaptureMode, CaptureSource, GlossaryTerm, HotkeySettings, OverlaySettings, VadSettings,
     },
@@ -263,7 +265,7 @@ async fn apps_list(State(context): State<WebContext>, headers: HeaderMap) -> Res
     if let Err(response) = require_session(&context, &headers) {
         return response;
     }
-    match commands::list_running_apps().await {
+    match crate::application::list_running_apps().await {
         Ok(apps) => Json(apps).into_response(),
         Err(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,

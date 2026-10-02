@@ -3,7 +3,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
-use crate::{commands, models::HotkeySettings, pipeline, state::AppState};
+use crate::{models::HotkeySettings, pipeline, state::AppState};
 
 pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
     let app_handle = app.clone();
@@ -79,10 +79,10 @@ fn toggle_listening(app: &AppHandle) {
         .read()
         .expect("runtime lock poisoned")
         .listening;
-    match pipeline::set_listening(app, listening) {
+    match crate::application::listening::set_listening_sync(app, listening) {
         Ok(true) => {
-            if let Err(error) = commands::hide_main_for_session(app, true) {
-                let _ = pipeline::set_listening(app, false);
+            if let Err(error) = crate::desktop_windows::hide_main_for_session(app, true) {
+                let _ = crate::application::listening::set_listening_sync(app, false);
                 emit_shortcut_error(app, error);
             }
         }

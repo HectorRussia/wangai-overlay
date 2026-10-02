@@ -5,7 +5,6 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{
     audio::{self, IncomingCaptureConfig},
-    commands,
     models::{
         CaptureMode, StreamKind, TranscriptEvent, TranscriptKind, TranslationResult, WorkerEvent,
         WorkerStatusEvent,
@@ -182,7 +181,7 @@ pub fn set_listening(app: &AppHandle, enabled: bool) -> Result<bool> {
             runtime.status_message = "หยุดฟังเสียงขาเข้าแล้ว".into();
         });
         let _ = app.emit("runtime-state", runtime);
-        commands::show_main_after_stop(app).map_err(anyhow::Error::msg)?;
+        crate::desktop_windows::show_main_after_stop(app).map_err(anyhow::Error::msg)?;
         return Ok(false);
     }
     let settings = state.settings.snapshot();
@@ -210,7 +209,7 @@ pub fn set_listening(app: &AppHandle, enabled: bool) -> Result<bool> {
         return Err(error);
     }
     let _ = app.emit("runtime-state", state.runtime.read().unwrap().clone());
-    commands::show_listening_overlay(app).map_err(anyhow::Error::msg)?;
+    crate::desktop_windows::show_listening_overlay(app).map_err(anyhow::Error::msg)?;
     Ok(true)
 }
 
@@ -340,7 +339,7 @@ pub fn start_push_to_talk(app: &AppHandle) -> Result<()> {
         runtime.status_message = "กำลังฟังไมค์ภาษาไทย".into();
     });
     let _ = app.emit("runtime-state", runtime);
-    commands::show_listening_overlay(app).map_err(anyhow::Error::msg)?;
+    crate::desktop_windows::show_listening_overlay(app).map_err(anyhow::Error::msg)?;
     Ok(())
 }
 

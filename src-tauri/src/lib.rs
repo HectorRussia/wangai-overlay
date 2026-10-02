@@ -1,3 +1,5 @@
+mod application;
+mod desktop_windows;
 mod app_metadata;
 mod audio;
 mod cloud_stt;
@@ -80,7 +82,7 @@ pub fn run() {
             #[cfg(feature = "release-test")]
             release_test::checkpoint(app.handle(), "windows-created");
             portable_runtime::start_readiness_monitor(app.handle().clone());
-            commands::restore_overlay_bounds(app.handle(), &settings)
+            crate::desktop_windows::restore_overlay_bounds(app.handle(), &settings)
                 .map_err(anyhow::Error::msg)?;
             hotkeys::register_hotkeys(app.handle(), &settings.hotkeys)?;
 
@@ -129,7 +131,7 @@ pub fn run() {
                         runtime.listening || runtime.microphone_active
                     };
                     if running {
-                        let _ = commands::show_listening_overlay(window.app_handle());
+                        let _ = crate::desktop_windows::show_listening_overlay(window.app_handle());
                     }
                     let _ = window.hide();
                 } else if window.label() == "overlay" {

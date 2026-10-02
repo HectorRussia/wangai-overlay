@@ -1,4 +1,3 @@
-use crate::pipeline;
 use anyhow::{Context, Result};
 use tauri::{
     menu::{Menu, MenuItem},
@@ -31,7 +30,7 @@ pub fn create_tray(app: &AppHandle) -> Result<()> {
             "stop" => {
                 let handle = app.clone();
                 tauri::async_runtime::spawn_blocking(move || {
-                    if let Err(error) = pipeline::set_listening(&handle, false) {
+                    if let Err(error) = crate::application::listening::set_listening_sync(&handle, false) {
                         eprintln!("หยุด WANGAI จาก tray ไม่สำเร็จ: {error}");
                     }
                 });
