@@ -35,3 +35,5 @@ export function useCommandTask(
   };
   return { busy, toast, setToast, run };
 }
+
+export type CommandTask = ReturnType<typeof useCommandTask>["run"];

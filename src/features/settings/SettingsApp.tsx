@@ -1,4 +1,6 @@
-import { Slider } from "../../shared/ui/Slider";
+import { button, primary, input } from "./styles";
+import { HotkeySettingsCard } from "./HotkeySettingsCard";
+import { OverlaySettingsCard } from "./OverlaySettingsCard";
 import { HistoryView } from "./HistoryView";
 import { useCommandTask } from "../../shared/useCommandTask";
 import { useHotkeyRecorder } from "./useHotkeyRecorder";
@@ -6,20 +8,15 @@ import { useCallback, useEffect, useState } from "react";
 import appIcon from "../../../app-icon.png";
 import {
   History,
-  KeyRound,
   LoaderCircle,
   RefreshCw,
-  Save,
   Settings2,
-  SlidersHorizontal,
   TriangleAlert,
   Volume2,
 } from "lucide-react";
 import { api } from "../../api";
 import { ProcessPickerDialog } from "../sources/ProcessPickerDialog";
 import { MicrophonePickerDialog } from "../sources/MicrophonePickerDialog";
-import { OverlayAppearancePreview } from "../overlay/OverlayAppearancePreview";
-import { displayShortcut } from "./hotkeyCapture";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { ReadyRoom } from "./ReadyRoom";
 import { UpdatePanel } from "../updates/UpdatePanel";
@@ -37,18 +34,6 @@ import type {
 } from "../../types";
 import { errorText, useSnapshot } from "../../state/useSnapshot";
 
-const button =
-  "settings-button settings-button-secondary inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-40";
-const primary =
-  "settings-button settings-button-primary inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-40";
-const input =
-  "settings-input min-h-11 min-w-0 w-full rounded-xl px-3 text-sm outline-none";
-const hotkeyLabels: Record<keyof HotkeySettings, string> = {
-  toggleListening: "เริ่มหรือหยุดฟัง",
-  pushToTalk: "กดพูดเพื่อแปลตอบ",
-  copyLatest: "คัดลอกคำตอบล่าสุด",
-  editOverlay: "จัดตำแหน่ง Overlay",
-};
 const isDesktop = () => "__TAURI_INTERNALS__" in window;
 const isWeb = () => !isDesktop() && !isPreviewMode();
 
@@ -162,10 +147,6 @@ export function SettingsApp({
       </main>
     );
   const { settings, runtime } = snapshot;
-  const validCaptionDuration =
-    Number.isInteger(overlay.fadeSeconds) &&
-    overlay.fadeSeconds >= 2 &&
-    overlay.fadeSeconds <= 60;
   const showAudioRecovery =
     settings.captureMode === "system_output" ||
     Boolean(runtime.captureWarning) ||
@@ -376,241 +357,32 @@ export function SettingsApp({
                     )}
                   </section>
                 )}
-                <section
-                  className="settings-direct-card"
-                  aria-labelledby="settings-overlay-title"
-                >
-                  <header>
-                    <SlidersHorizontal aria-hidden="true" />
-                    <div>
-                      <h2 id="settings-overlay-title">Overlay</h2>
-                      <p>ปรับแล้วดูตัวอย่างได้ทันที</p>
-                    </div>
-                  </header>
-                  <div className="settings-overlay-studio">
-                    <div className="settings-overlay-controls">
-                      <Slider
-                        label="พื้นหลังหน้าต่าง"
-                        min={0.2}
-                        max={1}
-                        step={0.05}
-                        value={overlay.opacity}
-                        display={`${Math.round(overlay.opacity * 100)}%`}
-                        onChange={(value) =>
-                          setOverlay({ ...overlay, opacity: value })
-                        }
-                      />
-                      <Slider
-                        label="พื้นกล่องข้อความ"
-                        min={0.6}
-                        max={1}
-                        step={0.05}
-                        value={overlay.bubbleOpacity}
-                        display={`${Math.round(overlay.bubbleOpacity * 100)}%`}
-                        onChange={(value) =>
-                          setOverlay({ ...overlay, bubbleOpacity: value })
-                        }
-                      />
-                      <Slider
-                        label="ตัวอักษร"
-                        min={0.8}
-                        max={1}
-                        step={0.05}
-                        value={overlay.textOpacity}
-                        display={`${Math.round(overlay.textOpacity * 100)}%`}
-                        onChange={(value) =>
-                          setOverlay({ ...overlay, textOpacity: value })
-                        }
-                      />
-                      <div
-                        className="settings-type-controls"
-                        aria-label="ขนาดข้อความใน Overlay"
-                      >
-                        <h3>ขนาดข้อความ</h3>
-                        <fieldset className="settings-type-group">
-                          <legend>เสียงจากแอป</legend>
-                          <Slider
-                            label="คำแปลไทย"
-                            min={0.8}
-                            max={1.6}
-                            step={0.05}
-                            value={overlay.incomingTranslationScale}
-                            display={`${Math.round(overlay.incomingTranslationScale * 100)}%`}
-                            onChange={(value) =>
-                              setOverlay({
-                                ...overlay,
-                                incomingTranslationScale: value,
-                              })
-                            }
-                          />
-                          <Slider
-                            label="ต้นฉบับอังกฤษ"
-                            min={0.8}
-                            max={1.6}
-                            step={0.05}
-                            value={overlay.incomingOriginalScale}
-                            display={`${Math.round(overlay.incomingOriginalScale * 100)}%`}
-                            onChange={(value) =>
-                              setOverlay({
-                                ...overlay,
-                                incomingOriginalScale: value,
-                              })
-                            }
-                          />
-                        </fieldset>
-                        <fieldset className="settings-type-group">
-                          <legend>คำตอบของเรา</legend>
-                          <Slider
-                            label="คำแปลอังกฤษ"
-                            min={0.8}
-                            max={1.6}
-                            step={0.05}
-                            value={overlay.outgoingTranslationScale}
-                            display={`${Math.round(overlay.outgoingTranslationScale * 100)}%`}
-                            onChange={(value) =>
-                              setOverlay({
-                                ...overlay,
-                                outgoingTranslationScale: value,
-                              })
-                            }
-                          />
-                          <Slider
-                            label="ต้นฉบับไทย"
-                            min={0.8}
-                            max={1.6}
-                            step={0.05}
-                            value={overlay.outgoingOriginalScale}
-                            display={`${Math.round(overlay.outgoingOriginalScale * 100)}%`}
-                            onChange={(value) =>
-                              setOverlay({
-                                ...overlay,
-                                outgoingOriginalScale: value,
-                              })
-                            }
-                          />
-                        </fieldset>
-                      </div>
-                      <div className="settings-overlay-secondary">
-                        <div className="settings-duration-field">
-                          <label
-                            className="settings-direct-label"
-                            htmlFor="caption-duration"
-                          >
-                            คำแปลค้างบนจอ
-                          </label>
-                          <div className="settings-duration-input">
-                            <input
-                              id="caption-duration"
-                              type="number"
-                              inputMode="numeric"
-                              min="2"
-                              max="60"
-                              step="1"
-                              value={overlay.fadeSeconds}
-                              onChange={(event) =>
-                                setOverlay({
-                                  ...overlay,
-                                  fadeSeconds: Number(event.target.value),
-                                })
-                              }
-                            />
-                            <span>วินาที</span>
-                          </div>
-                          {!validCaptionDuration && (
-                            <p className="settings-field-error" role="alert">
-                              ใส่ค่าระหว่าง 2 ถึง 60 วินาที
-                            </p>
-                          )}
-                        </div>
-                        <Slider
-                          label="จำนวนคำแปลที่แสดง"
-                          min={1}
-                          max={5}
-                          step={1}
-                          value={overlay.maxItems}
-                          display={`${overlay.maxItems} ข้อความ`}
-                          onChange={(value) =>
-                            setOverlay({ ...overlay, maxItems: value })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <OverlayAppearancePreview settings={overlay} />
-                  </div>
-                  <button
-                    className={button}
-                    disabled={busy === "overlay" || !validCaptionDuration}
-                    onClick={() =>
-                      void run(
-                        "overlay",
-                        () => api.updateOverlay(overlay),
-                        "บันทึกการแสดงผลแล้ว",
-                      )
-                    }
-                  >
-                    <Save />
-                    บันทึก Overlay
-                  </button>
-                </section>
-                <section
-                  className="settings-direct-card settings-hotkey-card"
-                  aria-labelledby="settings-hotkey-title"
-                >
-                  <header>
-                    <KeyRound aria-hidden="true" />
-                    <div>
-                      <h2 id="settings-hotkey-title">ปุ่มลัด</h2>
-                      <p>ใช้ควบคุมระหว่างเล่นเกม</p>
-                    </div>
-                  </header>
-                  <div className="settings-hotkey-grid">
-                    {Object.entries(hotkeys).map(([key, value]) => (
-                      <div className="settings-hotkey-label" key={key}>
-                        <span>{hotkeyLabels[key as keyof HotkeySettings]}</span>
-                        <button
-                          type="button"
-                          className="settings-hotkey-capture"
-                          aria-label={`เปลี่ยนปุ่มลัด ${hotkeyLabels[key as keyof HotkeySettings]}`}
-                          aria-pressed={recordingHotkey === key}
-                          disabled={Boolean(
-                            recordingHotkey && recordingHotkey !== key,
-                          )}
-                          onClick={() =>
-                            void beginHotkeyCapture(key as keyof HotkeySettings)
-                          }
-                        >
-                          {recordingHotkey === key
-                            ? "กดปุ่มที่ต้องการ…"
-                            : value
-                              ? displayShortcut(value)
-                              : "ไม่ได้ตั้ง"}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="settings-direct-hint">
-                    {"คลิกช่องเพื่อเปลี่ยนปุ่มลัด · Esc เพื่อยกเลิก"}
-                  </p>
-                  {hotkeyError && (
-                    <p className="settings-field-error" role="alert">
-                      {hotkeyError}
-                    </p>
-                  )}
-                  <button
-                    className={button}
-                    disabled={busy === "hotkeys" || Boolean(recordingHotkey)}
-                    onClick={() =>
-                      void run(
-                        "hotkeys",
-                        () => api.updateHotkeys(hotkeys),
-                        "บันทึกปุ่มลัดแล้ว",
-                      )
-                    }
-                  >
-                    <Save />
-                    บันทึกปุ่มลัด
-                  </button>
-                </section>
+                <OverlaySettingsCard
+                  overlay={overlay}
+                  setOverlay={setOverlay}
+                  busy={busy}
+                  onSave={() =>
+                    void run(
+                      "overlay",
+                      () => api.updateOverlay(overlay),
+                      "บันทึกการแสดงผลแล้ว",
+                    )
+                  }
+                />
+                <HotkeySettingsCard
+                  hotkeys={hotkeys}
+                  recordingHotkey={recordingHotkey}
+                  hotkeyError={hotkeyError}
+                  busy={busy}
+                  beginHotkeyCapture={beginHotkeyCapture}
+                  onSave={() =>
+                    void run(
+                      "hotkeys",
+                      () => api.updateHotkeys(hotkeys),
+                      "บันทึกปุ่มลัดแล้ว",
+                    )
+                  }
+                />
                 <details
                   className="settings-diagnostics settings-direct-footer"
                   open={advancedOpen}
