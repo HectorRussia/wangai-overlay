@@ -1,26 +1,26 @@
+import { Slider } from "../../shared/ui/Slider";
+import { useCommandTask } from "../../shared/useCommandTask";
 import { useCallback, useEffect, useState } from "react";
 import { AudioLines, Cloud, Cpu, Globe2, Languages, LoaderCircle, Plus, RefreshCw, Save, SlidersHorizontal, Trash2, TriangleAlert, Volume2 } from "lucide-react";
-import { api, type WebCompanionInfo } from "./api";
-import { ProcessPickerDialog } from "./ProcessPickerDialog";
-import { advancedHref, settingsHref, type AdvancedSection, type SettingsTab } from "./router";
-import { isPreviewMode, previewOutputDevices, previewNotification, previewListeningBusy } from "./preview";
-import { useRunningApps } from "./useRunningApps";
-import type { AudioOutputDevice, GlossaryTerm, VadSettings } from "./types";
-import { errorText, useSnapshot } from "./useSnapshot";
+import { api, type WebCompanionInfo } from "../../api";
+import { ProcessPickerDialog } from "../sources/ProcessPickerDialog";
+import { advancedHref, settingsHref, type AdvancedSection, type SettingsTab } from "../../router";
+import { isPreviewMode, previewOutputDevices } from "../../preview";
+import { useRunningApps } from "../sources/useRunningApps";
+import type { AudioOutputDevice, GlossaryTerm, VadSettings } from "../../types";
+import { errorText, useSnapshot } from "../../state/useSnapshot";
 
 const button = "settings-button settings-button-secondary inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 text-xs font-bold disabled:opacity-40";
 const primary = "settings-button settings-button-primary inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 text-xs font-bold disabled:opacity-40";
 const input = "settings-input min-h-11 min-w-0 w-full rounded-lg px-3 text-sm outline-none";
 const isDesktop = () => "__TAURI_INTERNALS__" in window;
-type Toast = { kind: "ok" | "error"; text: string };
 
 export function AdvancedSettings({ activeTab = "advanced", advancedSection = "audio" }: { activeTab?: SettingsTab; advancedSection?: AdvancedSection }) {
   const { snapshot, refresh, loadingError } = useSnapshot();
   const [devices, setDevices] = useState<AudioOutputDevice[]>([]);
   const [picker, setPicker] = useState(false);
   const runningApps = useRunningApps(picker);
-  const [busy, setBusy] = useState<string | undefined>(() => previewListeningBusy() ? "listen" : undefined);
-  const [toast, setToast] = useState<Toast | undefined>(previewNotification);
+  const { busy, toast, setToast, run } = useCommandTask(refresh, undefined);
   const [vad, setVad] = useState<VadSettings>();
   const [glossary, setGlossary] = useState<GlossaryTerm[]>([]);
   const [webInfo, setWebInfo] = useState<WebCompanionInfo>();
@@ -37,13 +37,6 @@ export function AdvancedSettings({ activeTab = "advanced", advancedSection = "au
   }, []);
   useEffect(() => { void loadDevices(); }, [loadDevices]);
   useEffect(() => { if (isDesktop()) void api.getWebCompanionInfo().then(setWebInfo).catch(() => undefined); }, []);
-
-  const run = async (key: string, task: () => Promise<unknown>, ok: string) => {
-    setBusy(key); setToast(undefined);
-    try { await task(); await refresh(); setToast({ kind: "ok", text: ok }); }
-    catch (error) { setToast({ kind: "error", text: errorText(error) }); }
-    finally { setBusy(undefined); }
-  };
 
   if (!snapshot || !vad) return <main className="settings-app grid min-h-screen place-content-center gap-4 p-6">
     {loadingError ? <section className="w-full max-w-xl space-y-4 rounded-2xl border border-white/10 bg-[#1d1f25] p-6">
@@ -76,7 +69,7 @@ export function AdvancedSettings({ activeTab = "advanced", advancedSection = "au
           <label className="mt-4 flex items-center gap-3 text-sm"><input checked={settings.rescueScanEnabled} type="checkbox" onChange={(event) => void run("rescue", () => api.updateRescueScan(event.target.checked), event.target.checked ? "เปิด Rescue Scan แล้ว" : "ปิด Rescue Scan แล้ว")} />Rescue Scan (ปิดเป็นค่าเริ่มต้น)</label>
         </Card>
         <Card title="Local Silero VAD" icon={<Cpu />} subtitle={`โปรไฟล์ ${settings.captureMode === "process_tree" ? "Process Tree" : "System Output"} จำค่าแยกกัน`}>
-          <div className="grid gap-5 md:grid-cols-2"><Slider label="VAD threshold" min={0.05} max={0.9} step={0.05} value={profile.vadThreshold} display={profile.vadThreshold.toFixed(2)} onChange={(value) => setVad({ ...vad, [profileKey]: { ...profile, vadThreshold: value } })} /><Slider label="VAD gain" min={0} max={18} step={1} value={profile.gainDb} display={`+${profile.gainDb} dB`} onChange={(value) => setVad({ ...vad, [profileKey]: { ...profile, gainDb: value } })} /><Slider label="จบเมื่อเงียบ" min={200} max={1500} step={100} value={vad.silenceMs} display={`${vad.silenceMs} ms`} onChange={(value) => setVad({ ...vad, silenceMs: value })} /><Slider label="Pre-roll" min={0} max={1000} step={50} value={vad.preRollMs} display={`${vad.preRollMs} ms`} onChange={(value) => setVad({ ...vad, preRollMs: value })} /></div><button className={`${primary} mt-5`} onClick={() => void run("vad", () => api.updateVad(vad), "บันทึก VAD แล้ว")}><Save />บันทึกและ Restart</button>
+          <div className="grid gap-5 md:grid-cols-2"><Slider inputClassName="mt-3 w-full accent-[#63c48b]" label="VAD threshold" min={0.05} max={0.9} step={0.05} value={profile.vadThreshold} display={profile.vadThreshold.toFixed(2)} onChange={(value) => setVad({ ...vad, [profileKey]: { ...profile, vadThreshold: value } })} /><Slider inputClassName="mt-3 w-full accent-[#63c48b]" label="VAD gain" min={0} max={18} step={1} value={profile.gainDb} display={`+${profile.gainDb} dB`} onChange={(value) => setVad({ ...vad, [profileKey]: { ...profile, gainDb: value } })} /><Slider inputClassName="mt-3 w-full accent-[#63c48b]" label="จบเมื่อเงียบ" min={200} max={1500} step={100} value={vad.silenceMs} display={`${vad.silenceMs} ms`} onChange={(value) => setVad({ ...vad, silenceMs: value })} /><Slider inputClassName="mt-3 w-full accent-[#63c48b]" label="Pre-roll" min={0} max={1000} step={50} value={vad.preRollMs} display={`${vad.preRollMs} ms`} onChange={(value) => setVad({ ...vad, preRollMs: value })} /></div><button className={`${primary} mt-5`} onClick={() => void run("vad", () => api.updateVad(vad), "บันทึก VAD แล้ว")}><Save />บันทึกและ Restart</button>
         </Card>
       </section>}
       {advancedSection === "ai" && <section className="space-y-4">
@@ -99,4 +92,3 @@ export function AdvancedSettings({ activeTab = "advanced", advancedSection = "au
 
 function Card({ title, subtitle, icon, children }: { title: string; subtitle: string; icon: React.ReactNode; children: React.ReactNode }) { return <section className="settings-card p-5"><header className="mb-5 flex gap-3"><span className="settings-card-icon grid size-10 place-items-center rounded-lg">{icon}</span><div><h2 className="font-bold text-white">{title}</h2><p className="text-xs text-[#9296a1]">{subtitle}</p></div></header>{children}</section>; }
 function Info({ label, value }: { label: string; value: string }) { return <div className="min-w-0 rounded-xl border border-white/8 bg-black/10 p-3"><small className="text-[#898d98]">{label}</small><p className="mt-1 break-all text-sm font-semibold text-white">{value}</p></div>; }
-function Slider({ label, min, max, step, value, display, onChange }: { label: string; min: number; max: number; step: number; value: number; display: string; onChange: (value: number) => void }) { return <label className="text-sm"><span className="flex justify-between"><span>{label}</span><strong className="settings-value">{display}</strong></span><input className="mt-3 w-full accent-[#63c48b]" min={min} max={max} step={step} type="range" value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>; }

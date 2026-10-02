@@ -1,4 +1,4 @@
-import type { SubtitleItem } from "./types";
+import type { SubtitleItem } from "../../types";
 
 export function visibleOverlayItems(
   history: SubtitleItem[],

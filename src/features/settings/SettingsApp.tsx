@@ -1,19 +1,23 @@
+import { Slider } from "../../shared/ui/Slider";
+import { HistoryView } from "./HistoryView";
+import { useCommandTask } from "../../shared/useCommandTask";
+import { useHotkeyRecorder } from "./useHotkeyRecorder";
 import { useCallback, useEffect, useState } from "react";
-import appIcon from "../app-icon.png";
+import appIcon from "../../../app-icon.png";
 import { History, KeyRound, LoaderCircle, RefreshCw, Save, Settings2, SlidersHorizontal, TriangleAlert, Volume2 } from "lucide-react";
-import { api } from "./api";
-import { ProcessPickerDialog } from "./ProcessPickerDialog";
-import { MicrophonePickerDialog } from "./MicrophonePickerDialog";
-import { OverlayAppearancePreview } from "./OverlayAppearancePreview";
-import { displayShortcut, shortcutFromKeydown } from "./hotkeyCapture";
+import { api } from "../../api";
+import { ProcessPickerDialog } from "../sources/ProcessPickerDialog";
+import { MicrophonePickerDialog } from "../sources/MicrophonePickerDialog";
+import { OverlayAppearancePreview } from "../overlay/OverlayAppearancePreview";
+import { displayShortcut } from "./hotkeyCapture";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { ReadyRoom } from "./ReadyRoom";
-import { UpdatePanel } from "./UpdatePanel";
-import { type AdvancedSection, type SettingsTab } from "./router";
-import { isPreviewMode, previewOutputDevices, previewMicrophoneDevices, previewNotification, previewListeningBusy } from "./preview";
-import { useRunningApps } from "./useRunningApps";
-import type { AudioOutputDevice, HotkeySettings, OverlaySettings, SubtitleItem } from "./types";
-import { errorText, useSnapshot } from "./useSnapshot";
+import { UpdatePanel } from "../updates/UpdatePanel";
+import { type AdvancedSection, type SettingsTab } from "../../router";
+import { isPreviewMode, previewOutputDevices, previewMicrophoneDevices } from "../../preview";
+import { useRunningApps } from "../sources/useRunningApps";
+import type { AudioOutputDevice, HotkeySettings, OverlaySettings } from "../../types";
+import { errorText, useSnapshot } from "../../state/useSnapshot";
 
 const button = "settings-button settings-button-secondary inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-40";
 const primary = "settings-button settings-button-primary inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-40";
@@ -26,7 +30,6 @@ const hotkeyLabels: Record<keyof HotkeySettings, string> = {
 };
 const isDesktop = () => "__TAURI_INTERNALS__" in window;
 const isWeb = () => !isDesktop() && !isPreviewMode();
-type Toast = { kind: "ok" | "error"; text: string };
 
 export function SettingsApp({ activeTab, advancedSection }: { activeTab: SettingsTab; advancedSection?: AdvancedSection }) {
   const { snapshot, refresh, loadingError } = useSnapshot();
@@ -38,20 +41,12 @@ export function SettingsApp({ activeTab, advancedSection }: { activeTab: Setting
   const [microphonePicker, setMicrophonePicker] = useState(false);
   const [picker, setPicker] = useState(false);
   const runningApps = useRunningApps(picker);
-  const [busy, setBusy] = useState<string | undefined>(() => previewListeningBusy() ? "listen" : undefined);
-  const [toast, setToast] = useState<Toast | undefined>(previewNotification);
+  const { busy, toast, setToast, run } = useCommandTask(refresh, 3500);
   const [hotkeys, setHotkeys] = useState<HotkeySettings>();
-  const [recordingHotkey, setRecordingHotkey] = useState<keyof HotkeySettings | null>(null);
-  const [hotkeyError, setHotkeyError] = useState<string>();
+  const { recordingHotkey, hotkeyError, beginHotkeyCapture } = useHotkeyRecorder(hotkeys, setHotkeys, text => setToast({ kind: "error", text }));
   const [advancedOpen, setAdvancedOpen] = useState(Boolean(advancedSection && advancedSection !== "controls"));
   useEffect(() => { setAdvancedOpen(Boolean(advancedSection && advancedSection !== "controls")); }, [advancedSection]);
   const [overlay, setOverlay] = useState<OverlaySettings>();
-
-  useEffect(() => {
-    if (toast?.kind !== "ok") return;
-    const timeout = window.setTimeout(() => setToast((current) => current === toast ? undefined : current), 3500);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
 
   useEffect(() => {
     if (!snapshot) return;
@@ -82,55 +77,6 @@ export function SettingsApp({ activeTab, advancedSection }: { activeTab: Setting
     window.addEventListener("focus", refreshOnFocus);
     return () => window.removeEventListener("focus", refreshOnFocus);
   }, [loadMicrophone]);
-
-  useEffect(() => {
-    if (!recordingHotkey || !hotkeys) return;
-    const cancel = () => { setRecordingHotkey(null); setHotkeyError(undefined); };
-    const record = (shortcut: string) => {
-      if (Object.entries(hotkeys).some(([key, value]) => key !== recordingHotkey && value.toLowerCase() === shortcut.toLowerCase())) {
-        setHotkeyError("ปุ่มลัดนี้ถูกใช้แล้ว เลือกปุ่มอื่น");
-        return;
-      }
-      setHotkeys({ ...hotkeys, [recordingHotkey]: shortcut });
-      setHotkeyError(undefined);
-      cancel();
-    };
-    const capture = (event: KeyboardEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.repeat) return;
-      if (event.code === "Escape" || event.key === "Escape" || event.key === "Esc") { cancel(); return; }
-      if (["ControlLeft", "ControlRight", "AltLeft", "AltRight", "ShiftLeft", "ShiftRight", "MetaLeft", "MetaRight"].includes(event.code) || ["Control", "Alt", "Shift", "Meta"].includes(event.key)) return;
-      const shortcut = shortcutFromKeydown(event);
-      if (!shortcut) { setHotkeyError("ปุ่มนี้ใช้เป็นปุ่มลัดไม่ได้ ลอง F1–F12 หรือ Ctrl/Alt ร่วมกับปุ่มอื่น"); return; }
-      record(shortcut);
-    };
-    window.addEventListener("keydown", capture, true);
-    window.addEventListener("blur", cancel);
-    return () => {
-      window.removeEventListener("keydown", capture, true);
-      window.removeEventListener("blur", cancel);
-      void api.setHotkeyCaptureMode(false);
-    };
-  }, [recordingHotkey, hotkeys]);
-
-  const beginHotkeyCapture = async (key: keyof HotkeySettings) => {
-    if (recordingHotkey) { setRecordingHotkey(null); setHotkeyError(undefined); return; }
-    setHotkeyError(undefined);
-    try {
-      await api.setHotkeyCaptureMode(true);
-      setRecordingHotkey(key);
-    } catch (error) {
-      setToast({ kind: "error", text: errorText(error) });
-    }
-  };
-
-  const run = async (key: string, task: () => Promise<unknown>, ok: string) => {
-    setBusy(key); setToast(undefined);
-    try { await task(); await refresh(); setToast({ kind: "ok", text: ok }); }
-    catch (error) { setToast({ kind: "error", text: errorText(error) }); }
-    finally { setBusy(undefined); }
-  };
 
   if (!snapshot || !hotkeys || !overlay) return <main className="settings-app grid min-h-screen place-content-center gap-4 p-6">
     {loadingError ? <section className="w-full max-w-xl space-y-4 rounded-2xl border p-6">
@@ -211,5 +157,3 @@ export function SettingsApp({ activeTab, advancedSection }: { activeTab: Setting
   </main>;
 }
 
-function Slider({ label, min, max, step, value, display, onChange }: { label: string; min: number; max: number; step: number; value: number; display: string; onChange: (value: number) => void }) { return <label className="text-sm"><span className="flex justify-between"><span>{label}</span><strong className="settings-value">{display}</strong></span><input className="mt-3 w-full" min={min} max={max} step={step} type="range" value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>; }
-function HistoryView({ history }: { history: SubtitleItem[] }) { return <section className="settings-history"><div className="settings-history-heading"><div><p className="eyebrow">บทสนทนา</p><h2>คำแปลในรอบนี้</h2></div><span>{history.length} รายการ</span></div><div className="settings-history-list">{history.map((item) => <article className="settings-history-item" key={item.segmentId}><div className="settings-history-meta"><span>{item.stream === "microphone" ? "F9 ตอบกลับ" : item.sourceDisplayName ?? "เสียงขาเข้า"}</span><time>{new Date(item.createdAtMs).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</time></div><div className="settings-history-copy"><p lang={item.originalLanguage}>{item.originalText}</p><strong>{item.translatedText ?? "กำลังแปล…"}</strong></div></article>)}{history.length === 0 && <p className="settings-history-empty">ยังไม่มีคำแปลในรอบนี้ · เริ่มใช้งานแล้วข้อความจะปรากฏที่นี่</p>}</div></section>; }

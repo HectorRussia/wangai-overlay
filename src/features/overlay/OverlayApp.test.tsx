@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppSnapshot } from "./types";
-import { snapshotFixture } from "./test/fixtures";
+import type { AppSnapshot } from "../../types";
+import { snapshotFixture } from "../../test/fixtures";
 
 const mocks = vi.hoisted(() => ({
   snapshot: undefined as AppSnapshot | undefined,
@@ -11,11 +11,11 @@ const mocks = vi.hoisted(() => ({
   setOverlayEditMode: vi.fn(async () => true),
 }));
 
-vi.mock("./useSnapshot", () => ({
+vi.mock("../../state/useSnapshot", () => ({
   useSnapshot: () => ({ snapshot: mocks.snapshot }),
 }));
 
-vi.mock("./api", () => ({
+vi.mock("../../api", () => ({
   api: {
     copyLatestReply: mocks.copyLatestReply,
     openSettingsWindow: mocks.openSettingsWindow,

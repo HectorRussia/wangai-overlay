@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { visibleOverlayItems } from "./overlayItems";
-import type { SubtitleItem } from "./types";
+import type { SubtitleItem } from "../../types";
 
 describe("visible overlay items", () => {
   it("keeps the latest four messages until the conversation becomes idle", () => {

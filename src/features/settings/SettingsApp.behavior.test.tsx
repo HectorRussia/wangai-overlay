@@ -1,15 +1,15 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsApp } from "./SettingsApp";
-import { api } from "./api";
-import { useSnapshot } from "./useSnapshot";
-import { snapshotFixture } from "./test/fixtures";
-import { previewRunningApps } from "./preview";
+import { api } from "../../api";
+import { useSnapshot } from "../../state/useSnapshot";
+import { snapshotFixture } from "../../test/fixtures";
+import { previewRunningApps } from "../../preview";
 
-vi.mock("./useSnapshot", () => ({ useSnapshot: vi.fn(), errorText: (error: unknown) => String(error) }));
-vi.mock("./updates", () => ({ desktopUpdates: { available: () => false } }));
+vi.mock("../../state/useSnapshot", () => ({ useSnapshot: vi.fn(), errorText: (error: unknown) => String(error) }));
+vi.mock("../updates/updates", () => ({ desktopUpdates: { available: () => false } }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => false }));
-vi.mock("./api", () => ({ api: {
+vi.mock("../../api", () => ({ api: {
   listOutputDevices: vi.fn(async () => []),
   listMicrophoneDevices: vi.fn(async () => []), startSession: vi.fn(async () => true),
   setHotkeyCaptureMode: vi.fn(async () => undefined),

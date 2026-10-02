@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { OverlaySettings } from "./types";
+import type { OverlaySettings } from "../../types";
 
 const examples = [
   { side: "incoming", translated: "ทางซ้ายปลอดภัย", original: "Left side is clear." },

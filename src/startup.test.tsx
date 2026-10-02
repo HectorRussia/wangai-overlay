@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render as renderView, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSnapshot } from "./types";
 import { snapshotFixture } from "./test/fixtures";
@@ -23,8 +23,11 @@ vi.mock("@tauri-apps/api/event", () => ({
     const stop = vi.fn(); mocks.unlisten.push(stop); return stop;
   }),
 }));
-vi.mock("./updates", () => ({ desktopUpdates: { available: () => false } }));
-import { SettingsApp } from "./SettingsApp";
+vi.mock("./features/updates/updates", () => ({ desktopUpdates: { available: () => false } }));
+import { SettingsApp } from "./features/settings/SettingsApp";
+
+import { SnapshotProvider } from "./state/SnapshotProvider";
+const render = (ui: React.ReactNode) => renderView(ui, { wrapper: SnapshotProvider });
 
 const notReady = "state not managed for field `state` on command `get_snapshot`";
 const readyRoom = () => screen.queryByRole("region", { name: /กำลังแปลเสียง|แปลเสียงสด|เลือกแอปเพื่อเริ่ม/ });
@@ -50,6 +53,17 @@ describe("real SettingsApp bootstrap (without mocking useSnapshot)", () => {
     expect(readyRoom()).toBeInTheDocument();
     expect(mocks.snapshot).toHaveBeenCalledTimes(3);
     expect(screen.queryByText(notReady)).not.toBeInTheDocument();
+  });
+
+  it("shares one bootstrap and event subscription with nested advanced settings", async () => {
+    mocks.snapshot.mockResolvedValue(snapshotFixture());
+    const view = render(<SettingsApp activeTab="advanced" advancedSection="audio" />);
+    await advance(0);
+    expect(screen.getByText("Incoming audio diagnostics")).toBeInTheDocument();
+    expect(mocks.snapshot).toHaveBeenCalledOnce();
+    expect(mocks.unlisten).toHaveLength(8);
+    view.unmount();
+    expect(mocks.unlisten.every(stop => stop.mock.calls.length === 1)).toBe(true);
   });
 
   it("stops automatic retries and offers a working keyboard-accessible retry button", async () => {

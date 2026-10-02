@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProcessPickerDialog } from "./ProcessPickerDialog";
-import { previewRunningApps } from "./preview";
-import type { RunningApp } from "./types";
+import { previewRunningApps } from "../../preview";
+import type { RunningApp } from "../../types";
 
 const appFixture = (): RunningApp => ({ ...previewRunningApps[1], processCount: 6, memberPids: [7210, 7211, 7212, 7213, 7214, 7215] });
 const props = () => ({ apps: [appFixture()], loading: false, previewMode: false, onClose: vi.fn(), onRefresh: vi.fn(), onSelect: vi.fn().mockResolvedValue(undefined) });

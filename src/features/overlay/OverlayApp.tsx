@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { AudioLines, Check, Clipboard, GripHorizontal, LockKeyhole, Mic, Settings, TriangleAlert } from "lucide-react";
-import { api } from "./api";
-import { audioLevel } from "./AudioWaveform";
+import { api } from "../../api";
+import { audioLevel } from "../../shared/ui/AudioWaveform";
 import { visibleOverlayItems } from "./overlayItems";
-import { isPreviewMode } from "./preview";
-import { useSnapshot } from "./useSnapshot";
+import { isPreviewMode } from "../../preview";
+import { useSnapshot } from "../../state/useSnapshot";
 
 export function OverlayApp() {
   const { snapshot } = useSnapshot();

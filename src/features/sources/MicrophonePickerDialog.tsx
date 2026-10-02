@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Mic, RefreshCw, X } from "lucide-react";
-import type { AudioOutputDevice } from "./types";
+import type { AudioOutputDevice } from "../../types";
 
 type Props = {
   devices: AudioOutputDevice[];

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { OverlayApp } from "./OverlayApp";
+import { OverlayApp } from "./features/overlay/OverlayApp";
 import { isPreviewMode } from "./preview";
-import { SettingsApp } from "./SettingsApp";
+import { SettingsApp } from "./features/settings/SettingsApp";
 import { useHashRoute } from "./router";
 
 export function App() {

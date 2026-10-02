@@ -1,8 +1,8 @@
 import { AudioLines, Check, ChevronRight, Cloud, Globe2, Headphones, LoaderCircle, Mic, Radio, ShieldCheck, TriangleAlert } from "lucide-react";
-import type { AppSettings, CaptureMode, RuntimeState } from "./types";
+import type { AppSettings, CaptureMode, RuntimeState } from "../../types";
 import { useEffect, type ReactNode } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { AudioWaveform } from "./AudioWaveform";
+import { AudioWaveform } from "../../shared/ui/AudioWaveform";
 
 type Props = {
   settings: AppSettings;

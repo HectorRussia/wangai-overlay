@@ -1,9 +1,9 @@
 import { act, renderHook, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api } from "./api";
+import { api } from "../../api";
 import { useRunningApps } from "./useRunningApps";
-import { previewRunningApps } from "./preview";
-vi.mock("./api", () => ({ api: { listRunningApps: vi.fn() } }));
+import { previewRunningApps } from "../../preview";
+vi.mock("../../api", () => ({ api: { listRunningApps: vi.fn() } }));
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.resetAllMocks(); });
 describe("running apps refresh lifecycle", () => {
   it("loads on each open, polls while open, and cancels polling on close", async () => {

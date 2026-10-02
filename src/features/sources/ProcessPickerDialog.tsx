@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Globe2, Info, LoaderCircle, Monitor, RefreshCw, Search, X } from "lucide-react";
-import type { CaptureSource, RunningApp, SavedProcess } from "./types";
+import type { CaptureSource, RunningApp, SavedProcess } from "../../types";
 
 type Props = {
   apps: RunningApp[];

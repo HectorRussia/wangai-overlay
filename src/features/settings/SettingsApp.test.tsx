@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReadyRoom } from "./ReadyRoom";
-import { snapshotFixture } from "./test/fixtures";
+import { snapshotFixture } from "../../test/fixtures";
 
 describe("single-source Ready Room", () => {
   afterEach(cleanup);

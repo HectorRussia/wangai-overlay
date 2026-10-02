@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "./api";
-import { isPreviewMode, previewRunningApps } from "./preview";
-import type { RunningApp } from "./types";
+import { api } from "../../api";
+import { isPreviewMode, previewRunningApps } from "../../preview";
+import type { RunningApp } from "../../types";
 
 export function useRunningApps(open: boolean) {
   const [apps, setApps] = useState<RunningApp[]>([]);

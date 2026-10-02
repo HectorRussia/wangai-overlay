@@ -1,16 +1,16 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "./App";
+import { App } from "../../App";
 import { SettingsApp } from "./SettingsApp";
-import { snapshotFixture } from "./test/fixtures";
-import { useSnapshot } from "./useSnapshot";
-import { api } from "./api";
+import { snapshotFixture } from "../../test/fixtures";
+import { useSnapshot } from "../../state/useSnapshot";
+import { api } from "../../api";
 
-vi.mock("./useSnapshot", () => ({
+vi.mock("../../state/useSnapshot", () => ({
   useSnapshot: vi.fn(),
   errorText: (error: unknown) => String(error),
 }));
-vi.mock("./api", () => ({
+vi.mock("../../api", () => ({
   api: {
     listRunningApps: vi.fn().mockResolvedValue([]),
     listOutputDevices: vi.fn().mockResolvedValue([]),
