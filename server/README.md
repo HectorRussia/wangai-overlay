@@ -19,7 +19,7 @@ In another terminal at the repository root:
 
 ```powershell
 $env:WANGAI_API_BASE_URL = "http://127.0.0.1:8080"
-pnpm tauri dev
+pnpm --dir apps/desktop tauri dev
 ```
 
 `.env` loads once at process startup; existing process environment takes precedence.
@@ -73,11 +73,12 @@ writer are process-local. The container runs as uid 10001. On SIGTERM it stops
 accepting connections, drains requests, then flushes queued statistics. Do not use
 `docker compose down -v` unless intentionally deleting all usage history.
 
-Build a distributable desktop with its public gateway URL (not provider secrets):
+From the repository root, build a distributable desktop with its public gateway URL
+(not provider secrets):
 
 ```powershell
 $env:WANGAI_API_BASE_URL = "https://your-gateway.example"
-pnpm tauri build
+pnpm --dir apps/desktop tauri build
 ```
 
 Release builds require an HTTPS gateway URL. Debug builds default to loopback 8080.
