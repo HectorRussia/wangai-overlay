@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  ArrowUpRight,
   AudioLines,
   Check,
   Gamepad2,
@@ -14,7 +13,6 @@ import { Brand } from "@/components/ui/Brand";
 import { DownloadLink } from "@/components/ui/DownloadLink";
 import { TranslationDemo } from "@/components/sections/TranslationDemo";
 import { faqs } from "@/content/home";
-import { site } from "@/config/site";
 
 export default function Home() {
   return (
@@ -121,9 +119,6 @@ export default function Home() {
               <br />
               <span className="muted-heading">ที่พบบ่อย</span>
             </h2>
-            <a className="text-link" href={`${site.repository}/issues`}>
-              สอบถามเพิ่มเติม <ArrowUpRight size={16} aria-hidden="true" />
-            </a>
           </div>
           <div className="faq-list">
             {faqs.map((faq) => (
@@ -156,12 +151,6 @@ export default function Home() {
           <Brand />
         </a>
         <p>AI แปลเสียงพูดระหว่างเล่นเกม</p>
-        <nav aria-label="ลิงก์เพิ่มเติม">
-          <a href={site.guide}>คู่มือ</a>
-          <a href={site.repository}>
-            GitHub <ArrowUpRight size={14} aria-hidden="true" />
-          </a>
-        </nav>
       </footer>
     </>
   );
