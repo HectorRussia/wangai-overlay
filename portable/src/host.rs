@@ -84,7 +84,13 @@ pub fn legacy_settings() -> Option<PathBuf> {
 }
 pub fn work(task:Task, root:PathBuf, import:bool, cancel:Arc<AtomicBool>, report:Reporter) -> Result<()> {
     match task {
-        Task::Prepare(exe) => {
+        Task::Prepare(exe) => prepare(exe, root, import, cancel, report),
+        Task::Apply(nonce) => apply_update(nonce, root, report),
+        Task::Recover => recover(root, report),
+    }
+}
+
+fn prepare(exe:PathBuf, root:PathBuf, import:bool, cancel:Arc<AtomicBool>, report:Reporter) -> Result<()> {
             ensure_no_other_app(None)?;
             let layout = PortableLayout::initialize(&root)?; let _lock = layout.lock()?;
             ensure!(transaction::journal(&layout)?.is_none(),"มีการอัปเดตค้างอยู่ กรุณาเปิด WANGAI.exe เพื่อกู้คืนก่อน");
@@ -121,8 +127,9 @@ pub fn work(task:Task, root:PathBuf, import:bool, cancel:Arc<AtomicBool>, report
             })();
             if transaction::journal(&layout)?.is_none() { let _=layout.cleanup_transaction(&nonce); }
             result
-        }
-        Task::Apply(nonce) => {
+}
+
+fn apply_update(nonce:String, root:PathBuf, report:Reporter) -> Result<()> {
             let layout=PortableLayout::open(&root)?;
             let folder=layout.transaction(&nonce)?;
             let request:UpdateRequest=read_json(&folder.join("request.json"))?;
@@ -140,8 +147,9 @@ pub fn work(task:Task, root:PathBuf, import:bool, cancel:Arc<AtomicBool>, report
             ensure!(manifest.version==request.version,"Staged update version mismatch");
             report(Progress::Status("กำลังเปลี่ยนชุดโปรแกรม…".into(),60,false));
             apply_and_launch(&layout,&nonce,&request.version,&report)
-        }
-        Task::Recover => {
+}
+
+fn recover(root:PathBuf, report:Reporter) -> Result<()> {
             let layout=PortableLayout::open(&root)?; let _lock=layout.lock()?;
             ensure_no_other_app(None)?;
             report(Progress::Status("กำลังกู้คืนการอัปเดตที่หยุดกลางทาง…".into(),30,false));
@@ -150,9 +158,8 @@ pub fn work(task:Task, root:PathBuf, import:bool, cancel:Arc<AtomicBool>, report
             launch_ready(&layout,&nonce,&restored).context("กู้คืนไฟล์แล้ว แต่เปิดโปรแกรมไม่ได้ กรุณาตรวจไฟล์หรือเตรียม Portable ในโฟลเดอร์ใหม่ ข้อมูล Data ไม่ถูกลบ")?;
             crate::ui::error("คืนโปรแกรมรุ่นก่อนหน้าแล้ว ข้อมูลใน Data ไม่ถูกย้อนทับ กรุณาลองอัปเดตอีกครั้งภายหลัง");
             Ok(())
-        }
-    }
 }
+
 fn apply_and_launch(layout:&PortableLayout,nonce:&str,version:&str,report:&Reporter) -> Result<()> {
     let result=(|| {
         transaction::begin(layout,nonce,PUBLIC_KEY)?;

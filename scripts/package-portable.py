@@ -51,10 +51,7 @@ def sign(path,verifier):
     subprocess.run([str(verifier),str(path),str(path)+'.sig'],check=True)
     return signature
 
-def build(args):
-    output=args.output.resolve()
-    if output.exists() and any(output.iterdir()): raise ValueError('Choose an empty artifact directory; existing artifacts are never overwritten')
-    output.mkdir(parents=True,exist_ok=True)
+def collect_inputs(args):
     version=args.version or json.loads((ROOT/'package.json').read_text())['version']
     notes = release_notes(version)
     pin=json.loads((ROOT/'portable/webview2.lock.json').read_text())
@@ -69,26 +66,42 @@ def build(args):
         if audit[name]!=2: raise ValueError(f'Console entrypoint is forbidden: {name}')
     # Python/worker utility executables may be CUI. The core launches its worker
     # with CREATE_NO_WINDOW and redirected pipes; none is a user entrypoint.
+    return version, notes, pin, files, audit
+
+
+def write_manifest(output, version, pin, files, verifier):
     manifest={'format':1,'product':'dev.gamelingo.overlay.portable','version':version,'architecture':'x86_64','bootstrapMin':1,'bootstrapMax':1,'webviewVersion':pin['version'],
         'files':{name:{'size':file.stat().st_size,'sha256':digest(file)} for name,file in sorted(files.items())}}
     if sum(v['size'] for v in manifest['files'].values())>4*1024**3: raise ValueError('Expanded package exceeds 4 GiB')
     manifest_file=output/'package-manifest.json';manifest_file.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
-    sign(manifest_file,args.verifier)
+    sign(manifest_file,verifier)
+    return manifest_file
+
+
+def write_payload(output, version, files, manifest_file, verifier):
     payload=output/f'WANGAI_{version}_x64-update.zip'
     with zipfile.ZipFile(payload,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=6,allowZip64=True,strict_timestamps=False) as archive:
         for name,file in sorted(files.items()): archive.write(file,name)
         archive.write(manifest_file,manifest_file.name)
         archive.write(Path(str(manifest_file)+'.sig'),manifest_file.name+'.sig')
     if payload.stat().st_size>1024**3: raise ValueError('Archive exceeds 1 GiB')
-    signature=sign(payload,args.verifier)
+    signature=sign(payload,verifier)
+    return payload, signature
+
+
+def embed_portable(output, version, host, payload, signature, verifier):
     portable=output/f'WANGAI_{version}_x64-portable.exe'
     with portable.open('xb') as dest:
-        with args.host.open('rb') as source: shutil.copyfileobj(source,dest)
+        with host.open('rb') as source: shutil.copyfileobj(source,dest)
         offset=dest.tell()
         with payload.open('rb') as source: shutil.copyfileobj(source,dest)
         sig=signature.encode('utf8');dest.write(sig)
         dest.write(struct.pack('<16sQQQ',b'WANGAI_PORTABLE1',offset,payload.stat().st_size,len(sig)))
-    sign(portable,args.verifier)
+    sign(portable,verifier)
+    return portable
+
+
+def write_release_metadata(output, version, notes, payload, signature, audit):
     (output/'RELEASE-NOTES.md').write_text(notes,encoding='utf8')
     channel={'version':version,'notes':notes,'pub_date':datetime.now(timezone.utc).isoformat(),'platforms':{'windows-x86_64':{'url':f'{REPO}/v{version}/{payload.name}','signature':signature}}}
     (output/'latest-portable.json').write_text(json.dumps(channel,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
@@ -96,6 +109,17 @@ def build(args):
     (output/'windows-subsystems.json').write_text(json.dumps(audit,indent=2)+'\n',encoding='utf8')
     shutil.copyfile(ROOT/'portable/webview2.lock.json',output/'webview2.lock.json')
     (output/'SHA256SUMS.txt').write_text(''.join(f'{digest(file)}  {file.name}\n' for file in sorted(output.iterdir()) if file.is_file()),encoding='utf8')
+
+
+def build(args):
+    output=args.output.resolve()
+    if output.exists() and any(output.iterdir()): raise ValueError('Choose an empty artifact directory; existing artifacts are never overwritten')
+    output.mkdir(parents=True,exist_ok=True)
+    version, notes, pin, files, audit = collect_inputs(args)
+    manifest = write_manifest(output, version, pin, files, args.verifier)
+    payload, signature = write_payload(output, version, files, manifest, args.verifier)
+    portable = embed_portable(output, version, args.host, payload, signature, args.verifier)
+    write_release_metadata(output, version, notes, payload, signature, audit)
     print(f'Prepared {portable.name}: {portable.stat().st_size:,} bytes. Not published.')
 
 if __name__=='__main__':
