@@ -1,78 +1,67 @@
-# WANGAI Landing Page
+# WANGAI landing page
 
-โครงสร้างเริ่มต้นสำหรับส่งต่อการพัฒนาเว็บไซต์แนะนำ WANGAI ด้วย **Next.js App Router + React + TypeScript + Tailwind CSS**
+เว็บไซต์แนะนำ WANGAI ภาษาไทย ใช้ Next.js App Router, React, TypeScript และ Tailwind CSS เป็นแอปแยกจาก desktop ไม่เรียก Tauri, ไมโครโฟน หรือบริการ AI จากเว็บไซต์
 
-**สถานะ: มีเฉพาะโฟลเดอร์และเอกสาร ยังรันหรือ deploy ไม่ได้** ยังไม่มี `package.json`, dependencies, Next.js configuration หรือหน้าเว็บที่ใช้งานได้
+## Run
 
-## โครงสร้างและหน้าที่
+ใช้ Node.js 22 ขึ้นไป รันจาก `apps/landing`:
 
-```text
-apps/landing/
-├─ README.md
-├─ public/
-│  ├─ images/
-│  │  └─ .gitkeep
-│  └─ fonts/
-│     └─ .gitkeep
-└─ src/
-   ├─ app/
-   │  └─ .gitkeep
-   ├─ components/
-   │  ├─ layout/
-   │  │  └─ .gitkeep
-   │  ├─ sections/
-   │  │  └─ .gitkeep
-   │  └─ ui/
-   │     └─ .gitkeep
-   ├─ content/
-   │  └─ .gitkeep
-   ├─ config/
-   │  └─ .gitkeep
-   └─ styles/
-      └─ .gitkeep
+```sh
+npm ci
+npm run dev
 ```
 
-| โฟลเดอร์ | หน้าที่ |
-| --- | --- |
-| `public/images` | รูปภาพ โลโก้ และภาพตัวอย่างสำหรับเว็บไซต์ |
-| `public/fonts` | ไฟล์ฟอนต์ที่เว็บไซต์ให้บริการเอง |
-| `src/app` | Routes, root layout, metadata และไฟล์ SEO ตาม convention ของ Next.js |
-| `src/components/layout` | Header, Navigation และ Footer ที่ใช้ร่วมระหว่างหน้า |
-| `src/components/sections` | ส่วนประกอบหน้า landing เช่น Hero, Features, Demo, FAQ และ Download CTA |
-| `src/components/ui` | Component พื้นฐาน เช่น Button และ Container |
-| `src/content` | ข้อความหน้าเว็บและข้อมูล FAQ |
-| `src/config` | ชื่อสินค้า ลิงก์ดาวน์โหลด และค่ากลางของเว็บไซต์ |
-| `src/styles` | Global styles และ theme ของ landing |
+เปิด http://127.0.0.1:3000 หรือใช้ `npm run dev -- --port 3100`
+Landing ใช้ npm และ package-lock.json แยกจาก root pnpm project ยังไม่เปลี่ยน workspace ของ desktop
 
-`.gitkeep` เป็นไฟล์ว่างเพื่อให้ Git เก็บโฟลเดอร์ที่ยังไม่มีไฟล์จริง ไม่ได้มีผลต่อ Next.js ให้นำออกจากโฟลเดอร์นั้นเมื่อเพิ่มไฟล์ใช้งานจริงแล้ว
+## Check and build
 
-## แนวทางการพัฒนา
+```sh
+npm run lint
+npm run typecheck
+npm run build
+npm run start
+```
 
-- ใช้หน้า static เป็นค่าเริ่มต้น และแยก Client Components เฉพาะส่วนที่ต้องโต้ตอบหรือใช้ browser APIs
-- Landing เป็นแอปแยกจาก desktop ห้าม import Tauri, Local Web Companion API หรือโค้ดที่ควบคุม desktop engine เข้ามาใน landing
-- แยกเนื้อหาที่แก้บ่อยไว้ใน `src/content` และรวมชื่อสินค้า ลิงก์ดาวน์โหลด และค่ากลางไว้ใน `src/config`
-- เก็บ component เฉพาะเว็บไซต์ไว้ในแอปนี้ก่อน ค่อยแยก shared package เมื่อมีการใช้ร่วมจริง
+หน้าแรก prerender เป็น static HTML ใช้ Client Components เฉพาะเดโมและเมนูมือถือ FAQ ใช้ native details จึงเปิดคำตอบได้โดยไม่ใช้ JavaScript
 
-## เริ่มงานต่อ
+## Design
 
-1. เพิ่ม `package.json` สำหรับ landing พร้อม Next.js, React, TypeScript และ Tailwind CSS รวมถึง scripts สำหรับพัฒนา ตรวจสอบ และ build
-2. เพิ่ม config ที่จำเป็นสำหรับ Next.js, TypeScript และ Tailwind CSS โดยคงโครงสร้างโฟลเดอร์นี้ไว้
-3. ตั้งค่าการจัดการ dependencies และเชื่อม pnpm workspace เป็นงานแยกก่อนใช้ workspace commands ปัจจุบัน repo root ยังไม่มี workspace ที่รวม landing
-4. เพิ่ม root layout, หน้าแรก, metadata และ global styles แล้วพัฒนา sections ตามแบบที่ตกลงกัน
-5. ตรวจ build ของ landing และการแสดงผลบนจอมือถือกับ desktop ก่อนนำไป deploy
+- พื้นขาวนวล ตัวอักษรไทยใหญ่ สีม่วงหลัก อ้างอิงความโปร่งของ Speaak และการโชว์สินค้าบนพื้นเข้มของ Animos
+- Hero → เดโมแปล → ประโยชน์ → เริ่มใช้งาน → FAQ → ดาวน์โหลด
+- Hero entrance, เปลี่ยนสถานการณ์, scroll reveal แบบ progressive enhancement และ hover CTA รองรับ prefers-reduced-motion และ waveform หยุดเองภายใน 5 วินาที
+- สื่อสารประโยชน์โดยไม่ระบุปุ่มลัด เพราะผู้ใช้ตั้งเองได้
+- เดโมและภาพเลือกแหล่งเสียงระบุว่าเป็นภาพ/ข้อความจำลอง ไม่ฟังเสียงจริงและไม่ขอสิทธิ์ไมโครโฟน
+- ปุ่มดาวน์โหลดไป GitHub Releases ให้เลือกรุ่น ไม่ hardcode เวอร์ชัน ไม่อ้างราคา/จำนวนผู้ใช้ที่ไม่มีข้อมูล
 
-คำสั่ง `pnpm dev` และ `pnpm build` ที่ repo root ปัจจุบันเป็นของ frontend ฝั่ง desktop ไม่ใช่ landing ต้องใช้ scripts ของแอป landing หลังตั้งค่าเสร็จ
+## Edit
 
-## Deployment เป้าหมาย
+| Path                                        | Purpose                                               |
+| ------------------------------------------- | ----------------------------------------------------- |
+| src/app/page.tsx                            | เนื้อหาและ sections                                   |
+| src/content/home.ts                         | ตัวอย่างบทสนทนาและ FAQ                                |
+| src/config/site.ts                          | Metadata และลิงก์                                     |
+| src/styles/globals.css                      | Layout สี responsive และ motion                       |
+| src/components/sections/TranslationDemo.tsx | เดโมการฟังและตอบกลับ                                  |
+| src/components/layout                       | เมนู desktop / mobile                                 |
+| public/fonts                                | Kanit, Noto Sans Thai จาก repo พร้อม SIL OFL licenses |
+| public/images/wangai-icon.png               | โลโก้เดิมจาก src-tauri/icons/128x128.png (favicon ใช้ 32x32.png)                             |
 
-เมื่อแอปพร้อมใช้งาน ให้สร้าง Vercel project สำหรับ landing โดยตั้งค่า:
+Metadata ยังไม่กำหนด canonical URL จนกว่าจะมี production domain จริง
 
-- **Root Directory:** `apps/landing`
-- **Framework Preset:** `Next.js`
-- ใช้ build และ output settings ของ Next.js preset หลังตั้งค่า package และ dependencies แล้ว
+## Deployment
 
-Landing ต้อง build ได้แยกจาก Rust, Python และ Windows desktop tooling
+Vercel: Root Directory `apps/landing`, Framework Preset `Next.js`, Install `npm ci`, Build `npm run build` ไม่ต้องใช้ Rust, Python, desktop tooling หรือ environment secrets
 
-## ขอบเขตของโครงสร้างชุดนี้
+## Browser acceptance checks
 
-เพิ่มเฉพาะ README และ `.gitkeep` ภายใน `apps/landing` ไม่มีการติดตั้ง dependencies สร้างหน้าเว็บ แก้ workspace หรือ lockfile ย้ายโค้ด desktop/backend เปลี่ยน public API หรือตั้งค่า deployment จริง
+1. Desktop 1280px และ mobile 390px / 320px: ไม่มี horizontal overflow หัวข้ออ่านครบ
+2. สลับเกม, Discord, วิดีโอ: ต้นฉบับและคำแปลตรงสถานการณ์
+3. พูดตอบกลับ: แสดงไทย → อังกฤษ; เปลี่ยนสถานการณ์แล้วกลับสู่โหมดฟัง
+4. เมนูมือถือเปิดด้วย keyboard ได้ เลือก anchor แล้วปิด Escape ปิดและคืน focus
+5. FAQ เปิด/ปิดได้ มีข้อมูลอินเทอร์เน็ต, หนึ่งแอปต่อครั้ง, ข้อความตอบกลับ และโหมดหน้าจอที่รองรับ
+6. ทุก CTA ใช้ Releases ใน config และ anchor มีปลายทาง
+7. Console ไม่มี error และไม่มีชื่อปุ่มลัดบนหน้า
+
+Desktop engine และระบบแปลจริงอยู่นอกขอบเขตการทดสอบของ landing นี้
+
