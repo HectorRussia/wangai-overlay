@@ -3,16 +3,8 @@
 import Image from "next/image";
 import { gameScenes } from "@/content/gameScenes";
 import { ProductOverlayPreview } from "./ProductOverlayPreview";
-import { useEffect, useState } from "react";
-import {
-  ArrowRight,
-  Headphones,
-  Mic,
-  Pause,
-  Play,
-  RotateCcw,
-  Volume2,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Headphones, Mic, Volume2 } from "lucide-react";
 
 const steps = [
   {
@@ -49,26 +41,44 @@ const steps = [
 
 export function TranslationDemo() {
   const scene = gameScenes[0];
-  const [step, setStep] = useState(2);
-  const [initialPreview, setInitialPreview] = useState(true);
-  const [playing, setPlaying] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [step, setStep] = useState(0);
+  const [inView, setInView] = useState(false);
+  const [pageVisible, setPageVisible] = useState(true);
+  const [focused, setFocused] = useState(false);
+  const playing = inView && pageVisible && !focused;
   const [copied, setCopied] = useState<"idle" | "done" | "error">("idle");
   const current = steps[step];
   const replying = step >= 3;
 
   useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { threshold: 0.3 },
+    );
+    observer.observe(stage);
+    const visibility = () => setPageVisible(!document.hidden);
+    visibility();
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!playing) return;
     const timer = window.setTimeout(() => {
-      if (step === steps.length - 1) setPlaying(false);
-      else setStep(step + 1);
+      setStep((step + 1) % steps.length);
+      setCopied("idle");
     }, 2600);
     return () => window.clearTimeout(timer);
   }, [step, playing]);
 
   function selectStep(index: number) {
-    setInitialPreview(false);
     setStep(index);
-    setPlaying(false);
     setCopied("idle");
   }
 
@@ -85,6 +95,11 @@ export function TranslationDemo() {
     <section
       className="demo-section flow-demo"
       id="demo"
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget))
+          setFocused(false);
+      }}
       aria-label="ตัวอย่างลำดับการแปลเสียงและตอบกลับ"
     >
       <div className="flow-header">
@@ -95,26 +110,6 @@ export function TranslationDemo() {
             <br className="flow-mobile-break" /> สู่บทสนทนาที่เข้าใจ
           </h2>
         </div>
-        <button
-          className="flow-play"
-          onClick={() => {
-            if ((initialPreview || step === 5) && !playing) {
-              setInitialPreview(false);
-              setStep(0);
-              setCopied("idle");
-            }
-            setPlaying(!playing);
-          }}
-        >
-          {playing ? (
-            <Pause size={17} />
-          ) : step === 5 ? (
-            <RotateCcw size={17} />
-          ) : (
-            <Play size={17} />
-          )}
-          {playing ? "หยุดชั่วคราว" : step === 5 ? "ดูอีกครั้ง" : "เล่นให้ดู"}
-        </button>
       </div>
       <div className="flow-modes" role="group" aria-label="เลือกฝั่งการสนทนา">
         <button aria-pressed={!replying} onClick={() => selectStep(0)}>
@@ -127,7 +122,7 @@ export function TranslationDemo() {
           พูดไทย ดูคำตอบอังกฤษ
         </button>
       </div>
-      <div className={`flow-scene scene-${scene.id}`}>
+      <div ref={stageRef} className={`flow-scene scene-${scene.id}`}>
         <Image
           key={scene.id}
           src={`/images/${scene.image}`}

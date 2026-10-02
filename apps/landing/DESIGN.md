@@ -52,3 +52,7 @@ The demo now offers FPS, fantasy, survival, farming, racing and space, with genr
 ## FPS-only refinement
 
 The current landing demo uses only FPS; genre selection and automatic scene cycling were removed. A separate explanatory voice annotation points to the teammate and shows the incoming English line. Playback animates its voice indicator before pending translation and the Thai bubble. This annotation belongs to the demonstration, not the desktop overlay. Reply mode identifies the player's Thai microphone speech separately.
+
+## Automatic playback
+
+The FPS flow starts automatically when at least 30% of the game stage is visible and loops through all six steps. It pauses outside the viewport, while the browser tab is hidden, or while a demo control has focus so users can inspect a step or copy a reply. The explicit play/replay button is removed. Timers and observers are cleaned up on unmount.
