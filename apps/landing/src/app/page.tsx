@@ -43,16 +43,16 @@ export default function Home() {
           className="product-intro section-wrap"
           aria-labelledby="product-title"
         >
-          <p className="eyebrow">เสียงของเขา ความเข้าใจของคุณ</p>
+          <p className="eyebrow">ฟังและตอบกลับ</p>
           <h2 id="product-title">
-            เล่นต่อได้
+            รู้ว่าเพื่อนพูดอะไร
             <br />
-            <span className="muted-heading">แม้คุยกันคนละภาษา</span>
+            <span className="muted-heading">รู้ว่าจะตอบยังไง</span>
           </h2>
           <p>
-            จากเสียงเพื่อนร่วมทีม สู่คำแปลที่อ่านได้บนหน้าจอ
+            ฟังเพื่อนพูดอังกฤษ อ่านคำแปลไทยบนจอ
             <br />
-            ให้คุณรู้ว่าเขาพูดอะไร และเตรียมข้อความตอบกลับได้
+            พูดไทยเพื่อดูประโยคอังกฤษที่ใช้ตอบกลับ
           </p>
         </section>
         <section
@@ -61,24 +61,20 @@ export default function Home() {
         >
           <div className="story-copy">
             <p className="eyebrow">
-              <span>01</span> ฟังแล้วเข้าใจ
+              <span>01</span> เลือกแหล่งเสียง
             </p>
             <h2 id="listen-title">
-              เขาพูดอังกฤษ
+              เลือกแอป
               <br />
-              <span className="accent">คุณอ่านไทย</span>
+              <span className="accent">ที่ต้องการแปลเสียง</span>
             </h2>
             <p>
-              เลือกแอปที่ต้องการฟัง ว่าไงจะแสดงต้นฉบับและคำแปลไทยบน overlay
-              เมื่อพูดจบวลี
+              เลือกเสียงจากเกม Discord หรือเบราว์เซอร์
+              ว่าไงจะฟังเฉพาะแอปที่คุณเลือก
             </p>
             <div className="story-detail">
               <Headphones size={18} aria-hidden="true" />
-              <span>เลือกฟังเกม Discord หรือเบราว์เซอร์</span>
-            </div>
-            <div className="story-detail">
-              <Monitor size={18} aria-hidden="true" />
-              <span>ย้ายและปรับขนาด overlay ได้ตามถนัด</span>
+              <span>เลือกฟังได้ครั้งละหนึ่งแอป</span>
             </div>
           </div>
           <div className="source-visual">
@@ -115,7 +111,7 @@ export default function Home() {
               <span className="status-dot" />
               <span>เลือกฟังครั้งละหนึ่งแอป</span>
               <ArrowRight size={16} aria-hidden="true" />
-              <span>ซับไทยบนจอ</span>
+              <span>เริ่มฟังเสียง</span>
             </div>
           </div>
         </section>
@@ -141,20 +137,20 @@ export default function Home() {
               I’m on my way.
             </p>
             <div className="reply-caption">
-              <span>รู้ว่าจะตอบอังกฤษว่าอะไร</span>
+              <span>ตอบเป็นอังกฤษว่าอะไร</span>
               <span>อ่านแล้วพูดตามได้</span>
             </div>
           </div>
           <div className="story-copy">
             <p className="eyebrow">
-              <span>02</span> พูดแล้วตอบ
+              <span>02</span> แปลคำตอบเป็นอังกฤษ
             </p>
             <h2 id="reply-title">
               อยากตอบอะไร
               <br />
               <span className="accent">ลองพูดเป็นไทย</span>
             </h2>
-            <p>ว่าไงช่วยให้รู้ว่าประโยคที่อยากตอบ พูดเป็นอังกฤษว่าอะไร</p>
+            <p>พูดสิ่งที่อยากบอกเป็นไทย ว่าไงจะแปลเป็นประโยคอังกฤษให้ดู</p>
             <p className="story-note">อ่านแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต</p>
             <a className="text-link" href="#demo">
               ดูตัวอย่างการแปล <ArrowUpRight size={17} aria-hidden="true" />
@@ -164,7 +160,7 @@ export default function Home() {
         <section className="setup section-wrap" aria-labelledby="setup-title">
           <div className="setup-heading">
             <p className="eyebrow">เริ่มใช้งาน</p>
-            <h2 id="setup-title">พร้อมก่อนเข้าเกม</h2>
+            <h2 id="setup-title">ตั้งค่าก่อนเล่น</h2>
             <a className="text-link" href={site.guide}>
               อ่านคู่มือ <ArrowUpRight size={16} aria-hidden="true" />
             </a>
@@ -182,18 +178,17 @@ export default function Home() {
             </li>
             <li>
               <span>03</span>
-              <h3>เปิด overlay แล้วเล่นเลย</h3>
+              <h3>เปิดหน้าต่างคำแปล</h3>
               <p>ใช้เกมในโหมด Borderless หรือ Windowed เพื่ออ่านซับบนจอ</p>
             </li>
           </ol>
         </section>
         <section className="faq section-wrap" aria-labelledby="faq-title">
           <div>
-            <p className="eyebrow">คำถามที่พบบ่อย</p>
             <h2 id="faq-title">
-              ก่อนกด
+              คำถาม
               <br />
-              <span className="muted-heading">เข้าเกม</span>
+              <span className="muted-heading">ที่พบบ่อย</span>
             </h2>
             <a className="text-link" href={`${site.repository}/issues`}>
               สอบถามเพิ่มเติม <ArrowUpRight size={16} aria-hidden="true" />

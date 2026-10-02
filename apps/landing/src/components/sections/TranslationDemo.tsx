@@ -14,7 +14,7 @@ const steps = [
   },
   {
     title: "ถอดเสียงและแปล",
-    detail: "เมื่อจบวลี AI ถอดเสียงเป็นข้อความ แล้วแปลเป็นไทย",
+    detail: "เมื่อเพื่อนพูดจบ ว่าไงแปลงเสียงเป็นข้อความแล้วแปลเป็นไทย",
     quote: "Stay together. I'll cover you.",
   },
   {
@@ -28,12 +28,12 @@ const steps = [
     quote: "โอเค ฉันจะตามไป",
   },
   {
-    title: "ดูคำตอบอังกฤษ",
-    detail: "ดูว่าสิ่งที่คุณอยากบอก ตอบเป็นอังกฤษว่าอะไร",
+    title: "ดูประโยคอังกฤษ",
+    detail: "ว่าไงแปลสิ่งที่คุณพูดเป็นประโยคอังกฤษให้ดู",
     quote: "Okay, I'll follow you.",
   },
   {
-    title: "นำไปตอบคู่สนทนา",
+    title: "พูดตอบหรือส่งแชต",
     detail: "อ่านประโยคอังกฤษแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต",
     quote: "Okay, I'll follow you.",
   },
@@ -106,8 +106,8 @@ export function TranslationDemo() {
         <div>
           <p className="eyebrow">WANGAI ทำงานอย่างไร</p>
           <h2>
-            จากเสียงที่ได้ยิน
-            <br className="flow-mobile-break" /> สู่บทสนทนาที่เข้าใจ
+            ฟังเพื่อนพูด
+            <br className="flow-mobile-break" /> แล้วแปลคำตอบของคุณ
           </h2>
         </div>
       </div>
@@ -119,7 +119,7 @@ export function TranslationDemo() {
         <ArrowRight size={16} aria-hidden="true" />
         <button aria-pressed={replying} onClick={() => selectStep(4)}>
           <Mic size={17} />
-          พูดไทย ดูคำตอบอังกฤษ
+          พูดไทย ดูประโยคอังกฤษ
         </button>
       </div>
       <div ref={stageRef} className={`flow-scene scene-${scene.id}`}>
@@ -133,7 +133,7 @@ export function TranslationDemo() {
           preload
         />
         <div className="game-window-label">
-          <span /> {scene.label} · Gameplay example
+          <span /> {scene.label} · ภาพประกอบการใช้งาน
         </div>
         <span className="game-crosshair" aria-hidden="true" />
         <div
