@@ -219,11 +219,10 @@ export default function Home() {
           <AudioLines className="cta-wave" size={42} aria-hidden="true" />
           <p className="eyebrow">WANGAI FOR WINDOWS</p>
           <h2>
-            เกมต่อไป
+            แปลเสียงพูด
             <br />
-            <span className="accent">เข้าใจกันมากขึ้น</span>
+            <span className="accent">ระหว่างเล่นเกม</span>
           </h2>
-          <p>เริ่มฟังเสียงอังกฤษเป็นซับไทย กับว่าไง</p>
           <DownloadLink />
           <span className="platform-note">
             Windows 10 / 11 x64 · ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อแปล
