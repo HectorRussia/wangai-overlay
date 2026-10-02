@@ -32,3 +32,7 @@ Final generation prompt:
 ## Brand and workflow refinement
 
 Uses the existing W chat-bubble app icon, mint #5ff0bd, cyan #65d8ed and cream #fbebcf. The central demo is a user-controlled, six-step sequence: English app audio, phrase-end transcription/translation, Thai overlay, Thai microphone reply, English text, manual copy/paste into chat. It plays once per activation, supports pause/replay and direct step selection, and honors reduced motion. Timing is illustrative, not a latency claim. No microphone capture, voice synthesis, or automatic message sending occurs.
+
+## Desktop overlay fidelity
+
+The product preview now derives its markup from `src/OverlayApp.tsx` and its scoped presentation rules from the overlay section of `src/styles.css`. It uses the actual W sensor, status row, incoming left-aligned gray bubble, outgoing right-aligned amber bubble, original/translated text hierarchy, and edit-mode copy affordance. The 420 × 236 presentation sits over the illustrative game scene. Configurable shortcut labels are omitted per the marketing brief; toolbar icons are illustrative and do not control desktop settings. Explanation and playback controls remain outside the product window. This is a source-derived interactive preview, not a captured game session.

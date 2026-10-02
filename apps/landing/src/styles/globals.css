@@ -1731,3 +1731,47 @@ h2 {
 .flow-wave:not(.has-voice) {
   visibility: hidden;
 }
+
+/* Actual desktop overlay at window scale. */
+.flow-scene {
+  min-height: 500px;
+  padding: 0;
+  background: #111;
+}
+.flow-scene .game-scene {
+  opacity: 1;
+  object-position: center;
+}
+.game-window-label {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  background: #171b20;
+  color: #b8bfc5;
+  font:
+    11px var(--font-body),
+    sans-serif;
+  letter-spacing: 0.06em;
+}
+.game-window-label > span {
+  width: 7px;
+  height: 7px;
+  background: #6c8584;
+  border-radius: 50%;
+}
+.flow-demo > .flow-explanation {
+  margin: 20px 0 0;
+  min-height: 27px;
+}
+@media (max-width: 600px) {
+  .flow-scene {
+    min-height: 410px;
+  }
+  .flow-demo > .flow-explanation {
+    min-height: 50px;
+  }
+}

@@ -1,0 +1,449 @@
+/* Presentation rules copied from src/styles.css; keep aligned with desktop. */
+.product-overlay-preview {
+  .overlay-card {
+    --overlay-opacity: 0.94;
+    --overlay-bubble-opacity: 1;
+    --overlay-text-opacity: 1;
+    --overlay-scale: 1;
+    --overlay-incoming-translation-scale: 1;
+    --overlay-incoming-original-scale: 1;
+    --overlay-outgoing-translation-scale: 1;
+    --overlay-outgoing-original-scale: 1;
+    width: 100%;
+    height: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(30, 34, 43, var(--overlay-opacity));
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.26);
+    font-size: calc(16px * var(--overlay-scale));
+  }
+
+  .overlay-card {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px 10px;
+    overflow: hidden;
+    border-radius: 16px;
+    animation: overlay-enter 190ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .overlay-card.is-editing {
+    border-color: rgba(104, 213, 220, 0.7);
+    box-shadow:
+      0 0 0 3px rgba(104, 213, 220, 0.12),
+      0 18px 48px rgba(0, 0, 0, 0.32);
+  }
+
+  .overlay-w-sensor {
+    display: grid;
+    width: 24px;
+    height: 20px;
+    flex: 0 0 auto;
+    place-items: center;
+    color: #8bdfe1;
+  }
+  .overlay-w-sensor svg {
+    width: 24px;
+    height: 17px;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease;
+  }
+
+  .overlay-key {
+    display: inline-flex;
+    min-height: 26px;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    color: #d5e0e1;
+    background: rgba(255, 255, 255, 0.055);
+    font: 700 10px var(--font-mono);
+    letter-spacing: 0.02em;
+  }
+  .overlay-key svg {
+    width: 11px;
+    height: 11px;
+  }
+  .overlay-header-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+  }
+  .overlay-titlebar {
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .overlay-titlebar.is-draggable {
+    cursor: grab;
+  }
+  .overlay-titlebar.is-draggable:active {
+    cursor: grabbing;
+  }
+  .overlay-settings-button {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 5px;
+    border: 1px solid rgba(104, 213, 220, 0.28);
+    border-radius: 9px;
+    color: #96e2e6;
+    background: rgba(104, 213, 220, 0.09);
+    cursor: pointer;
+  }
+  .overlay-settings-button svg {
+    width: 15px;
+    height: 15px;
+  }
+  .overlay-settings-button small {
+    font-size: 9px;
+  }
+  .overlay-settings-button:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .overlay-settings-button:not(:disabled):hover {
+    background: rgba(104, 213, 220, 0.18);
+  }
+  .overlay-settings-button:focus-visible {
+    outline: 2px solid #8be2e7;
+    outline-offset: 2px;
+  }
+  .overlay-warning {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 2px 0 4px;
+    color: #f0d3a1;
+    font-size: 0.7em;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .overlay-warning svg {
+    width: 13px;
+    height: 13px;
+    flex: 0 0 auto;
+  }
+  .overlay-messages.is-readable {
+    justify-content: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    user-select: text;
+  }
+  .overlay-messages.is-readable > * {
+    flex-shrink: 0;
+  }
+
+  .overlay-drag-handle {
+    display: grid;
+    width: 26px;
+    height: 30px;
+    place-items: center;
+    color: #9ce7e9;
+    cursor: grab;
+  }
+  .overlay-drag-handle svg {
+    width: 16px;
+    height: 16px;
+  }
+  .overlay-lock-button {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 1px solid rgba(104, 213, 220, 0.45);
+    border-radius: 9px;
+    color: #9ce7e9;
+    background: rgba(104, 213, 220, 0.09);
+    cursor: pointer;
+  }
+  .overlay-lock-button svg {
+    width: 15px;
+    height: 15px;
+  }
+  .overlay-lock-button:hover {
+    background: rgba(104, 213, 220, 0.18);
+  }
+  .overlay-lock-button:focus-visible {
+    outline: 2px solid #8be2e7;
+    outline-offset: 2px;
+  }
+
+  .overlay-bubble {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 88%;
+    min-width: 0;
+    gap: 2px;
+    padding: 8px 11px;
+    border-radius: 15px;
+    animation: bubble-enter 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .overlay-bubble strong {
+    display: -webkit-box;
+    overflow: hidden;
+    color: #f5f6f8;
+    font-size: 1em;
+    font-weight: 650;
+    line-height: 1.35;
+    opacity: var(--overlay-text-opacity);
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .overlay-bubble > span {
+    display: -webkit-box;
+    overflow: hidden;
+    color: #9295a1;
+    font-size: 0.78em;
+    line-height: 1.35;
+    opacity: var(--overlay-text-opacity);
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .overlay-messages.is-readable .overlay-bubble {
+    max-width: 100%;
+  }
+  .overlay-messages.is-readable .overlay-bubble strong,
+  .overlay-messages.is-readable .overlay-bubble > span {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+  .overlay-messages.is-readable .overlay-source-badge {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .overlay-bubble.is-incoming {
+    align-self: flex-start;
+    background: rgba(48, 54, 64, var(--overlay-bubble-opacity));
+  }
+  .overlay-bubble.is-outgoing {
+    align-self: flex-end;
+    padding-right: 36px;
+    background: rgba(242, 186, 119, var(--overlay-bubble-opacity));
+  }
+  .overlay-bubble.is-outgoing strong {
+    color: #2d241d;
+  }
+  .overlay-bubble.is-outgoing > span {
+    color: rgba(45, 36, 29, 0.76);
+  }
+  .overlay-bubble.is-incoming strong {
+    font-size: calc(1em * var(--overlay-incoming-translation-scale));
+  }
+  .overlay-bubble.is-incoming > span {
+    font-size: calc(0.78em * var(--overlay-incoming-original-scale));
+  }
+  .overlay-bubble.is-outgoing strong {
+    font-size: calc(1em * var(--overlay-outgoing-translation-scale));
+  }
+  .overlay-bubble.is-outgoing > span {
+    font-size: calc(0.78em * var(--overlay-outgoing-original-scale));
+  }
+  .overlay-source-badge {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: 999px;
+    color: #9be2e6;
+    font: 750 0.61em var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .overlay-copy {
+    position: absolute;
+    right: 8px;
+    bottom: 7px;
+    display: inline-flex;
+    align-items: center;
+    color: rgba(45, 36, 29, 0.78);
+  }
+  .overlay-copy {
+    width: 22px;
+    height: 22px;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+  }
+  .overlay-copy:hover {
+    background: rgba(255, 255, 255, 0.5);
+  }
+  .overlay-copy:focus-visible {
+    outline: 2px solid #2d241d;
+    outline-offset: 2px;
+  }
+  .overlay-copy svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .overlay-live {
+    display: grid;
+    gap: 3px;
+    padding: 6px 10px;
+    border-left: 2px solid rgba(104, 213, 220, 0.7);
+    color: #d8dae0;
+    animation: bubble-enter 150ms ease-out both;
+  }
+  .overlay-live span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #8fe0e5;
+    font: 750 0.66em var(--font-mono);
+  }
+  .overlay-live span i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #8fe0e5;
+  }
+  .overlay-live strong {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: calc(0.82em * var(--overlay-incoming-original-scale));
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .overlay-messages.is-readable .overlay-live strong {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+
+  .overlay-listening,
+  .overlay-empty {
+    display: grid;
+    min-height: 120px;
+    place-content: center;
+    justify-items: center;
+    gap: 5px;
+    color: #858894;
+    text-align: center;
+  }
+  .overlay-listening svg,
+  .overlay-empty svg {
+    width: 22px;
+    height: 22px;
+    margin-bottom: 5px;
+    color: #80dce2;
+  }
+  .overlay-listening strong,
+  .overlay-empty strong {
+    color: #d9dbe1;
+    font-size: 0.82em;
+  }
+  .overlay-listening span,
+  .overlay-empty span {
+    font-size: 0.62em;
+  }
+}
+
+.product-overlay-preview {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  width: 420px;
+  height: 236px;
+  text-align: left;
+  --font-mono: monospace;
+}
+.product-overlay-preview .product-titlebar {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+}
+.product-overlay-preview .product-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: #c6d3d6;
+  font-size: 11px;
+  font-weight: 700;
+}
+.product-overlay-preview .product-messages {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 0;
+  overflow: hidden;
+}
+.product-overlay-preview .product-messages.is-readable {
+  justify-content: flex-start;
+}
+@media (max-width: 600px) {
+  .product-overlay-preview {
+    right: 12px;
+    bottom: 16px;
+    width: calc(100% - 24px);
+    height: 236px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-overlay-preview * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@keyframes overlay-enter {
+  from {
+    opacity: 1;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes bubble-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes signal-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
