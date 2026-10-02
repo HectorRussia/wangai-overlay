@@ -6,6 +6,7 @@ import "@/styles/globals.css";
 const bodyFont = localFont({
   src: "../../public/fonts/NotoSansThai.woff2",
   variable: "--font-body",
+  weight: "100 900",
   display: "swap",
 });
 const displayFont = localFont({
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = { themeColor: "#faf9f6" };
+export const viewport: Viewport = { themeColor: "#090d0d" };
 
 export default function RootLayout({
   children,

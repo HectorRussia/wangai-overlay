@@ -1,16 +1,17 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import {
   ArrowRight,
   AudioLines,
+  Check,
+  Copy,
   Gamepad2,
   Headphones,
-  Languages,
   MessageCircle,
   Mic,
   Play,
-  RotateCcw,
 } from "lucide-react";
 import { scenarios } from "@/content/home";
 
@@ -19,108 +20,182 @@ const icons = [Gamepad2, MessageCircle, Play];
 export function TranslationDemo() {
   const [selected, setSelected] = useState(0);
   const [reply, setReply] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
+    "idle",
+  );
   const example = scenarios[selected];
 
+  async function copyReply() {
+    try {
+      await navigator.clipboard.writeText(example.translatedReply);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+  }
+
   return (
-    <section
+    <div
       className="demo-section"
       id="demo"
-      aria-label="ทดลองดูตัวอย่างการแปล"
+      role="region"
+      aria-label="ตัวอย่างการแปลด้วยข้อความจำลอง"
     >
-      <div className="scenario-picker" role="group" aria-label="เลือกสถานการณ์">
-        {scenarios.map((scenario, index) => {
-          const Icon = icons[index];
-          return (
-            <button
-              key={scenario.id}
-              aria-pressed={selected === index}
-              onClick={() => {
-                setSelected(index);
-                setReply(false);
-              }}
-            >
-              <Icon size={16} aria-hidden="true" />
-              {scenario.label}
-            </button>
-          );
-        })}
+      <div className="demo-toolbar">
+        <span className="demo-label">
+          <AudioLines size={17} aria-hidden="true" /> ดูว่าไงทำงาน
+        </span>
+        <div
+          className="scenario-picker"
+          role="group"
+          aria-label="เลือกสถานการณ์"
+        >
+          {scenarios.map((scenario, index) => {
+            const Icon = icons[index];
+            return (
+              <button
+                key={scenario.id}
+                aria-pressed={selected === index}
+                onClick={() => {
+                  setSelected(index);
+                  setReply(false);
+                  setCopyState("idle");
+                }}
+              >
+                <Icon size={15} aria-hidden="true" />
+                {scenario.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <div className="demo-stage">
+      <div className={`demo-stage ${reply ? "is-reply" : ""}`}>
+        <Image
+          className="game-scene"
+          src="/images/wangai-game-scene.webp"
+          alt="ฉากเกมจำลอง นักสำรวจในโรงเก็บยานมืดที่เปิดออกสู่ภูเขา"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1400px) 90vw, 1240px"
+          preload
+        />
+        <div className="scene-shade" />
         <div className="stage-topline">
           <span>
             <span className="status-dot" /> WANGAI OVERLAY
           </span>
-          <span>
-            EN <ArrowRight size={12} /> TH
-          </span>
+          <span>ภาพประกอบการใช้งาน</span>
         </div>
-        <div className="demo-content" aria-live="polite" aria-atomic="true">
-          <div className="source-voice" key={`${example.id}-${reply}-source`}>
+        <div
+          className="demo-content"
+          aria-live="polite"
+          aria-atomic="true"
+          key={`${example.id}-${reply}`}
+        >
+          <div className="source-voice">
             <span className="voice-avatar">
-              {reply ? <Mic size={26} /> : <Headphones size={26} />}
+              {reply ? (
+                <Mic size={20} aria-hidden="true" />
+              ) : (
+                <Headphones size={20} aria-hidden="true" />
+              )}
             </span>
-            <p className="micro-label">
-              {reply ? "YOUR VOICE · ภาษาไทย" : example.person}
-            </p>
-            <p className="source-quote" lang={reply ? "th" : "en"}>
-              “{reply ? example.reply : example.english}”
-            </p>
+            <div>
+              <p className="micro-label">
+                {reply ? "เสียงของคุณ · ภาษาไทย" : example.person}
+              </p>
+              <p className="source-quote" lang={reply ? "th" : "en"}>
+                {reply ? example.reply : example.english}
+              </p>
+            </div>
             <div className="waveform" aria-hidden="true">
-              {Array.from({ length: 35 }, (_, i) => (
+              {Array.from({ length: 11 }, (_, i) => (
                 <i
                   key={i}
                   style={{
-                    height: `${8 + ((i * 17 + 7) % 31)}px`,
-                    animationDelay: `${i * 45}ms`,
+                    height: `${9 + ((i * 13 + 7) % 22)}px`,
+                    animationDelay: `${i * 60}ms`,
                   }}
                 />
               ))}
             </div>
           </div>
-          <div className="translation-path" aria-hidden="true">
-            <span />
-            <Languages size={20} />
-            <span />
-          </div>
-          <div
-            className="overlay-preview"
-            key={`${example.id}-${reply}-result`}
-          >
+          <div className="overlay-preview">
             <div className="overlay-top">
-              <span className="mini-wordmark">
-                w<span>↗</span>
+              <span>
+                <AudioLines size={16} aria-hidden="true" /> ว่าไง
               </span>
-              <span>{example.source}</span>
-              <AudioLines size={16} />
+              <span>
+                {reply ? "ไทย" : "อังกฤษ"}{" "}
+                <ArrowRight size={12} aria-hidden="true" />{" "}
+                {reply ? "อังกฤษ" : "ไทย"}
+              </span>
             </div>
-            <p className="micro-label">
-              {reply ? "คำตอบของคุณ · TH → EN" : "เพื่อนกำลังบอกว่า"}
-            </p>
             <p className="translated-quote" lang={reply ? "en" : "th"}>
               {reply ? example.translatedReply : example.thai}
             </p>
             <div className="overlay-bottom">
               <span>
                 <span className="status-dot" />{" "}
-                {reply ? "พร้อมคัดลอกไปตอบกลับ" : "แปลเมื่อจบวลี"}
+                {reply ? "ข้อความอังกฤษสำหรับตอบกลับ" : "แสดงคำแปลเมื่อจบวลี"}
               </span>
-              <span>WANGAI</span>
+              {reply && (
+                <button onClick={copyReply}>
+                  {copyState === "copied" ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <Copy size={14} aria-hidden="true" />
+                  )}
+                  {copyState === "copied" ? "คัดลอกแล้ว" : "คัดลอกตัวอย่าง"}
+                </button>
+              )}
             </div>
+            {copyState === "error" && reply && (
+              <p className="copy-error" role="status">
+                คัดลอกไม่สำเร็จ เลือกข้อความด้านบนเพื่อคัดลอกได้
+              </p>
+            )}
           </div>
         </div>
         <div className="stage-bottomline">
-          <span>คุยต่อได้ ไม่ต้องสลับหน้าจอ</span>
-          <button aria-pressed={reply} onClick={() => setReply(!reply)}>
-            {reply ? <RotateCcw size={14} /> : <Mic size={14} />}
-            {reply ? "กลับไปฟังเพื่อน" : "ลองดูตอนพูดตอบกลับ"}
-            <ArrowRight size={14} />
+          <span>
+            {reply
+              ? "คัดลอกข้อความ แล้ววางในแชตด้วยตัวเอง"
+              : "อ่านคำแปลบนจอ ระหว่างที่เล่นเกม"}
+          </span>
+          <span>{example.source}</span>
+        </div>
+      </div>
+      <div className="demo-controls">
+        <p>
+          ลองสลับดูทั้งสองฝั่ง <ArrowRight size={15} aria-hidden="true" />
+        </p>
+        <div role="group" aria-label="โหมดตัวอย่างการแปล">
+          <button
+            aria-pressed={!reply}
+            onClick={() => {
+              setReply(false);
+              setCopyState("idle");
+            }}
+          >
+            <Headphones size={16} aria-hidden="true" />
+            ฟังอังกฤษ → อ่านไทย
+          </button>
+          <button
+            aria-pressed={reply}
+            onClick={() => {
+              setReply(true);
+              setCopyState("idle");
+            }}
+          >
+            <Mic size={16} aria-hidden="true" />
+            พูดไทย → ข้อความอังกฤษ
           </button>
         </div>
       </div>
       <p className="demo-caption">
-        <span className="caption-rule" /> ตัวอย่างการทำงานด้วยข้อความจำลอง{" "}
-        <span className="caption-rule" />
+        ตัวอย่างด้วยข้อความจำลอง · ภาพเกมประกอบ
+        ไม่ได้บันทึกเสียงจากเบราว์เซอร์ของคุณ
       </p>
-    </section>
+    </div>
   );
 }
