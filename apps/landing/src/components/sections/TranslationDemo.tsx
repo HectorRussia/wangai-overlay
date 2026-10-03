@@ -107,8 +107,8 @@ export function TranslationDemo() {
         <div>
           <p className="eyebrow">WANGAI ทำงานอย่างไร</p>
           <h2>
-            ฟังเพื่อนพูด
-            <br className="flow-mobile-break" /> แล้วแปลคำตอบของคุณ
+            ฟังเสียงเพื่อนในเกม
+            <br className="flow-mobile-break" /> อ่านคำแปลไทยบนจอ
           </h2>
         </div>
       </div>
