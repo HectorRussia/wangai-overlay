@@ -1,0 +1,99 @@
+import {
+  Check,
+  Clipboard,
+  GripHorizontal,
+  LockKeyhole,
+  Mic,
+  Settings,
+} from "lucide-react";
+import "./ProductOverlayPreview.css";
+
+// Presentation mirrors src/OverlayApp.tsx. No desktop APIs run on the website.
+export function ProductOverlayPreview({
+  dialogue,
+  step,
+  copied,
+  onCopy,
+}: {
+  dialogue: {
+    english: string;
+    thai: string;
+    replyThai: string;
+    replyEnglish: string;
+  };
+  step: number;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  const editing = step === 5;
+  return (
+    <div
+      className="product-overlay-preview"
+      aria-label="ตัวอย่างหน้าตา overlay จากโปรแกรม WANGAI"
+    >
+      <div className={`overlay-card ${editing ? "is-editing" : ""}`}>
+        <div className="product-titlebar">
+          <div className="product-status">
+            <span className="overlay-w-sensor" aria-hidden="true">
+              <svg viewBox="0 0 30 20">
+                <path d="M2 3 L8 17 L15 5 L22 17 L28 3" />
+              </svg>
+            </span>
+            <span>
+              {step === 3 ? "กำลังฟังภาษาไทย" : "กำลังฟังเสียงจากเกม"}
+            </span>
+          </div>
+          <div className="overlay-header-actions" aria-hidden="true">
+            <span className="overlay-key">
+              <Mic />
+            </span>
+            {editing && (
+              <>
+                <span className="overlay-drag-handle">
+                  <GripHorizontal />
+                </span>
+                <span className="overlay-lock-button">
+                  <LockKeyhole />
+                </span>
+              </>
+            )}
+            <span className="overlay-settings-button">
+              <Settings />
+            </span>
+          </div>
+        </div>
+        <div
+          className={`overlay-messages product-messages ${editing ? "is-readable" : ""}`}
+        >
+          {step >= 1 && (
+            <article
+              className="overlay-bubble is-incoming"
+              key={step === 1 ? "pending" : "translated"}
+            >
+              <small className="overlay-source-badge">GAME</small>
+              <strong lang="th">
+                {step === 1 ? "กำลังแปล…" : dialogue.thai}
+              </strong>
+              <span lang="en">{dialogue.english}</span>
+            </article>
+          )}
+          {step >= 4 && (
+            <article className="overlay-bubble is-outgoing">
+              <strong lang="en">{dialogue.replyEnglish}</strong>
+              <span lang="th">{dialogue.replyThai}</span>
+              {editing && (
+                <button
+                  className="overlay-copy"
+                  onClick={onCopy}
+                  aria-label={copied ? "คัดลอกแล้ว" : "คัดลอกตัวอย่าง"}
+                >
+                  {copied ? <Check /> : <Clipboard />}
+                </button>
+              )}
+            </article>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

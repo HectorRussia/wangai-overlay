@@ -12,6 +12,20 @@ WANGAI เป็น Windows overlay สำหรับแปลเสียง�
 ## โครงสร้าง
 
 ```text
+apps/
+  desktop/     # React UI, Tauri, Python worker, Portable, assets และ build scripts
+  landing/     # เว็บไซต์ landing แยกจาก Desktop
+ai-protocol/   # สัญญาร่วมระหว่าง Desktop และ AI server
+server/        # AI Gateway
+docs/          # เอกสารภาพรวม การปล่อยรุ่น และผลตรวจ
+scripts/       # เครื่องมือตรวจระดับ repo/server
+```
+
+เริ่มพัฒนา Desktop ที่ [apps/desktop](apps/desktop/README.md) ซึ่งมี `package.json` และ lockfile ของตัวเอง คำสั่ง pnpm ของ Desktop รันจากโฟลเดอร์นี้ ไม่มีการรวม dependency ของ landing
+
+ดู [แผนผังโมดูลและจุดเพิ่มฟีเจอร์](docs/architecture.md) และ [ผลตรวจ refactor / compatibility / ข้อจำกัด](docs/refactor-verification.md) สำหรับการพัฒนาและส่งต่องาน
+
+```text
 React/TypeScript UI
        ↕ Tauri commands หรือ loopback REST/WebSocket
 Axum Local Web Companion · 127.0.0.1 · session cookie
@@ -48,6 +62,7 @@ Local Web Companion bind เฉพาะ `127.0.0.1`; production ขอ port ว
 ต้องมี Windows 11, Node.js, pnpm, Rust MSVC toolchain และ Visual Studio C++ Build Tools
 
 ```powershell
+cd apps/desktop
 pnpm install
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
 pnpm tauri dev
@@ -108,6 +123,8 @@ Hotkeys เริ่มต้น:
 | `F7` | ลาก/ปรับ overlay |
 
 ## การทดสอบ
+
+รันจาก `apps/desktop`:
 
 ```powershell
 pnpm build

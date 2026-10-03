@@ -1,7 +1,22 @@
 use super::*;
+use crate::{
+    config::Config,
+    services::{protect_glossary, valid_transcription},
+};
 use axum::{body::Body, http::Request};
+use axum::{
+    http::{HeaderMap, StatusCode},
+    routing::post,
+    Json, Router,
+};
 use http_body_util::BodyExt;
+use serde_json::{json, Value};
+use std::{sync::Arc, time::Duration};
 use tower::ServiceExt;
+use uuid::Uuid;
+use wangai_ai_protocol::{
+    ApiError, ErrorCode, ServiceStatus, TranscriptionResponse, TranslationRequest,
+};
 
 fn config(url: &str) -> Config {
     Config::load(|key| match key {
