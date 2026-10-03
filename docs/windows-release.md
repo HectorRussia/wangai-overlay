@@ -1,5 +1,7 @@
 # Windows 0.2.2: installer, updates and owner checklist
 
+Desktop บน branch ปัจจุบันย้ายไป `apps/desktop` แล้ว ดู [คู่มือ Desktop](../apps/desktop/README.md) สำหรับคำสั่งปัจจุบัน คำสั่งด้านล่างเป็นประวัติของ checkout `v0.2.2` ซึ่งยังใช้โครงสร้างเดิม
+
 > Historical instructions for the `v0.2.2` checkout only. Version 0.3.0 and newer
 > use [Windows Portable](windows-portable.md). Do not build new NSIS releases from main.
 

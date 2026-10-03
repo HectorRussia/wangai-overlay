@@ -1,0 +1,524 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureSource {
+    pub pid: u32,
+    pub name: String,
+    pub executable_path: String,
+    pub display_name: String,
+    pub is_mistfall: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunningApp {
+    pub id: String,
+    pub display_name: String,
+    pub executable_name: String,
+    pub executable_path: String,
+    pub search_names: Vec<String>,
+    pub process_count: usize,
+    pub member_pids: Vec<u32>,
+    pub has_window: bool,
+    pub roots: Vec<CaptureSource>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioOutputDevice {
+    pub id: String,
+    pub name: String,
+    pub is_default: bool,
+    pub sample_rate: u32,
+    pub channels: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedProcess {
+    pub executable_path: String,
+    pub executable_name: String,
+    pub display_name: String,
+    pub last_pid: Option<u32>,
+}
+
+impl From<&CaptureSource> for SavedProcess {
+    fn from(source: &CaptureSource) -> Self {
+        Self {
+            executable_path: source.executable_path.clone(),
+            executable_name: source.name.clone(),
+            display_name: source.display_name.clone(),
+            last_pid: Some(source.pid),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StreamKind {
+    Incoming,
+    Microphone,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CaptureMode {
+    #[default]
+    ProcessTree,
+    SystemOutput,
+}
+
+impl StreamKind {
+    pub fn id(self) -> u8 {
+        match self {
+            Self::Incoming => 1,
+            Self::Microphone => 2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TranscriptKind {
+    Partial,
+    Final,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptEvent {
+    pub segment_id: String,
+    pub stream: StreamKind,
+    #[serde(default)]
+    pub source_display_name: Option<String>,
+    pub language: String,
+    pub text: String,
+    pub kind: TranscriptKind,
+    pub started_at_ms: i64,
+    pub ended_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TranslationStatus {
+    Pending,
+    Success,
+    Error,
+    Quota,
+    SourceOnly,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationResult {
+    pub segment_id: String,
+    pub from: String,
+    pub to: String,
+    pub source_text: String,
+    pub translated_text: Option<String>,
+    pub status: TranslationStatus,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SubtitleItem {
+    pub segment_id: String,
+    pub stream: StreamKind,
+    #[serde(default)]
+    pub source_display_name: Option<String>,
+    pub original_language: String,
+    pub original_text: String,
+    pub translated_text: Option<String>,
+    pub status: TranslationStatus,
+    pub created_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GlossaryTerm {
+    pub source: String,
+    pub target: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HotkeySettings {
+    pub toggle_listening: String,
+    pub push_to_talk: String,
+    pub copy_latest: String,
+    pub edit_overlay: String,
+}
+
+impl Default for HotkeySettings {
+    fn default() -> Self {
+        Self {
+            toggle_listening: "F8".into(),
+            push_to_talk: "F9".into(),
+            copy_latest: "F10".into(),
+            edit_overlay: "F7".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OverlaySettings {
+    pub opacity: f64,
+    #[serde(default = "fully_opaque")]
+    pub bubble_opacity: f64,
+    #[serde(default = "fully_opaque")]
+    pub text_opacity: f64,
+    pub font_scale: f64,
+    #[serde(default = "default_text_scale")]
+    pub incoming_translation_scale: f64,
+    #[serde(default = "default_text_scale")]
+    pub incoming_original_scale: f64,
+    #[serde(default = "default_text_scale")]
+    pub outgoing_translation_scale: f64,
+    #[serde(default = "default_text_scale")]
+    pub outgoing_original_scale: f64,
+    pub fade_seconds: u64,
+    pub max_items: usize,
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Default for OverlaySettings {
+    fn default() -> Self {
+        Self {
+            opacity: 0.92,
+            bubble_opacity: 1.0,
+            text_opacity: 1.0,
+            font_scale: 1.0,
+            incoming_translation_scale: 1.0,
+            incoming_original_scale: 1.0,
+            outgoing_translation_scale: 1.0,
+            outgoing_original_scale: 1.0,
+            fade_seconds: 30,
+            max_items: 4,
+            x: None,
+            y: None,
+            width: 420,
+            height: 236,
+        }
+    }
+}
+
+fn fully_opaque() -> f64 {
+    1.0
+}
+fn default_text_scale() -> f64 {
+    1.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct VadProfile {
+    pub vad_threshold: f32,
+    pub gain_db: f32,
+}
+
+impl VadProfile {
+    pub fn process_tree_default() -> Self {
+        Self {
+            vad_threshold: 0.5,
+            gain_db: 0.0,
+        }
+    }
+
+    pub fn system_output_default() -> Self {
+        Self {
+            vad_threshold: 0.35,
+            gain_db: 9.0,
+        }
+    }
+}
+
+impl Default for VadProfile {
+    fn default() -> Self {
+        Self::process_tree_default()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct VadSettings {
+    pub process_tree: VadProfile,
+    pub system_output: VadProfile,
+    pub silence_ms: u64,
+    pub pre_roll_ms: u64,
+    pub max_utterance_ms: u64,
+}
+
+impl VadSettings {
+    pub fn active_profile(&self, mode: CaptureMode) -> &VadProfile {
+        match mode {
+            CaptureMode::ProcessTree => &self.process_tree,
+            CaptureMode::SystemOutput => &self.system_output,
+        }
+    }
+}
+
+impl Default for VadSettings {
+    fn default() -> Self {
+        Self {
+            process_tree: VadProfile::process_tree_default(),
+            system_output: VadProfile::system_output_default(),
+            silence_ms: 500,
+            pre_roll_ms: 200,
+            max_utterance_ms: 12_000,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AppSettings {
+    pub schema_version: u32,
+    pub listening_source: Option<SavedProcess>,
+    pub capture_mode: CaptureMode,
+    pub output_device_id: Option<String>,
+    pub microphone_device_id: Option<String>,
+    pub rescue_scan_enabled: bool,
+    pub auto_attach: bool,
+    pub hotkeys: HotkeySettings,
+    pub overlay: OverlaySettings,
+    pub vad: VadSettings,
+    pub installation_id: String,
+    pub glossary: Vec<GlossaryTerm>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            schema_version: 16,
+            listening_source: None,
+            capture_mode: CaptureMode::default(),
+            output_device_id: None,
+            microphone_device_id: None,
+            rescue_scan_enabled: false,
+            auto_attach: true,
+            hotkeys: HotkeySettings::default(),
+            overlay: OverlaySettings::default(),
+            vad: VadSettings::default(),
+            installation_id: uuid::Uuid::new_v4().to_string(),
+            glossary: vec![
+                GlossaryTerm {
+                    source: "Mistfall".into(),
+                    target: "Mistfall".into(),
+                },
+                GlossaryTerm {
+                    source: "extract".into(),
+                    target: "จุดถอนตัว".into(),
+                },
+                GlossaryTerm {
+                    source: "revive".into(),
+                    target: "ชุบเพื่อน".into(),
+                },
+                GlossaryTerm {
+                    source: "boss".into(),
+                    target: "บอส".into(),
+                },
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeState {
+    pub listening: bool,
+    pub microphone_active: bool,
+    pub overlay_edit_mode: bool,
+    pub worker_ready: bool,
+    pub worker_model: Option<String>,
+    pub ai_stt_busy: bool,
+    pub ai_status: String,
+    pub ai_service: wangai_ai_protocol::ServiceStatus,
+    pub attached_source: Option<CaptureSource>,
+    pub effective_capture_pid: Option<u32>,
+    pub effective_capture_name: Option<String>,
+    pub effective_output_device_id: Option<String>,
+    pub effective_output_device_name: Option<String>,
+    pub effective_output_device_is_default: bool,
+    pub audio_rms_dbfs: Option<f32>,
+    pub audio_peak_dbfs: Option<f32>,
+    pub audio_last_seen_at_ms: Option<i64>,
+    pub microphone_rms_dbfs: Option<f32>,
+    pub microphone_peak_dbfs: Option<f32>,
+    pub microphone_last_seen_at_ms: Option<i64>,
+    pub vad_active: bool,
+    pub effective_vad_threshold: f32,
+    pub effective_vad_gain_db: f32,
+    pub effective_vad_auto_gain_db: f32,
+    pub dropped_audio_chunks: u64,
+    pub capture_warning: Option<String>,
+    pub status_message: String,
+    pub last_error: Option<String>,
+}
+
+impl Default for RuntimeState {
+    fn default() -> Self {
+        Self {
+            listening: false,
+            microphone_active: false,
+            overlay_edit_mode: false,
+            worker_ready: false,
+            worker_model: None,
+            ai_stt_busy: false,
+            ai_status: "กำลังเชื่อมต่อบริการ AI".into(),
+            ai_service: wangai_ai_protocol::ServiceStatus::default(),
+            attached_source: None,
+            effective_capture_pid: None,
+            effective_capture_name: None,
+            effective_output_device_id: None,
+            effective_output_device_name: None,
+            effective_output_device_is_default: false,
+            audio_rms_dbfs: None,
+            audio_peak_dbfs: None,
+            audio_last_seen_at_ms: None,
+            microphone_rms_dbfs: None,
+            microphone_peak_dbfs: None,
+            microphone_last_seen_at_ms: None,
+            vad_active: false,
+            effective_vad_threshold: 0.5,
+            effective_vad_gain_db: 0.0,
+            effective_vad_auto_gain_db: 0.0,
+            dropped_audio_chunks: 0,
+            capture_warning: None,
+            status_message: "กำลังเตรียมระบบถอดเสียง".into(),
+            last_error: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSnapshot {
+    pub settings: AppSettings,
+    pub runtime: RuntimeState,
+    pub history: Vec<SubtitleItem>,
+    pub partial: Option<TranscriptEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+// Python uses snake_case event names and camelCase event fields.
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+pub enum WorkerEvent {
+    Ready {
+        model: String,
+        device: String,
+    },
+    Status {
+        message: String,
+    },
+    SpeechState {
+        stream: StreamKind,
+        active: bool,
+        utterance_id: u64,
+        sample_cursor: u64,
+    },
+    AudioGap {
+        stream: StreamKind,
+        expected_sample_cursor: u64,
+        actual_sample_cursor: u64,
+    },
+    Error {
+        message: String,
+        stream: Option<StreamKind>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkerStatusEvent {
+    pub state: String,
+    pub message: String,
+    pub model: Option<String>,
+}
+
+#[cfg(test)]
+mod worker_contract_tests {
+    use super::*;
+
+    #[test]
+    fn python_speech_and_gap_events_deserialize_and_round_trip() {
+        let fixture = include_str!("../../worker/fixtures/events.jsonl");
+        let events: Vec<WorkerEvent> = fixture
+            .lines()
+            .map(|line| {
+                let event: WorkerEvent =
+                    serde_json::from_str(line).expect("Python worker wire contract");
+                assert_eq!(
+                    serde_json::to_value(&event).unwrap(),
+                    serde_json::from_str::<serde_json::Value>(line).unwrap()
+                );
+                event
+            })
+            .collect();
+        assert!(matches!(
+            events[0],
+            WorkerEvent::SpeechState {
+                stream: StreamKind::Incoming,
+                active: true,
+                utterance_id: 1,
+                sample_cursor: 512
+            }
+        ));
+        assert!(matches!(
+            events[1],
+            WorkerEvent::SpeechState {
+                stream: StreamKind::Incoming,
+                active: false,
+                utterance_id: 1,
+                sample_cursor: 1024
+            }
+        ));
+        assert!(matches!(
+            events[2],
+            WorkerEvent::AudioGap {
+                stream: StreamKind::Incoming,
+                expected_sample_cursor: 1536,
+                actual_sample_cursor: 4096
+            }
+        ));
+    }
+
+    #[test]
+    fn readiness_status_and_optional_error_stream_remain_compatible() {
+        for line in [
+            r#"{"type":"ready","model":"silero-vad","device":"cpu"}"#,
+            r#"{"type":"status","message":"starting"}"#,
+            r#"{"type":"error","message":"bad frame"}"#,
+            r#"{"type":"error","message":"bad frame","stream":"incoming"}"#,
+        ] {
+            serde_json::from_str::<WorkerEvent>(line).expect("existing worker event");
+        }
+    }
+
+    #[test]
+    fn incomplete_speech_events_are_not_silently_accepted() {
+        for line in [
+            r#"{"type":"speech_state","stream":"incoming","active":true,"sampleCursor":512}"#,
+            r#"{"type":"speech_state","stream":"incoming","active":true,"utteranceId":1}"#,
+            r#"{"type":"audio_gap","stream":"incoming","expectedSampleCursor":512}"#,
+        ] {
+            assert!(serde_json::from_str::<WorkerEvent>(line).is_err());
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OverlayPresentation {
+    Collapsed,
+    Expanded,
+}

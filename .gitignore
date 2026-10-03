@@ -1,26 +1,44 @@
+# Dependencies and build output (also valid before the Desktop relocation).
 node_modules/
 dist/
-src-tauri/target/
-portable/target/
-server/target/
-ai-protocol/target/
+target/
+output/
+*.tsbuildinfo
+
+# Python environments and caches.
+.venv/
+.packaging-venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated Tauri metadata; capabilities/ and tauri.conf.json remain source.
+tauri.release.generated.json
+/src-tauri/gen/schemas/
+/apps/desktop/src-tauri/gen/schemas/
+
+# Shared library: application crates keep their own committed Cargo.lock.
+/ai-protocol/Cargo.lock
+
+# Local test reports and editor state.
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+.playwright-cli/
+.idea/
+.vscode/
+*.log
+
+# Local data and credentials.
 *.sqlite3
 *.sqlite3-shm
 *.sqlite3-wal
-.venv/
-.packaging-venv/
-output/
-src-tauri/tauri.release.generated.json
 *.key
 *.key.pub
-worker/__pycache__/
-*.pyc
-*.pyo
-*.log
 .env
 .env.*
 !.env.example
-.idea/
-.vscode/
-.playwright-cli/
-output/playwright/

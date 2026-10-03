@@ -1,0 +1,54 @@
+[package]
+name = "gamelingo"
+version = "0.5.0"
+description = "Near-realtime game voice translator overlay"
+authors = ["GameLingo"]
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+name = "gamelingo_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Isolated installer QA only; release workflow rejects this feature.
+release-test = ["wangai-portable/release-test"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+url = "2"
+base64 = "0.22"
+
+[dependencies]
+wangai-portable = { path = "../portable" }
+wangai-ai-protocol = { path = "../../../ai-protocol" }
+anyhow = "1.0"
+async-trait = "0.1"
+axum = { version = "0.8", features = ["ws"] }
+base64 = "0.22"
+chrono = { version = "0.4.45", features = ["serde"] }
+flexaudio = "0.2.0"
+futures-util = "0.3"
+rand = "0.9"
+regex = "1.12"
+reqwest = { version = "0.12.24", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sysinfo = { version = "0.35.2", default-features = false, features = ["system"] }
+tauri = { version = "2.11.5", features = ["tray-icon"] }
+tauri-plugin-clipboard-manager = "2.3.2"
+tauri-plugin-global-shortcut = "2.3.2"
+tauri-plugin-opener = "2.5.0"
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-single-instance = "2.4.0"
+thiserror = "2.0"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tower-http = { version = "0.6", features = ["fs", "limit"] }
+uuid = { version = "1.26.0", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tempfile = "3.23"
+tauri = { version = "2.11.5", features = ["test"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Storage_FileSystem"] }

@@ -1,0 +1,741 @@
+mod signal;
+use signal::*;
+
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle},
+    time::{Duration, Instant},
+};
+
+use anyhow::{anyhow, Result};
+use flexaudio::{devices, open, DeviceInfo, OutputFormat, ProcessMode, SourceKind, StreamConfig};
+use tauri::{AppHandle, Emitter, Manager};
+
+use crate::{
+    cloud_stt::AiSttManager,
+    models::{AudioOutputDevice, CaptureMode, StreamKind},
+    processes,
+    state::AppState,
+    worker::WorkerManager,
+};
+
+struct CaptureHandle {
+    stop: Arc<AtomicBool>,
+    join: Option<JoinHandle<()>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct IncomingCaptureConfig {
+    pub selected_pid: u32,
+    pub effective_pid: u32,
+    pub capture_mode: CaptureMode,
+    pub vad_gain_db: f32,
+    pub output_device_id: Option<String>,
+    pub output_device_name: Option<String>,
+    pub cloud_scan_enabled: bool,
+}
+
+pub(crate) fn list_output_devices() -> Result<Vec<AudioOutputDevice>> {
+    let mut outputs = map_output_devices(devices()?);
+    outputs.sort_by(|left, right| {
+        right
+            .is_default
+            .cmp(&left.is_default)
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+    });
+    Ok(outputs)
+}
+
+pub(crate) fn default_microphone_name() -> Result<Option<String>> {
+    Ok(devices()?
+        .into_iter()
+        .find(|device| device.source_kind == SourceKind::Mic && device.is_default)
+        .map(|device| device.name))
+}
+
+pub(crate) fn list_microphone_devices() -> Result<Vec<AudioOutputDevice>> {
+    let mut inputs: Vec<_> = devices()?
+        .into_iter()
+        .filter(|device| device.source_kind == SourceKind::Mic)
+        .map(|device| AudioOutputDevice {
+            id: device.id,
+            name: device.name,
+            is_default: device.is_default,
+            sample_rate: device.sample_rate,
+            channels: device.channels,
+        })
+        .collect();
+    inputs.sort_by(|a, b| {
+        b.is_default
+            .cmp(&a.is_default)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    Ok(inputs)
+}
+
+pub(crate) fn resolve_microphone_device(id: &str) -> Result<AudioOutputDevice> {
+    list_microphone_devices()?
+        .into_iter()
+        .find(|device| device.id == id)
+        .ok_or_else(|| anyhow!("ไม่พบไมโครโฟนที่เลือก: {id}"))
+}
+
+fn map_output_devices(devices: Vec<DeviceInfo>) -> Vec<AudioOutputDevice> {
+    devices
+        .into_iter()
+        .filter(|device| device.source_kind == SourceKind::SystemLoopback)
+        .map(|device| AudioOutputDevice {
+            id: device.id,
+            name: device.name,
+            is_default: device.is_default,
+            sample_rate: device.sample_rate,
+            channels: device.channels,
+        })
+        .collect()
+}
+
+pub(crate) fn resolve_output_device(selected_id: Option<&str>) -> Result<AudioOutputDevice> {
+    let devices = list_output_devices()?;
+    match selected_id {
+        Some(id) => devices
+            .into_iter()
+            .find(|device| device.id == id)
+            .ok_or_else(|| anyhow!("ไม่พบอุปกรณ์ output ที่เลือก: {id}")),
+        None => devices
+            .into_iter()
+            .find(|device| device.is_default)
+            .ok_or_else(|| anyhow!("ไม่พบ Windows default output device")),
+    }
+}
+
+impl CaptureHandle {
+    fn stop(mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct AudioManager {
+    incoming: Mutex<Option<CaptureHandle>>,
+    microphone: Mutex<Option<CaptureHandle>>,
+}
+
+impl AudioManager {
+    pub fn start_incoming(
+        &self,
+        app: AppHandle,
+        config: IncomingCaptureConfig,
+        worker: WorkerManager,
+        ai_stt: AiSttManager,
+    ) -> Result<()> {
+        self.stop_incoming();
+        if !processes::process_is_alive(config.selected_pid) {
+            return Err(anyhow!("process {} ไม่ได้ทำงานแล้ว", config.selected_pid));
+        }
+        if config.capture_mode == CaptureMode::ProcessTree
+            && !processes::process_is_alive(config.effective_pid)
+        {
+            return Err(anyhow!(
+                "process root {} ไม่ได้ทำงานแล้ว",
+                config.effective_pid
+            ));
+        }
+        worker.reset_stream(StreamKind::Incoming);
+        ai_stt.reset_stream(StreamKind::Incoming);
+        let handle = spawn_capture(
+            app,
+            StreamKind::Incoming,
+            Some(config),
+            None,
+            Some(worker),
+            ai_stt,
+        )?;
+        *self
+            .incoming
+            .lock()
+            .expect("incoming capture lock poisoned") = Some(handle);
+        Ok(())
+    }
+
+    pub fn stop_incoming(&self) {
+        if let Some(handle) = self
+            .incoming
+            .lock()
+            .expect("incoming capture lock poisoned")
+            .take()
+        {
+            handle.stop();
+        }
+    }
+
+    pub fn start_microphone(
+        &self,
+        app: AppHandle,
+        ai_stt: AiSttManager,
+        device_id: Option<String>,
+    ) -> Result<()> {
+        let mut guard = self.microphone.lock().expect("mic capture lock poisoned");
+        if guard.is_some() {
+            return Ok(());
+        }
+        *guard = Some(spawn_capture(
+            app,
+            StreamKind::Microphone,
+            None,
+            device_id,
+            None,
+            ai_stt,
+        )?);
+        Ok(())
+    }
+
+    pub fn stop_microphone(&self) {
+        if let Some(handle) = self
+            .microphone
+            .lock()
+            .expect("mic capture lock poisoned")
+            .take()
+        {
+            handle.stop();
+        }
+    }
+
+    pub fn stop_all(&self) {
+        self.stop_incoming();
+        self.stop_microphone();
+    }
+}
+
+fn spawn_capture(
+    app: AppHandle,
+    stream_kind: StreamKind,
+    incoming_config: Option<IncomingCaptureConfig>,
+    microphone_device_id: Option<String>,
+    worker: Option<WorkerManager>,
+    ai_stt: AiSttManager,
+) -> Result<CaptureHandle> {
+    let stop = Arc::new(AtomicBool::new(false));
+    let thread_stop = stop.clone();
+    let (startup_tx, startup_rx) = std::sync::mpsc::sync_channel(1);
+    let join = thread::Builder::new()
+        .name(format!("gamelingo-capture-{stream_kind:?}"))
+        .spawn(move || {
+            let (source_kind, target_pid) =
+                capture_source_config(stream_kind, incoming_config.as_ref());
+            let device_id = if stream_kind == StreamKind::Microphone {
+                microphone_device_id
+            } else {
+                capture_device_id(stream_kind, incoming_config.as_ref())
+            };
+            let config = StreamConfig {
+                kind: source_kind,
+                device_id,
+                target_pid,
+                mode: ProcessMode::Include,
+                output: OutputFormat {
+                    sample_rate: 16_000,
+                    channels: capture_output_channels(stream_kind),
+                },
+                ring_capacity_chunks: 100,
+                ..Default::default()
+            };
+            let mut stream = match open(config) {
+                Ok(stream) => stream,
+                Err(error) => {
+                    let _ = startup_tx
+                        .send(Err(format!("เปิด {stream_kind:?} capture ไม่สำเร็จ: {error}")));
+                    capture_failed(
+                        &app,
+                        stream_kind,
+                        format!("เปิด {stream_kind:?} capture ไม่สำเร็จ: {error}"),
+                    );
+                    return;
+                }
+            };
+            if let Err(error) = stream.start() {
+                let _ =
+                    startup_tx.send(Err(format!("เริ่ม {stream_kind:?} capture ไม่สำเร็จ: {error}")));
+                capture_failed(
+                    &app,
+                    stream_kind,
+                    format!("เริ่ม {stream_kind:?} capture ไม่สำเร็จ: {error}"),
+                );
+                return;
+            }
+            let _ = startup_tx.send(Ok(()));
+            let _ = app.emit("capture-started", stream_kind);
+            let mut last_process_check = Instant::now();
+            let capture_started = Instant::now();
+            let mut last_meter_emit = Instant::now();
+            let mut last_cloud_scan_check = Instant::now();
+            let mut last_audio_received: Option<Instant> = None;
+            let mut last_audible_received: Option<Instant> = None;
+            let mut meter_sum_squares = 0.0_f64;
+            let mut meter_peak = 0.0_f32;
+            let mut meter_samples = 0_u64;
+            let mut vad_leveler = VadAutoLeveler::default();
+            let mut vad_auto_gain_db = 0.0_f32;
+            let mut dropped = 0_u64;
+            while !thread_stop.load(Ordering::Relaxed) {
+                let mut had_audio = false;
+                while let Some(chunk) = stream.poll_chunk() {
+                    had_audio = true;
+                    let mono_data = match stream_kind {
+                        StreamKind::Incoming => downmix_stereo_voice_preserving(&chunk.data),
+                        StreamKind::Microphone => chunk.data,
+                    };
+                    if stream_kind != StreamKind::Microphone {
+                        last_audio_received = Some(Instant::now());
+                        if mono_data.iter().any(|sample| sample.abs() > 0.0001) {
+                            last_audible_received = Some(Instant::now());
+                        }
+                    }
+                    accumulate_levels(
+                        &mono_data,
+                        &mut meter_sum_squares,
+                        &mut meter_peak,
+                        &mut meter_samples,
+                    );
+                    let span = ai_stt.ingest_audio(stream_kind, &mono_data);
+                    if let Some(worker) = worker.as_ref() {
+                        let samples = incoming_config
+                            .as_ref()
+                            .map(|config| {
+                                let samples = vad_leveler.process(
+                                    &mono_data,
+                                    config.vad_gain_db,
+                                    config.capture_mode == CaptureMode::SystemOutput,
+                                );
+                                vad_auto_gain_db = vad_leveler.auto_gain_db;
+                                samples
+                            })
+                            .unwrap_or(mono_data);
+                        if !worker.send_audio(stream_kind, span.start_sample_cursor, samples) {
+                            dropped += 1;
+                        }
+                    }
+                }
+                while let Some(event) = stream.poll_event() {
+                    let _ = app.emit("capture-log", format!("{stream_kind:?}: {event:?}"));
+                }
+                if stream_kind != StreamKind::Microphone
+                    && last_process_check.elapsed() >= Duration::from_secs(1)
+                {
+                    last_process_check = Instant::now();
+                    if incoming_config
+                        .as_ref()
+                        .is_some_and(|config| !processes::process_is_alive(config.selected_pid))
+                    {
+                        let reason = "listening_source_exited";
+                        let _ = app.emit("capture-ended", reason);
+                        break;
+                    }
+                }
+                if last_meter_emit.elapsed() >= Duration::from_millis(200) {
+                    if stream_kind == StreamKind::Microphone {
+                        emit_microphone_audio_diagnostics(
+                            &app,
+                            meter_sum_squares,
+                            meter_peak,
+                            meter_samples,
+                        );
+                    } else {
+                        emit_playback_audio_diagnostics(
+                            &app,
+                            stream_kind,
+                            incoming_config.as_ref().expect("incoming capture config"),
+                            capture_started,
+                            last_audio_received,
+                            last_audible_received,
+                            meter_sum_squares,
+                            meter_peak,
+                            meter_samples,
+                            vad_auto_gain_db,
+                            dropped,
+                        );
+                    }
+                    last_meter_emit = Instant::now();
+                    meter_sum_squares = 0.0;
+                    meter_peak = 0.0;
+                    meter_samples = 0;
+                }
+                if stream_kind != StreamKind::Microphone
+                    && incoming_config
+                        .as_ref()
+                        .is_some_and(|config| config.cloud_scan_enabled)
+                    && last_cloud_scan_check.elapsed() >= Duration::from_millis(250)
+                {
+                    last_cloud_scan_check = Instant::now();
+                    ai_stt.maybe_enqueue_auto_scan(app.clone());
+                }
+                if !had_audio {
+                    thread::sleep(Duration::from_millis(5));
+                }
+            }
+            stream.stop();
+            if let Some(worker) = worker.as_ref() {
+                worker.finalize_stream(stream_kind);
+            }
+            if dropped > 0 {
+                let _ = app.emit(
+                    "capture-log",
+                    format!("ทิ้ง audio chunks {dropped} ชุดเพราะ worker ช้า"),
+                );
+            }
+            if stream_kind != StreamKind::Microphone {
+                clear_playback_audio_diagnostics(&app, stream_kind);
+            } else {
+                clear_microphone_audio_diagnostics(&app);
+            }
+            let _ = app.emit("capture-stopped", stream_kind);
+        })?;
+    let handle = CaptureHandle {
+        stop,
+        join: Some(join),
+    };
+    match startup_rx.recv_timeout(Duration::from_secs(10)) {
+        Ok(Ok(())) => Ok(handle),
+        result => {
+            handle.stop();
+            Err(anyhow!(match result {
+                Ok(Err(message)) => message,
+                Err(error) => format!("เปิด audio capture ไม่สำเร็จ: {error}"),
+                _ => unreachable!(),
+            }))
+        }
+    }
+}
+
+fn capture_failed(app: &AppHandle, stream_kind: StreamKind, message: String) {
+    let state = app.state::<AppState>();
+    let runtime = state.update_runtime(|runtime| {
+        if stream_kind == StreamKind::Incoming {
+            runtime.last_error = Some(message.clone());
+            runtime.status_message = "เปิด audio capture ไม่สำเร็จ จะลองใหม่".into();
+            runtime.attached_source = None;
+            runtime.effective_capture_pid = None;
+            runtime.effective_capture_name = None;
+            runtime.effective_output_device_id = None;
+            runtime.effective_output_device_name = None;
+            runtime.effective_output_device_is_default = false;
+            runtime.audio_rms_dbfs = None;
+            runtime.audio_peak_dbfs = None;
+            runtime.audio_last_seen_at_ms = None;
+            runtime.vad_active = false;
+            runtime.effective_vad_auto_gain_db = 0.0;
+            runtime.capture_warning = Some(message.clone());
+        } else {
+            runtime.last_error = Some(message.clone());
+            runtime.status_message = "เปิด audio capture ไม่สำเร็จ จะลองใหม่".into();
+            runtime.microphone_active = false;
+            runtime.microphone_rms_dbfs = None;
+            runtime.microphone_peak_dbfs = None;
+            runtime.microphone_last_seen_at_ms = None;
+        }
+    });
+    let _ = app.emit("capture-error", message.clone());
+    let _ = app.emit("pipeline-error", message);
+    let _ = app.emit("runtime-state", runtime);
+}
+
+fn emit_microphone_audio_diagnostics(
+    app: &AppHandle,
+    sum_squares: f64,
+    peak: f32,
+    sample_count: u64,
+) {
+    let levels = (sample_count > 0).then(|| {
+        let rms = (sum_squares / sample_count as f64).sqrt() as f32;
+        (amplitude_to_dbfs(rms), amplitude_to_dbfs(peak))
+    });
+    let state = app.state::<AppState>();
+    let runtime = state.update_runtime(|runtime| {
+        runtime.microphone_rms_dbfs = levels.map(|value| value.0);
+        runtime.microphone_peak_dbfs = levels.map(|value| value.1);
+        runtime.microphone_last_seen_at_ms =
+            (sample_count > 0).then(|| chrono::Utc::now().timestamp_millis());
+    });
+    let _ = app.emit("runtime-state", runtime);
+}
+
+fn clear_microphone_audio_diagnostics(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let runtime = state.update_runtime(|runtime| {
+        runtime.microphone_rms_dbfs = None;
+        runtime.microphone_peak_dbfs = None;
+        runtime.microphone_last_seen_at_ms = None;
+    });
+    let _ = app.emit("runtime-state", runtime);
+}
+
+fn capture_source_config(
+    stream_kind: StreamKind,
+    incoming_config: Option<&IncomingCaptureConfig>,
+) -> (SourceKind, Option<u32>) {
+    match (stream_kind, incoming_config) {
+        (StreamKind::Incoming, Some(config))
+            if config.capture_mode == CaptureMode::SystemOutput =>
+        {
+            (SourceKind::SystemLoopback, None)
+        }
+        (StreamKind::Incoming, Some(config)) => {
+            (SourceKind::ProcessLoopback, Some(config.effective_pid))
+        }
+        _ => (SourceKind::Mic, None),
+    }
+}
+
+fn capture_device_id(
+    stream_kind: StreamKind,
+    incoming_config: Option<&IncomingCaptureConfig>,
+) -> Option<String> {
+    match (stream_kind, incoming_config) {
+        (StreamKind::Incoming, Some(config))
+            if config.capture_mode == CaptureMode::SystemOutput =>
+        {
+            config.output_device_id.clone()
+        }
+        _ => None,
+    }
+}
+
+fn capture_output_channels(stream_kind: StreamKind) -> u16 {
+    match stream_kind {
+        StreamKind::Incoming => 2,
+        StreamKind::Microphone => 1,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_playback_audio_diagnostics(
+    app: &AppHandle,
+    _stream_kind: StreamKind,
+    config: &IncomingCaptureConfig,
+    capture_started: Instant,
+    last_audio_received: Option<Instant>,
+    last_audible_received: Option<Instant>,
+    sum_squares: f64,
+    peak: f32,
+    sample_count: u64,
+    vad_auto_gain_db: f32,
+    dropped: u64,
+) {
+    let levels = (sample_count > 0).then(|| {
+        let rms = (sum_squares / sample_count as f64).sqrt() as f32;
+        (amplitude_to_dbfs(rms), amplitude_to_dbfs(peak))
+    });
+    let no_audio_for = last_audio_received
+        .map(|last| last.elapsed())
+        .unwrap_or_else(|| capture_started.elapsed());
+    let no_audible_for = last_audible_received
+        .map(|last| last.elapsed())
+        .unwrap_or_else(|| capture_started.elapsed());
+    let warning = if dropped > 0 {
+        Some(format!(
+            "ตัวตรวจคำพูดประมวลผลเสียงไม่ทัน ข้ามเสียงไป {dropped} ช่วง ลองลดภาระเครื่อง"
+        ))
+    } else if no_audio_for >= Duration::from_secs(3) {
+        Some(match config.capture_mode {
+            CaptureMode::ProcessTree => "ยังไม่พบเสียงจากแอปที่เลือก ลองตรวจแอปหรือฟังเสียงทั้งเครื่อง".into(),
+            CaptureMode::SystemOutput => format!(
+                "ยังไม่ได้รับเสียงจาก {} ลองเลือกอุปกรณ์ที่แอปใช้อยู่",
+                config
+                    .output_device_name
+                    .as_deref()
+                    .unwrap_or("System Output")
+            ),
+        })
+    } else if no_audible_for >= Duration::from_secs(3) {
+        Some(match config.capture_mode {
+            CaptureMode::ProcessTree => "แอปที่เลือกยังไม่มีเสียง ลองตรวจแอปหรือฟังเสียงทั้งเครื่อง".into(),
+            CaptureMode::SystemOutput => {
+                format!(
+                    "{} ยังไม่มีเสียง ลองตรวจว่าแอปใช้อุปกรณ์นี้อยู่",
+                    config
+                        .output_device_name
+                        .as_deref()
+                        .unwrap_or("System Output")
+                )
+            }
+        })
+    } else {
+        None
+    };
+    let state = app.state::<AppState>();
+    let runtime = state.update_runtime(|runtime| {
+        runtime.audio_rms_dbfs = levels.map(|value| value.0);
+        runtime.audio_peak_dbfs = levels.map(|value| value.1);
+        if sample_count > 0 {
+            runtime.audio_last_seen_at_ms = Some(chrono::Utc::now().timestamp_millis());
+        }
+        runtime.dropped_audio_chunks = dropped;
+        runtime.effective_vad_auto_gain_db = vad_auto_gain_db;
+        runtime.capture_warning = warning;
+    });
+    let _ = app.emit("runtime-state", runtime);
+}
+
+fn clear_playback_audio_diagnostics(app: &AppHandle, _stream_kind: StreamKind) {
+    let state = app.state::<AppState>();
+    let runtime = state.update_runtime(|runtime| {
+        runtime.audio_rms_dbfs = None;
+        runtime.audio_peak_dbfs = None;
+        runtime.audio_last_seen_at_ms = None;
+        runtime.vad_active = false;
+        runtime.effective_vad_auto_gain_db = 0.0;
+        runtime.dropped_audio_chunks = 0;
+        runtime.capture_warning = None;
+    });
+    let _ = app.emit("runtime-state", runtime);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "Read-only check against the current Windows input devices"]
+    fn live_default_microphone_discovery() {
+        println!(
+            "Windows default microphone: {:?}",
+            default_microphone_name().unwrap()
+        );
+    }
+
+    #[test]
+    fn converts_known_amplitudes_to_dbfs() {
+        assert!((amplitude_to_dbfs(1.0) - 0.0).abs() < 0.001);
+        assert!((amplitude_to_dbfs(0.5) + 6.0206).abs() < 0.01);
+        assert_eq!(amplitude_to_dbfs(0.0), -96.0);
+    }
+
+    #[test]
+    fn vad_gain_clamps_without_changing_the_input() {
+        let input = vec![0.25, -0.75];
+        let gained = apply_gain(&input, 12.0);
+        assert_eq!(input, vec![0.25, -0.75]);
+        assert!(gained[0] > input[0]);
+        assert_eq!(gained[1], -1.0);
+    }
+
+    #[test]
+    fn system_output_auto_leveler_lifts_quiet_vad_copy_only() {
+        let input = vec![0.004; 512];
+        let mut leveler = VadAutoLeveler::default();
+        let output = leveler.process(&input, 18.0, true);
+
+        assert_eq!(input, vec![0.004; 512]);
+        assert!(leveler.auto_gain_db > 9.5);
+        assert!(rms_and_peak(&output).0 >= 0.08);
+        assert!(output.iter().all(|sample| sample.abs() <= 1.0));
+    }
+
+    #[test]
+    fn process_tree_uses_manual_gain_without_auto_leveling() {
+        let input = vec![0.004; 512];
+        let mut leveler = VadAutoLeveler::default();
+        let output = leveler.process(&input, 9.0, false);
+
+        assert_eq!(leveler.auto_gain_db, 0.0);
+        assert!((output[0] - input[0] * 10.0_f32.powf(9.0 / 20.0)).abs() < 0.000_001);
+    }
+
+    #[test]
+    fn level_accumulator_reports_rms_and_peak() {
+        let mut sum = 0.0;
+        let mut peak = 0.0;
+        let mut count = 0;
+        accumulate_levels(&[0.5, -0.5], &mut sum, &mut peak, &mut count);
+        assert_eq!(count, 2);
+        assert_eq!(peak, 0.5);
+        assert!(((sum / count as f64).sqrt() - 0.5).abs() < 0.0001);
+    }
+
+    #[test]
+    fn capture_mode_selects_process_or_system_loopback() {
+        let mut config = IncomingCaptureConfig {
+            selected_pid: 10,
+            effective_pid: 20,
+            capture_mode: CaptureMode::ProcessTree,
+            vad_gain_db: 0.0,
+            output_device_id: Some("Speakers (PRO)".into()),
+            output_device_name: Some("Speakers (PRO)".into()),
+            cloud_scan_enabled: false,
+        };
+        assert_eq!(
+            capture_source_config(StreamKind::Incoming, Some(&config)),
+            (SourceKind::ProcessLoopback, Some(20))
+        );
+        assert_eq!(capture_device_id(StreamKind::Incoming, Some(&config)), None);
+        config.capture_mode = CaptureMode::SystemOutput;
+        assert_eq!(
+            capture_source_config(StreamKind::Incoming, Some(&config)),
+            (SourceKind::SystemLoopback, None)
+        );
+        assert_eq!(
+            capture_device_id(StreamKind::Incoming, Some(&config)).as_deref(),
+            Some("Speakers (PRO)")
+        );
+        assert_eq!(
+            capture_source_config(StreamKind::Microphone, None),
+            (SourceKind::Mic, None)
+        );
+        assert_eq!(capture_output_channels(StreamKind::Incoming), 2);
+        assert_eq!(capture_output_channels(StreamKind::Microphone), 1);
+    }
+
+    #[test]
+    fn stereo_downmix_preserves_out_of_phase_voice() {
+        let stereo = vec![0.5, -0.5, -0.25, 0.25, 0.125, -0.125];
+        let mono = downmix_stereo_voice_preserving(&stereo);
+
+        assert_eq!(mono, vec![0.5, -0.25, 0.125]);
+        assert!(mono.iter().any(|sample| sample.abs() > 0.1));
+    }
+
+    #[test]
+    fn stereo_downmix_selects_the_stronger_channel_for_the_chunk() {
+        let stereo = vec![0.01, 0.4, -0.01, -0.3, 0.02, 0.2];
+        let mono = downmix_stereo_voice_preserving(&stereo);
+
+        assert_eq!(mono, vec![0.4, -0.3, 0.2]);
+        assert_eq!(mono.len(), stereo.len() / 2);
+    }
+
+    #[test]
+    fn output_device_mapping_keeps_only_system_loopback_devices() {
+        let devices = vec![
+            DeviceInfo {
+                id: "Microphone".into(),
+                name: "Microphone".into(),
+                source_kind: SourceKind::Mic,
+                sample_rate: 48_000,
+                channels: 1,
+                is_loopback: false,
+                is_default: true,
+            },
+            DeviceInfo {
+                id: "Speakers (PRO)".into(),
+                name: "Speakers (PRO)".into(),
+                source_kind: SourceKind::SystemLoopback,
+                sample_rate: 48_000,
+                channels: 2,
+                is_loopback: true,
+                is_default: true,
+            },
+        ];
+
+        let mapped = map_output_devices(devices);
+        assert_eq!(mapped.len(), 1);
+        assert_eq!(mapped[0].id, "Speakers (PRO)");
+        assert_eq!(mapped[0].sample_rate, 48_000);
+        assert_eq!(mapped[0].channels, 2);
+        assert!(mapped[0].is_default);
+    }
+}
