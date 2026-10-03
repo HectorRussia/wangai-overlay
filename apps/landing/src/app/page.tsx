@@ -134,8 +134,8 @@ export default function Home() {
         </section>
         <section className="final-cta" id="download">
           <div className="closing-copy">
-            <h2>ลอง<span className="accent">ว่าไง</span>กับทีมของคุณ</h2>
-            <p>ดาวน์โหลด แล้วลองคุยในเกมดู</p>
+            <h2>ลองใช้<span className="accent">ว่าไง</span></h2>
+            <p>ให้ว่าไงช่วยแปล ตอนเล่นเกมกับเพื่อน</p>
           </div>
           <div className="closing-action">
             <DownloadLink />
