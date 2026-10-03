@@ -133,17 +133,14 @@ export default function Home() {
           </div>
         </section>
         <section className="final-cta" id="download">
-          <AudioLines className="cta-wave" size={42} aria-hidden="true" />
-          <p className="eyebrow">WANGAI FOR WINDOWS</p>
-          <h2>
-            แปลเสียงพูด
-            <br />
-            <span className="accent">ระหว่างเล่นเกม</span>
-          </h2>
-          <DownloadLink />
-          <span className="platform-note">
-            Windows 10 / 11 x64 · ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อแปล
-          </span>
+          <div className="closing-copy">
+            <h2>ลอง<span className="accent">ว่าไง</span>กับทีมของคุณ</h2>
+            <p>ดาวน์โหลด แล้วลองคุยในเกมดู</p>
+          </div>
+          <div className="closing-action">
+            <DownloadLink />
+            <span className="platform-note">Windows 10 / 11 x64</span>
+          </div>
         </section>
       </main>
       <footer className="site-footer section-wrap">

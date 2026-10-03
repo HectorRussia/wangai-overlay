@@ -2269,3 +2269,21 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .translation-motion *, .translation-motion *::after { animation: none !important; }
 }
+
+.final-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(32px, 8vw, 100px);
+  padding: 44px 32px;
+  text-align: left;
+  border: 0;
+}
+.final-cta h2 { font-size: clamp(26px, 3vw, 34px); line-height: 1.4; }
+.closing-copy p { margin-top: 10px; color: var(--muted); font-size: 14px; }
+.closing-action { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.closing-action .platform-note { margin: 0; font-size: 11px; }
+@media (max-width: 700px) {
+  .final-cta { flex-direction: column; text-align: center; gap: 24px; padding: 36px 20px; }
+  .final-cta h2 { font-size: 27px; }
+}
