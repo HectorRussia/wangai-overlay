@@ -2,43 +2,11 @@
 
 import Image from "next/image";
 import { gameScenes } from "@/content/gameScenes";
+import { steps } from "@/content/translationSteps";
 import { ProductOverlayPreview } from "./ProductOverlayPreview";
 import { TranslationMotion } from "./TranslationMotion";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Headphones, Mic, Volume2 } from "lucide-react";
-
-const steps = [
-  {
-    title: "รับเสียง",
-    detail: "เพื่อนพูดในเกม → WANGAI รับเสียงจากเกม",
-    quote: "Stay together. I'll cover you.",
-  },
-  {
-    title: "ถอดเสียงและแปล",
-    detail: "เมื่อเพื่อนพูดจบ ว่าไงแปลงเสียงเป็นข้อความแล้วแปลเป็นไทย",
-    quote: "Stay together. I'll cover you.",
-  },
-  {
-    title: "อ่านซับไทย",
-    detail: "เสียงอังกฤษจากเพื่อน → คำแปลไทยใน WANGAI",
-    quote: "อยู่ด้วยกันไว้ เดี๋ยวฉันคุ้มกันให้",
-  },
-  {
-    title: "พูดสิ่งที่อยากตอบ",
-    detail: "พูดสิ่งที่อยากตอบผ่านไมโครโฟนของคุณ",
-    quote: "โอเค ฉันจะตามไป",
-  },
-  {
-    title: "ดูประโยคอังกฤษ",
-    detail: "ว่าไงแปลสิ่งที่คุณพูดเป็นประโยคอังกฤษให้ดู",
-    quote: "Okay, I'll follow you.",
-  },
-  {
-    title: "พูดตอบหรือส่งแชต",
-    detail: "อ่านประโยคอังกฤษแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต",
-    quote: "Okay, I'll follow you.",
-  },
-];
 
 export function TranslationDemo() {
   const scene = gameScenes[0];
