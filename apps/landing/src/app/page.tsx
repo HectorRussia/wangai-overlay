@@ -14,6 +14,7 @@ import { DownloadLink } from "@/components/ui/DownloadLink";
 import { TranslationDemo } from "@/components/sections/TranslationDemo";
 import { faqs } from "@/content/home";
 import Link from "next/link";
+import { FloatingConversations } from "@/components/sections/FloatingConversations";
 
 export default function Home() {
   return (
@@ -37,22 +38,7 @@ export default function Home() {
           </div>
           <TranslationDemo />
         </section>
-        <section
-          className="product-intro section-wrap"
-          aria-labelledby="product-title"
-        >
-          <p className="eyebrow">ฟังและตอบกลับ</p>
-          <h2 id="product-title">
-            รู้ว่าเพื่อนพูดอะไร
-            <br />
-            <span className="muted-heading">รู้ว่าจะตอบยังไง</span>
-          </h2>
-          <p>
-            ฟังเพื่อนพูดอังกฤษ อ่านคำแปลไทยบนจอ
-            <br />
-            พูดไทยเพื่อดูประโยคอังกฤษที่ใช้ตอบกลับ
-          </p>
-        </section>
+        <FloatingConversations />
         <section
           className="feature-story section-wrap"
           aria-labelledby="listen-title"
