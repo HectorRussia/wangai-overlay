@@ -56,3 +56,11 @@ The current landing demo uses only FPS; genre selection and automatic scene cycl
 ## Automatic playback
 
 The FPS flow starts automatically when at least 30% of the game stage is visible and loops through all six steps. It pauses outside the viewport, while the browser tab is hidden, or while a demo control has focus so users can inspect a step or copy a reply. The explicit play/replay button is removed. Timers and observers are cleaned up on unmount.
+
+## Motion and neutral palette refinement
+
+References reviewed: Speaak (https://speaak.ai/#how), Linear's 2026 interface refresh (https://linear.app/now/behind-the-latest-design-refresh), and Material motion guidance (https://m3.material.io/styles/motion/overview/how-it-works).
+
+Use a single synchronized sequence below the real FPS overlay: source waveform, WANGAI processing pulse, then translated text revealed in short word groups. Incoming and outgoing examples share the existing six-step timeline, rather than introducing another carousel or redundant section. The translated reply is text for the user to say or send themselves; it never implies synthesized voice or automatic sending. These animations explain the example; their duration is not a product latency claim.
+
+Replace green-tinted page and panel fills with charcoal (#0b0c0f, #17181c, #202127). Retain logo mint for signal, selection, and primary actions. Mobile stacks the output below the source and engine. Respect reduced-motion through CSS, and keep continuous effects tied to the existing viewport and tab-visibility state.

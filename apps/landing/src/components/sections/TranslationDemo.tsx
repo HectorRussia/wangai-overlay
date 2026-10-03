@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { gameScenes } from "@/content/gameScenes";
 import { ProductOverlayPreview } from "./ProductOverlayPreview";
+import { TranslationMotion } from "./TranslationMotion";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Headphones, Mic, Volume2 } from "lucide-react";
 
@@ -166,26 +167,10 @@ export function TranslationDemo() {
         />
       </div>
       <div className="flow-panel">
-        {replying && step >= 4 ? (
-          <div className="reply-answer" aria-live="polite">
-            <div>
-              <span>คุณอยากบอกว่า</span>
-              <p>{scene.replyThai}</p>
-            </div>
-            <ArrowRight size={20} aria-hidden="true" />
-            <div>
-              <span>ตอบเป็นอังกฤษว่า</span>
-              <p lang="en">{scene.replyEnglish}</p>
-            </div>
-            <p className="reply-use-note">
-              อ่านแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต
-            </p>
-          </div>
-        ) : (
+        <TranslationMotion step={step} playing={playing} dialogue={scene} />
           <p className="flow-explanation" aria-live="polite" aria-atomic="true">
-            {current.detail}
+            {replying && step >= 4 ? "อ่านแล้วพูดตอบเอง หรือคัดลอกไปส่งในแชต" : current.detail}
           </p>
-        )}
         <ol
           className="flow-steps"
           aria-label={replying ? "ขั้นตอนตอบกลับ" : "ขั้นตอนฟังคำแปล"}
