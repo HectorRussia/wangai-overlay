@@ -2219,3 +2219,53 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .translation-motion *, .speech-bars i { animation: none !important; transition: none !important; }
 }
+
+/* A focused signal path: speak, translate, reveal. */
+.flow-panel { padding: 28px; }
+.translation-motion { grid-template-columns: minmax(0,1fr) 64px 82px 64px minmax(0,1fr); max-width: 960px; margin: auto; gap: 12px; }
+.motion-input { padding: 20px; border-radius: 18px; background: #202127; min-height: 164px; animation: motion-card-in 450ms both; }
+.motion-label b { padding: 3px 7px; border-radius: 5px; background: #30323b; color: #c4c6d0; font-size: 10px; letter-spacing: .04em; }
+.motion-audio { gap: 14px; margin: 16px 0 12px; }
+.motion-audio-icon { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; background: #30333b; }
+.motion-wave { gap: 3px; height: 44px; }
+.motion-wave i { height: var(--bar); width: 3px; opacity: .75; transform: scaleY(.55); transition: transform 350ms ease; }
+.is-listening.is-running .motion-wave i { animation: signal-wave 450ms var(--delay) ease-in-out infinite alternate; }
+.has-result .motion-wave i { transform: scaleY(.18); opacity: .4; }
+.motion-logo { background: linear-gradient(145deg,#31333c,#1b1d23); box-shadow: inset 0 1px 0 #ffffff14,0 8px 20px #00000026; }
+.motion-logo > span { border-color: #65d8ed88; }
+.motion-engine > span { animation: motion-card-in 250ms both; }
+.motion-transfer { position: relative; overflow: hidden; height: 24px; background: none; }
+.motion-transfer::before { content: ''; position: absolute; inset: 11px 0 auto; height: 2px; background: #353741; }
+.motion-transfer::after { content: ''; position: absolute; right: 1px; top: 8px; width: 7px; height: 7px; border-top: 2px solid #6a6d7b; border-right: 2px solid #6a6d7b; transform: rotate(45deg); }
+.motion-transfer i { position: absolute; width: 22px; height: 2px; top: 11px; left: -22px; border-radius: 2px; background: linear-gradient(90deg,transparent,var(--accent)); opacity: 0; animation: none; }
+.is-running.is-listening .motion-transfer-in i,.is-running.is-processing .motion-transfer-in i { animation: signal-packet 1.1s ease-in-out infinite; }
+.is-running.is-processing .motion-transfer-out i,.is-running.has-result .motion-transfer-out i { animation: signal-packet 1.1s ease-in-out 200ms infinite; }
+.motion-output { position: relative; min-height: 164px; padding: 20px; border-radius: 18px; overflow: hidden; transition: box-shadow 500ms ease; }
+.motion-output.is-ready { box-shadow: inset 0 0 0 1px #5ff0bd25; }
+.motion-output.is-ready::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg,transparent 25%,#65d8ed0c 48%,transparent 70%); transform: translateX(-100%); animation: result-sweep 850ms ease-out both; pointer-events: none; }
+.motion-output p { min-height: 54px; margin: 16px 0 12px; font-size: 22px; }
+.motion-output p > span { animation: word-arrive 500ms var(--word-delay) cubic-bezier(.16,1,.3,1) both; }
+.motion-result-status { display: flex; align-items: center; gap: 6px; color: #9195a3; font-size: 11px; margin-top: auto; }
+.is-ready .motion-result-status svg { color: var(--accent); animation: result-check 450ms 300ms both; }
+.motion-placeholder { min-height: 54px; margin: 16px 0 12px; align-content: center; }
+.flow-panel .flow-explanation { margin: 20px 0 18px; }
+.flow-panel .flow-steps { max-width: 960px; margin: auto; }
+.flow-panel .flow-steps button { padding: 12px 14px; font-size: 13px; }
+@keyframes signal-packet { 0% { left: -22px; opacity: 0; } 20% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+@keyframes motion-card-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes result-sweep { to { transform: translateX(100%); } }
+@keyframes result-check { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (max-width: 700px) {
+  .flow-panel { padding: 16px 12px; }
+  .translation-motion { grid-template-columns: minmax(0,1fr) 26px 56px; gap: 8px; }
+  .motion-input { min-height: 150px; padding: 16px 12px; }
+  .motion-audio { gap: 8px; }
+  .motion-wave { gap: 2px; }
+  .motion-wave i { width: 2px; }
+  .motion-output { min-height: 144px; padding: 16px; }
+  .motion-output p { font-size: 20px; min-height: 40px; }
+  .flow-panel .flow-steps button { padding: 12px 6px; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .translation-motion *, .translation-motion *::after { animation: none !important; }
+}

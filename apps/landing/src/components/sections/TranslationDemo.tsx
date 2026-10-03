@@ -74,7 +74,7 @@ export function TranslationDemo() {
     const timer = window.setTimeout(() => {
       setStep((step + 1) % steps.length);
       setCopied("idle");
-    }, 2600);
+    }, step === 2 || step === 5 ? 3800 : 2600);
     return () => window.clearTimeout(timer);
   }, [step, playing]);
 
