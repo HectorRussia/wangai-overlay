@@ -36,6 +36,7 @@ class Payload:
 class PreviewTests(unittest.TestCase):
     def test_packaging_uses_matching_release_notes_and_keeps_test_fixture(self):
         self.assertIn('WANGAI 0.5.0', packaging.release_notes('0.5.0'))
+        self.assertIn('WANGAI 0.5.1', packaging.release_notes('0.5.1'))
         self.assertEqual(packaging.release_notes('0.3.1'), packaging.release_notes('0.3.0'))
         for invalid in ('../0.5.0', '0.5.0/notes', '0.5.0-beta', '0.6.0'):
             with self.subTest(version=invalid), self.assertRaises(ValueError):
