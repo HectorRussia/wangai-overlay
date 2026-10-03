@@ -37,8 +37,8 @@ class PackageLayoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "apps" / "desktop"
             inputs = {
-                "package.json": b'{"version":"0.5.0"}',
-                "../../docs/releases/v0.5.0.md": b"Fixture release notes",
+                "package.json": b'{"version":"0.5.1"}',
+                "../../docs/releases/v0.5.1.md": b"Fixture release notes",
                 "../../docs/THIRD-PARTY-NOTICES.md": b"Fixture notices",
                 "portable/webview2.lock.json": b'{"version":"1.2.3"}',
                 "portable/legacy-0.2.2.json": b'{"version":"0.2.2"}',
@@ -62,14 +62,16 @@ class PackageLayoutTests(unittest.TestCase):
                 packaging.build(args)
                 with self.assertRaisesRegex(ValueError, "empty artifact directory"):
                     packaging.build(args)
-            payload = output / "WANGAI_0.5.0_x64-update.zip"
+            payload = output / "WANGAI_0.5.1_x64-update.zip"
             manifest = json.loads((output / "package-manifest.json").read_text())
+            self.assertEqual(manifest["version"], "0.5.1")
+            self.assertEqual((output / "RELEASE-NOTES.md").read_text(), "Fixture release notes")
             with zipfile.ZipFile(payload) as archive:
                 self.assertEqual(json.loads(archive.read("package-manifest.json")), manifest)
                 self.assertEqual(archive.read("gamelingo.exe"), inputs["core.exe"])
                 self.assertEqual(archive.read("worker/_internal/silero_vad/data/model.onnx"), b"model")
                 self.assertEqual(set(archive.namelist()), set(manifest["files"]) | {"package-manifest.json", "package-manifest.json.sig"})
-            portable = (output / "WANGAI_0.5.0_x64-portable.exe").read_bytes()
+            portable = (output / "WANGAI_0.5.1_x64-portable.exe").read_bytes()
             magic, offset, length, signature_length = struct.unpack("<16sQQQ", portable[-40:])
             self.assertEqual(magic, b"WANGAI_PORTABLE1")
             self.assertEqual(portable[:offset], inputs["host.exe"])
@@ -77,6 +79,8 @@ class PackageLayoutTests(unittest.TestCase):
             signature = portable[offset + length:-40].decode()
             self.assertEqual(len(signature.encode()), signature_length)
             channel = json.loads((output / "latest-portable.json").read_text())
+            self.assertEqual(channel["version"], "0.5.1")
+            self.assertEqual(json.loads((output / "latest.json").read_text())["version"], "0.2.2")
             self.assertEqual(channel["platforms"]["windows-x86_64"]["signature"], signature)
             self.assertTrue(channel["platforms"]["windows-x86_64"]["url"].endswith(payload.name))
             for line in (output / "SHA256SUMS.txt").read_text().splitlines():

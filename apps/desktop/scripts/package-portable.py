@@ -18,7 +18,7 @@ def digest(path):
 
 
 def release_notes(version):
-    if version not in ("0.3.0", "0.3.1", "0.5.0"):
+    if version not in ("0.3.0", "0.3.1", "0.5.0", "0.5.1"):
         raise ValueError("Unsupported build version")
     # 0.3.1 is the isolated updater test fixture, not a published release.
     notes_version = "0.3.0" if version == "0.3.1" else version
