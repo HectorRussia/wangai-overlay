@@ -30,4 +30,3 @@ export const steps = [
     quote: "Okay, I'll follow you.",
   },
 ];
-

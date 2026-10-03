@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "next typegen && tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check:seo": "node scripts/check-seo.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

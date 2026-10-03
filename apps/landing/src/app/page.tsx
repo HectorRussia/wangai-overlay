@@ -16,10 +16,17 @@ import { faqs } from "@/content/home";
 import Link from "next/link";
 import { FloatingConversations } from "@/components/sections/FloatingConversations";
 import { AnimatedAppName } from "@/components/ui/AnimatedAppName";
+import { ProductStructuredData } from "@/components/sections/ProductStructuredData";
+import { pageMetadata } from "@/config/seo";
+import { site } from "@/config/site";
+
+const homeMetadata = pageMetadata("/", site.title, site.description);
+export const metadata = { ...homeMetadata, alternates: { ...homeMetadata.alternates, types: { "text/markdown": "/index.md" } } };
 
 export default function Home() {
   return (
     <>
+      <ProductStructuredData />
       <a href="#main" className="skip-link">
         ข้ามไปเนื้อหา
       </a>

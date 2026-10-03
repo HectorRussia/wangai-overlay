@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/config/seo";
 import Link from "next/link";
 import { LegalLayout } from "@/components/layout/LegalLayout";
 
-export const metadata: Metadata = { title: "นโยบายความเป็นส่วนตัว | WANGAI", description: "เสียงและข้อความที่ว่าไงใช้แปล ข้อมูลที่ส่งไปบริการ AI และวิธีควบคุมการรับเสียง" };
+export const metadata: Metadata = pageMetadata("/privacy", "นโยบายความเป็นส่วนตัว | WANGAI", "เสียงและข้อความที่ว่าไงใช้แปล ข้อมูลที่ส่งไปบริการ AI และวิธีควบคุมการรับเสียง");
 const sections = [
   { id: "scope", title: "นโยบายนี้ครอบคลุมอะไร" },
   { id: "data", title: "ข้อมูลที่ใช้และเก็บ" },

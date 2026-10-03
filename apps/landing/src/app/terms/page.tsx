@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/config/seo";
 import Link from "next/link";
 import { LegalLayout } from "@/components/layout/LegalLayout";
 
-export const metadata: Metadata = { title: "เงื่อนไขการใช้งาน | WANGAI", description: "ขอบเขตการทำงานของว่าไง การใช้งานร่วมกับเกม และข้อจำกัดในการแปลภาษา" };
+export const metadata: Metadata = pageMetadata("/terms", "เงื่อนไขการใช้งาน | WANGAI", "ขอบเขตการทำงานของว่าไง การใช้งานร่วมกับเกม และข้อจำกัดในการแปลภาษา");
 const sections = [
   { id: "purpose", title: "ว่าไงทำงานอย่างไร" },
   { id: "games", title: "กฎของเกมและความเสี่ยง" },
