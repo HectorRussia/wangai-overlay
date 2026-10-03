@@ -13,6 +13,7 @@ import { Brand } from "@/components/ui/Brand";
 import { DownloadLink } from "@/components/ui/DownloadLink";
 import { TranslationDemo } from "@/components/sections/TranslationDemo";
 import { faqs } from "@/content/home";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -147,7 +148,10 @@ export default function Home() {
         <a href="#" aria-label="กลับด้านบน">
           <Brand />
         </a>
-        <p>AI แปลเสียงพูดระหว่างเล่นเกม</p>
+        <nav aria-label="ข้อมูลทางกฎหมาย">
+          <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
+          <Link href="/terms">เงื่อนไขการใช้งาน</Link>
+        </nav>
       </footer>
     </>
   );
