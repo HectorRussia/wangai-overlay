@@ -4,23 +4,23 @@
 
 ## Run
 
-ใช้ Node.js 22 ขึ้นไป รันจาก `apps/landing`:
+ใช้ Node.js 22 ขึ้นไป และ pnpm 10.32.1 รันจาก `apps/landing`:
 
 ```sh
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-เปิด http://127.0.0.1:3000 หรือใช้ `npm run dev -- --port 3101`
-ใช้ npm และ package-lock.json แยกจาก root pnpm project
+เปิด http://127.0.0.1:3000 หรือใช้ `pnpm dev --port 3101`
+ใช้ pnpm รุ่นเดียวกับ Desktop แต่เก็บ `pnpm-lock.yaml` และติดตั้ง dependencies แยกภายในแต่ละแอป ไม่มี workspace หรือ lockfile กลางที่ root
 
 ## Check and build
 
 ```sh
-npm run lint
-npm run typecheck
-npm run build
-npm run start
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm start
 ```
 
 หน้าแรก prerender เป็น static HTML ใช้ Client Components สำหรับเดโมและหน้าต่างเข้าสู่ระบบ FAQ ใช้ native details
@@ -57,7 +57,7 @@ Metadata ใช้ `https://wangai.app` เป็น canonical domain ของ�
 
 ## Deployment
 
-Vercel: Root Directory `apps/landing`, Framework Preset `Next.js`, Install `npm ci`, Build `npm run build` ไม่ต้องใช้ Rust, Python, desktop tooling หรือ environment secrets
+Vercel: Root Directory `apps/landing`, Framework Preset `Next.js`, Install `pnpm install --frozen-lockfile`, Build `pnpm build` โดยใช้ pnpm 10.32.1 ตาม `packageManager` ไม่ต้องใช้ Rust, Python, desktop tooling หรือ environment secrets
 
 ## Browser acceptance checks
 
@@ -79,13 +79,20 @@ Desktop engine ระบบแปลจริง และ Google authentication
 - ใช้ static rendering เป็นค่าเริ่มต้น และ Client Components เฉพาะเดโม แอนิเมชัน และ dialog ที่ต้องใช้ browser APIs
 - Landing แยกจาก desktop ไม่ import Tauri, Local Web Companion API หรือโค้ดควบคุม desktop engine
 - เก็บข้อมูล FAQ บทสนทนา และขั้นตอนเดโมไว้ใน `src/content` และ metadata/ลิงก์ส่วนกลางใน `src/config`
-- ใช้ dependencies และ lockfile ภายในแอปนี้ ยังไม่เชื่อม pnpm workspace ของ root
+- ใช้ dependencies และ lockfile ภายในแอปนี้ แยกจาก Desktop โดยไม่มี pnpm workspace ที่ root
 - นำ `.gitkeep` ออกจากโฟลเดอร์ที่มีไฟล์จริงแล้ว
 - Build ของ landing ไม่ต้องพึ่ง Rust, Python หรือ Windows desktop tooling
 
 ขณะนี้ใช้ local preview ตามคำขอเจ้าของ ไม่มีการเผยแพร่การแก้ไขล่าสุดขึ้นเว็บไซต์ออนไลน์
 
-## ผลตรวจล่าสุด — 3 ตุลาคม 2569
+## ผลตรวจการย้ายเป็น pnpm — 4 ตุลาคม 2569
+
+- ใช้ `pnpm import` จาก npm lockfile เดิม โดย package/version ทั้ง 434 รายการและ integrity hashes ตรงกันทั้งหมด
+- ติดตั้งด้วย `pnpm install --frozen-lockfile` ในโฟลเดอร์ทดสอบสะอาดบน Windows ซึ่งไม่มี `node_modules` เดิม และยืนยันว่า lockfile ไม่เปลี่ยน
+- ผ่าน `pnpm lint`, `pnpm typecheck`, `pnpm build` และ `pnpm check:seo` บน production preview ที่เปิดด้วย `pnpm start --port 3101`
+- คง dependency versions, scripts, Node.js requirement และ UI เดิม รอบนี้ไม่ได้ deploy หรือเปลี่ยนค่าบน Vercel จริง
+
+## ผลตรวจเดิมก่อนย้ายเป็น pnpm — 3 ตุลาคม 2569
 
 เทียบข้อกำหนดกับ `HectorRussia/wangai-overlay` branch `dev` ที่ commit `4cd4694` แล้ว branch `ponkritwo/ove-4-landingpage` มี commit นี้เป็นบรรพบุรุษ และการเปลี่ยนแปลงทั้งหมดอยู่ใน `apps/landing`
 
@@ -108,7 +115,7 @@ Desktop engine ระบบแปลจริง และ Google authentication
 - Development, Vercel Preview หรือ `SITE_INDEXABLE=false` ใช้ noindex/nofollow และ disallow crawl ต้อง rebuild หลังเปลี่ยนค่า
 - เปลี่ยนโดเมนได้ผ่าน `SITE_URL` (ต้องเป็น HTTPS origin ไม่มี path) ดู `.env.example`
 
-หลัง `npm run build` และเปิด `npm run start -- --port 3101` ตรวจด้วย `npm run check:seo` หากทดสอบ preview ให้ส่ง `SITE_INDEXABLE=false` ให้ทั้ง build และคำสั่งตรวจ
+หลัง `pnpm build` และเปิด `pnpm start --port 3101` ตรวจด้วย `pnpm check:seo` หากทดสอบ preview ให้ส่ง `SITE_INDEXABLE=false` ให้ทั้ง build และคำสั่งตรวจ
 
 SEO และ structured data ช่วยให้เครื่องอ่านข้อมูล แต่ไม่รับประกันอันดับ การถูกอ้างอิงโดย AI หรือ rich results. llms.txt เป็นข้อเสนอเสริม ไม่ใช่ข้อกำหนดหรือสัญญาณจัดอันดับที่ทุกระบบรองรับ การอนุญาต OAI-SearchBot สำหรับการค้นหาแยกจาก GPTBot สำหรับ training; กฎ wildcard ปัจจุบันไม่ได้จำกัด training crawlers
 
