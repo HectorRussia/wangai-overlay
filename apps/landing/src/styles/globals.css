@@ -240,6 +240,23 @@ a svg {
 .hero h1 > .hero-app-name {
   color: var(--accent);
 }
+.animated-app-name { position: relative; display: inline-block; isolation: isolate; }
+.name-glyphs { position: relative; display: inline-flex; vertical-align: baseline; }
+.name-glyph { display: inline-block; }
+.name-phase-english .name-glyph { animation: name-arrive 450ms cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--glyph-index) * 65ms); }
+.name-phase-erase .name-glyph { animation: name-dissolve 380ms cubic-bezier(.4,0,.8,.2) forwards; animation-delay: calc(var(--erase-index) * 100ms); }
+.name-phase-thai .name-glyph { animation: name-assemble 650ms cubic-bezier(.16,1,.3,1) both; animation-delay: calc(var(--glyph-index) * 115ms); }
+.name-light-sweep { position: absolute; inset: -.1em -.12em; background: linear-gradient(110deg,transparent 30%,#b9ffe338%,transparent 70%); border-radius: 50%; pointer-events: none; opacity: 0; }
+.name-phase-english .name-light-sweep { animation: name-sweep 950ms 200ms ease-out; }
+.name-phase-thai .name-light-sweep { animation: name-sweep 950ms ease-out; }
+.name-orbit { position: absolute; inset: 0; pointer-events: none; }
+.name-orbit i { position: absolute; right: calc(var(--spark-index) * 15%); top: 60%; width: 3px; height: 3px; border-radius: 50%; background: #a8ffe0; opacity: 0; }
+.name-phase-erase .name-orbit i { animation: name-spark 600ms ease-out both; animation-delay: calc(var(--spark-index) * 100ms); }
+@keyframes name-arrive { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes name-dissolve { to { opacity: 0; transform: translateY(-18px) rotate(-9deg) scale(.85); } }
+@keyframes name-assemble { from { opacity: 0; transform: translateY(18px) scale(.9); } 65% { opacity: 1; transform: translateY(-3px) scale(1.02); } to { opacity: 1; transform: none; } }
+@keyframes name-sweep { 0% { opacity: 0; transform: translateX(-35%); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateX(35%); } }
+@keyframes name-spark { 20% { opacity: .8; } to { opacity: 0; transform: translate(8px,-32px); } }
 .hero-copy {
   color: #aab4b2;
   font-size: 17px;

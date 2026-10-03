@@ -15,6 +15,7 @@ import { TranslationDemo } from "@/components/sections/TranslationDemo";
 import { faqs } from "@/content/home";
 import Link from "next/link";
 import { FloatingConversations } from "@/components/sections/FloatingConversations";
+import { AnimatedAppName } from "@/components/ui/AnimatedAppName";
 
 export default function Home() {
   return (
@@ -27,7 +28,7 @@ export default function Home() {
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-intro">
             <h1 id="hero-title">
-              <span className="hero-app-name">ว่าไง</span> AI แปลเสียงพูด
+              <AnimatedAppName /> AI แปลเสียงพูด
               <br />
               ระหว่างเล่นเกม
             </h1>
