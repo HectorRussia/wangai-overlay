@@ -6,6 +6,8 @@ const repo = 'HectorRussia/wangai-overlay';
 const sha = (n) => n.toString(16).padStart(40, '0');
 const webhook = 'https://discord.com/api/webhooks/123/secret-token';
 const channelId = '1555581629072670781';
+const guildId = '1547404099291447380';
+const parentForumId = '123456789012345678';
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
 
 function promotionFixture(names, { missingProd = false, failId } = {}) {
@@ -63,23 +65,30 @@ test('archived QA is not promoted', async () => {
   assert.equal(f.writes.length, 0);
 });
 
-test('forum webhook is rejected before any API call or mutation', async () => {
-  const { args, calls } = fixture();
-  args.webhookUrl = `${webhook}?thread_id=456`;
-  await assert.rejects(notifyMainMerge(args), /without thread_id/);
-  assert.equal(calls.length, 0);
-});
+for (const query of ['', '?thread_id=456', `?thread_id=${channelId}&thread_id=${channelId}`]) {
+  test(`missing, wrong or duplicate thread ID is rejected before any API call: ${query}`, async () => {
+    const { args, calls } = fixture();
+    args.webhookUrl = `${webhook}${query}`;
+    await assert.rejects(notifyMainMerge(args), /exactly one thread_id/);
+    assert.equal(calls.length, 0);
+  });
+}
 
 test('unexpected Discord destination fails rather than reporting success', async () => {
   const { args } = fixture({ response: (url, options) => url.startsWith(webhook) && options.method === 'POST' ? json({ id: '123', channel_id: '999' }) : undefined });
-  await assert.rejects(notifyMainMerge(args), /unexpected destination channel/);
+  await assert.rejects(notifyMainMerge(args), /unexpected destination thread/);
 });
 
-for (const metadata of [{ type: 1, channel_id: '999' }, { type: 2, channel_id: channelId }, {}]) {
+for (const metadata of [
+  { type: 1, channel_id: parentForumId, guild_id: '999' },
+  { type: 2, channel_id: parentForumId, guild_id: guildId },
+  { type: 1, channel_id: channelId, guild_id: guildId },
+  { type: 1, channel_id: null, guild_id: guildId }, {},
+]) {
   test(`wrong or incomplete webhook metadata stops before Linear: ${JSON.stringify(metadata)}`, async () => {
     const { args, calls } = fixture({ pull: pr('dev'), response: (url, options) =>
       url === webhook && options.method === 'GET' ? json(metadata) : undefined });
-    await assert.rejects(notifyMainMerge(args), /configured text channel/);
+    await assert.rejects(notifyMainMerge(args), /configured server and a parent forum/);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].options.method, 'GET');
   });
@@ -108,7 +117,7 @@ function issue(id = 'OVE-123') {
 function fixture({ pull = pr(), data, response } = {}) {
   const calls = [];
   const args = { eventName: 'pull_request', repository: repo, githubToken: 'github-secret',
-    linearApiKey: 'linear-secret', webhookUrl: webhook,
+    linearApiKey: 'linear-secret', webhookUrl: `${webhook}?thread_id=${channelId}`,
     event: { action: 'closed', repository: { full_name: repo }, pull_request: structuredClone(pull) },
     fetchImpl: async (url, options) => {
       const body = options.body ? JSON.parse(options.body) : null;
@@ -128,9 +137,9 @@ function fixture({ pull = pr(), data, response } = {}) {
       assert.equal(options.headers?.Authorization, undefined);
       if (options.method === 'GET') {
         assert.equal(url, webhook);
-        return json({ type: 1, channel_id: channelId });
+        return json({ type: 1, channel_id: parentForumId, guild_id: guildId });
       }
-      assert.equal(url, `${webhook}?wait=true`);
+      assert.equal(url, `${webhook}?thread_id=${channelId}&wait=true`);
       return json({ id: '123456', channel_id: channelId });
     } };
   return { args, calls, pull };
@@ -248,9 +257,9 @@ test('long lists split into bounded messages without losing any issues', () => {
   for (const entry of issues) assert.equal(descriptions.split(`[${entry.identifier}]`).length - 1, 1);
 });
 
-test('valid versioned text-channel webhook forces wait=true', () => {
-  assert.equal(webhookAddress('https://discord.com/api/v10/webhooks/123/token?wait=false'),
-    'https://discord.com/api/v10/webhooks/123/token?wait=true');
+test('valid versioned forum webhook preserves thread_id and forces wait=true', () => {
+  assert.equal(webhookAddress(`https://discord.com/api/v10/webhooks/123/token?thread_id=${channelId}&wait=false`),
+    `https://discord.com/api/v10/webhooks/123/token?thread_id=${channelId}&wait=true`);
 });
 
 for (const value of ['', 'https://evil.test/api/webhooks/1/secret', 'http://discord.com/api/webhooks/1/secret',

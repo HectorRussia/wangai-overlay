@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { findIssueIds, linearRequest, requestJson, SyncError, UPDATE_MUTATION } from './linear-status-sync.mjs';
 
 const SHA = /^[a-f0-9]{40,64}$/i;
-const DISCORD_CHANNEL_ID = '1555581629072670781';
+const DISCORD_THREAD_ID = '1555581629072670781';
+const DISCORD_GUILD_ID = '1547404099291447380';
 const ISSUE_QUERY = `query NotificationIssue($issueId: String!) {
   organization { urlKey }
   issue(id: $issueId) {
@@ -66,12 +67,14 @@ export function webhookAddress(value) {
         || url.username || url.password || url.hash
         || !/^\/api(?:\/v\d+)?\/webhooks\/\d+\/[A-Za-z0-9_-]+$/.test(url.pathname)) throw new Error();
     for (const key of url.searchParams.keys()) {
-      if (key !== 'wait') throw new Error();
+      if (!['wait', 'thread_id'].includes(key)) throw new Error();
     }
+    if (url.searchParams.getAll('thread_id').length !== 1
+        || url.searchParams.get('thread_id') !== DISCORD_THREAD_ID) throw new Error();
     url.searchParams.set('wait', 'true');
     return url.href;
   } catch {
-    throw new SyncError('DISCORD_WEBHOOK_URL must be a valid HTTPS discord.com incoming webhook URL for a text channel, without thread_id.');
+    throw new SyncError('DISCORD_WEBHOOK_URL must be a valid HTTPS discord.com incoming webhook URL with exactly one thread_id=1555581629072670781 for the configured forum post.');
   }
 }
 
@@ -196,8 +199,12 @@ export async function notifyMainMerge({ event, eventName, repository, githubToke
   const metadataUrl = new URL(webhook);
   metadataUrl.search = '';
   const metadata = await requestJson(fetchImpl, metadataUrl.href, { method: 'GET' }, 'Discord');
-  if (metadata?.type !== 1 || metadata.channel_id !== DISCORD_CHANNEL_ID) {
-    throw new SyncError('Discord webhook does not target the configured text channel. No Linear update was attempted.');
+  // Webhook metadata identifies the parent forum, not the destination thread.
+  // Validate the guild here; Discord resolves thread membership on execution.
+  if (metadata?.type !== 1 || metadata.guild_id !== DISCORD_GUILD_ID
+      || typeof metadata.channel_id !== 'string' || !/^\d+$/.test(metadata.channel_id)
+      || metadata.channel_id === DISCORD_THREAD_ID) {
+    throw new SyncError('Discord webhook must belong to the configured server and a parent forum channel. No Linear update was attempted.');
   }
   const get = (path) => requestJson(fetchImpl, `https://api.github.com/repos/${repository}${path}`, {
     headers: { Authorization: `Bearer ${githubToken}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
@@ -240,7 +247,7 @@ export async function notifyMainMerge({ event, eventName, repository, githubToke
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       }, 'Discord');
       if (typeof response?.id !== 'string' || !/^\d+$/.test(response.id)) throw new SyncError('Discord did not confirm a saved message.');
-      if (response.channel_id !== DISCORD_CHANNEL_ID) throw new SyncError('Discord returned an unexpected destination channel. Check the webhook configuration.');
+      if (response.channel_id !== DISCORD_THREAD_ID) throw new SyncError('Discord returned an unexpected destination thread. Check the webhook configuration.');
       deliveries.push({ messageId: response.id, channelId: response.channel_id });
       sent++;
     }
@@ -252,7 +259,7 @@ export async function notifyMainMerge({ event, eventName, repository, githubToke
   const statusMessage = pr.head.ref === 'dev'
     ? `QA -> Prod: ${promoted.join(', ') || 'none'}. Already Prod: ${releaseIssues.filter((issue) => issue.promotion === 'already-prod').length}; preserved: ${releaseIssues.filter((issue) => issue.promotion === 'skipped').length}.`
     : 'Linear statuses were unchanged.';
-  return { outcome: 'sent', message: `PR #${number}: ${issues.length} OVE issues, ${sent} Discord messages. ${statusMessage} Discord channel: ${DISCORD_CHANNEL_ID}; message IDs: ${deliveries.map((delivery) => delivery.messageId).join(', ')}.`, deliveries };
+  return { outcome: 'sent', message: `PR #${number}: ${issues.length} OVE issues, ${sent} Discord messages. ${statusMessage} Discord thread: ${DISCORD_THREAD_ID}; message IDs: ${deliveries.map((delivery) => delivery.messageId).join(', ')}.`, deliveries };
 }
 
 export async function main(env = process.env) {
