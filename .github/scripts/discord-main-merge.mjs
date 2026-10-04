@@ -165,7 +165,7 @@ export function buildMessages(pr, issues, repository) {
     timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short',
   }).format(new Date(pr.merged_at));
   return descriptions.map((text, index) => ({
-    username: 'WANGAI Bot',
+    username: 'WANGAI Send Work Kub',
     allowed_mentions: { parse: [] },
     embeds: [{
       title: '🚀 Merged to main', color: 0x2ecc71,

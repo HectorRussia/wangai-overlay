@@ -152,7 +152,7 @@ test('direct main merge sends a green embed with Thai time, links, and no mentio
   assert.deepEqual(result.deliveries, [{ messageId: '123456', channelId }]);
   assert.equal(calls.length, 4);
   const message = calls.at(-1).body;
-  assert.equal(message.username, 'WANGAI Bot');
+  assert.equal(message.username, 'WANGAI Send Work Kub');
   assert.deepEqual(message.allowed_mentions, { parse: [] });
   const embed = message.embeds[0];
   assert.equal(embed.color, 0x2ecc71);
