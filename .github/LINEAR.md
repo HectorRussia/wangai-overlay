@@ -2,7 +2,7 @@
 
 Automation สำหรับ `HectorRussia/wangai-overlay` ดัดแปลงจาก
 [Book_fantasy snapshot f6dcfb2](https://github.com/HectorRussia/beastscribe/tree/f6dcfb2153e828a9b50307b1262b01a2f7a2cd93)
-ตามแนวทางที่เจ้าของโปรเจกต์ให้มา โดยเปลี่ยนทีมเป็น OVE และ Discord เป็นห้องข้อความปกติ
+ตามแนวทางที่เจ้าของโปรเจกต์ให้มา โดยเปลี่ยนทีมเป็น OVE และ Discord เป็นโพสต์ใน Forum
 
 ## ค่าที่ใช้
 
@@ -13,13 +13,13 @@ Automation สำหรับ `HectorRussia/wangai-overlay` ดัดแปล�
 | สถานะ | `In Progress` → `In Review` → `QA` → `Prod` |
 | Linear repository secret | `OVERLAY_WANGAI` → env `LINEAR_API_KEY` |
 | Discord repository secret | `DISCORD_WEBHOOK_URL` |
-| Discord text channel | [1555581629072670781](https://discord.com/channels/1547404099291447380/1555581629072670781) |
+| Discord forum post / thread | [1555581629072670781](https://discord.com/channels/1547404099291447380/1555581629072670781) |
 | ชื่อผู้ส่ง / เขตเวลา | `WANGAI Bot` / `Asia/Bangkok` |
 
 ค่าลับอยู่ใน GitHub Actions secrets เท่านั้น ไม่ใส่ API key หรือ URL webhook จริงในเอกสาร/โค้ด/log
 Linear personal API key ต้องอ่านและเขียนทีม OVE ได้ ไม่เติม `Bearer` หน้า key
-Discord webhook ต้องอยู่ในห้องด้านบนและไม่มี `thread_id`; สคริปต์อ่าน metadata ของ webhook
-เพื่อตรวจ channel ก่อนเขียน Linear แล้วตรวจ channel และ message ID หลังส่งด้วย `wait=true`
+Discord webhook ต้องสร้างใน Forum `overlay-wangnai` และมี `?thread_id=1555581629072670781`; สคริปต์อ่าน metadata ของ webhook
+เพื่อตรวจว่าเป็น incoming webhook ใน server `1547404099291447380` ก่อนเขียน Linear แล้วตรวจว่า channel ID ของข้อความตรงกับ thread ID และมี message ID หลังส่งด้วย `wait=true`
 
 ## Flow
 
@@ -62,7 +62,7 @@ release ใช้สอง parent SHA ของ merge commit และจับ�
 6. เจ้าของเปิด/merge PR dev → main ด้วย **Create a merge commit** ตาม branch rules เดิม
    `windows` และ `server` ยังเป็น required checks เดิม อย่าใช้ job แจ้ง Discord หลัง merge เป็น required check ก่อน merge
 7. ตรวจ Actions ว่าอัปเดต QA → Prod จริง และตรวจข้อความในห้องที่ระบุ
-   เก็บ PR URL, Actions run URL, channel ID และ message ID เป็นหลักฐาน
+   เก็บ PR URL, Actions run URL, thread ID และ message ID เป็นหลักฐาน
 
 GitHub default branch เป็น dev แต่ Discord โหลดสคริปต์จาก main โดยระบุ ref ชัดเจน
 workflows ไม่รันโค้ด feature branch ในขั้นตอนที่ใช้ secret และตั้ง `persist-credentials: false`
@@ -96,3 +96,26 @@ Mock tests ผ่านไม่ได้หมายความว่า key, 
 - ถ้าหลาย PR อ้าง issue เดียวกัน การ merge PR แรกเข้า dev ก็อาจทำให้งานเป็น QA ไม่รอทุก PR
 - หยุด automation ได้โดย disable workflows `Linear status sync` และ `Discord main merge` ใน Actions
   การหยุด workflow ไม่ย้อนสถานะหรือข้อความที่สร้างไปแล้ว
+
+## ปลายทาง Forum และการกู้คืน PR #7
+
+ปลายทางคือโพสต์ **ส่งงาน Done** ใน Forum **overlay-wangnai** ไม่ใช่ห้องข้อความปกติ
+เก็บ URL webhook เต็มที่ต่อท้าย `?thread_id=1555581629072670781` ไว้ใน secret เดิม
+หากลบ query ไปแล้ว ให้ใส่กลับก่อน rerun ห้ามใช้ ID ของช่อง Forum แม่แทน ID ของโพสต์
+
+metadata ของ webhook ระบุ channel ID ของ Forum แม่ ซึ่งต้องไม่ถูกเทียบกับ thread ID
+การตรวจล่วงหน้ายืนยัน server และรูปแบบ thread ID ได้ แต่ token webhook ไม่ได้ยืนยันข้อมูล
+parent ของ thread ผ่าน Channel API; Discord จะตรวจว่า thread อยู่ในช่องของ webhook เมื่อส่งจริง
+หากขั้นส่งล้มเหลวหลังย้าย Prod จะไม่ย้อน Linear และต้องตรวจปลายทางก่อน rerun
+
+PR #7 เคยล้มเหลวก่อนเรียก Linear เพราะโค้ดเดิมปฏิเสธ thread_id
+หลัง merge PR แก้ไขเข้า dev และเจ้าของ merge dev → main ด้วย merge commit แล้ว
+ให้ rerun **failed jobs ของ run 37215583758** เพื่อประมวลผล release #7 เดิม:
+
+```sh
+gh run rerun 37215583758 --repo HectorRussia/wangai-overlay --failed
+```
+
+workflow เดิม checkout สคริปต์จาก main จึงใช้สคริปต์ที่แก้ไขแล้วในการ rerun
+อย่าใช้ release แก้ไขรอบใหม่แทนการ rerun รอบเดิม เพราะ OVE-6 อยู่ใน snapshot ของ PR #7
+ตรวจ Actions summary ว่าย้าย OVE-6 และได้ message ID ใน thread ที่กำหนดจริงก่อนถือว่ากู้คืนสำเร็จ
