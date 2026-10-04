@@ -14,7 +14,7 @@ Automation สำหรับ `HectorRussia/wangai-overlay` ดัดแปล�
 | Linear repository secret | `OVERLAY_WANGAI` → env `LINEAR_API_KEY` |
 | Discord repository secret | `DISCORD_WEBHOOK_URL` |
 | Discord forum post / thread | [1555581629072670781](https://discord.com/channels/1547404099291447380/1555581629072670781) |
-| ชื่อผู้ส่ง / เขตเวลา | `WANGAI Bot` / `Asia/Bangkok` |
+| ชื่อผู้ส่ง / เขตเวลา | `WANGAI Send Work Kub` / `Asia/Bangkok` |
 
 ค่าลับอยู่ใน GitHub Actions secrets เท่านั้น ไม่ใส่ API key หรือ URL webhook จริงในเอกสาร/โค้ด/log
 Linear personal API key ต้องอ่านและเขียนทีม OVE ได้ ไม่เติม `Bearer` หน้า key
