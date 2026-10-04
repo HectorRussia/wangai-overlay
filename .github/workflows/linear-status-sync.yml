@@ -1,0 +1,51 @@
+name: Linear status sync
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, reopened, ready_for_review, synchronize, edited, closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Serialize updates for a PR. Every run reads live state instead of relying on
+# event ordering, including when an older run is retried after the PR merges.
+concurrency:
+  group: linear-status-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.head.ref, 'ove-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Load reviewed scripts from dev; no main bootstrap is needed.
+      # Never change this to the PR head, a merge ref, or PR-provided code.
+      - name: Check out trusted workflow code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: refs/heads/dev
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Set up Node.js
+        if: hashFiles('.github/scripts/linear-status-sync.mjs') != ''
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Update Linear issue status
+        if: hashFiles('.github/scripts/linear-status-sync.mjs') != ''
+        run: node .github/scripts/linear-status-sync.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.OVERLAY_WANGAI }}
+
+      - name: Report initial installation
+        if: hashFiles('.github/scripts/linear-status-sync.mjs') == ''
+        run: |
+          echo "::notice::Linear sync is not installed on dev yet; no status was changed."
+          echo "Bootstrap skipped: merge the installation PR into dev before testing Linear transitions." >> "$GITHUB_STEP_SUMMARY"
