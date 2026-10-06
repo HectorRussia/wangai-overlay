@@ -14,7 +14,8 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint .",
-    "check:seo": "node scripts/check-seo.mjs"
+    "check:seo": "node scripts/check-seo.mjs",
+    "test:download": "node --experimental-strip-types --test scripts/download.test.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

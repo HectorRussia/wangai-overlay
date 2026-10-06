@@ -15,7 +15,7 @@ ${faqs.map((faq) => `### ${faq.question}\n\n${faq.answer}`).join("\n\n")}
 
 ## ดาวน์โหลดและข้อมูลเพิ่มเติม
 
-- [ดาวน์โหลดสำหรับ Windows](${site.releases})
+- [ดาวน์โหลดสำหรับ Windows](${siteOrigin}${site.download})
 - [นโยบายความเป็นส่วนตัว](${siteOrigin}/privacy)
 - [เงื่อนไขการใช้งาน](${siteOrigin}/terms)
 
