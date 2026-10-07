@@ -34,6 +34,8 @@ for (const question of questions) {
 }
 const software = schema["@graph"].find((item) => item["@type"] === "SoftwareApplication");
 assert.equal(software.url, origin);
+assert.equal(software.downloadUrl, `${origin}/download/windows`);
+assert.equal([...visibleHtml.matchAll(/href="\/download\/windows"/g)].length, 3, "Header, hero and bottom download buttons use the direct download route");
 assert.ok(!software.offers && !software.aggregateRating, "Do not invent prices or ratings");
 
 const sitemap = await (await read("/sitemap.xml")).text();
