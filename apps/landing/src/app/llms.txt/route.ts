@@ -16,7 +16,8 @@ WANGAI is a Windows application that translates audio from a selected game or ap
 ## Product information
 - [Overview and FAQ](${siteOrigin}/index.md): Current features, supported systems, languages, and limitations in Markdown.
 - [Landing page](${siteOrigin}/): Product demonstrations and download links.
-- [Windows downloads](${site.releases}): Published builds on GitHub Releases.
+- [Windows download](${siteOrigin}${site.download}): Direct download of the latest stable Windows x64 build.
+- [Release notes](${site.releases}): Published builds and version history on GitHub Releases.
 
 ## Policies
 - [Privacy policy](${siteOrigin}/privacy): Audio processing, service providers, data retention, and pending contact information.
