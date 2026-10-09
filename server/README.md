@@ -1,5 +1,18 @@
 # WANGAI AI Gateway
 
+## Local STT developer preview
+
+`STT_MODE=local` enables translation only: no `STT_*` provider credentials/models are
+required, `/v1/transcriptions` rejects audio, and service status checks translation
+health only. The default mode is `cloud`.
+
+The preview launcher selects `server/.env.local-stt` via `WANGAI_SERVER_ENV_FILE`.
+Copy `local-stt.env.example` to that ignored file and add a private xAI key. An
+explicit file overrides inherited environment values and must load successfully;
+without this selector the existing `.env` behavior is unchanged. The preview uses
+loopback port 18080 and a separate usage database. See the
+[developer handoff](../docs/local-stt-handoff.md).
+
 Standalone Rust/Axum service. The Windows desktop still captures audio, runs Silero,
 filters speech and renders the overlay. This server owns provider credentials and
 calls STT / translation providers. It is **not** the localhost Web Companion.

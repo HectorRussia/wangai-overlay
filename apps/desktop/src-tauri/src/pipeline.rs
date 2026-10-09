@@ -13,6 +13,24 @@ use crate::{
     state::AppState,
 };
 
+pub(crate) fn ready_worker_status(
+    runtime: &crate::models::RuntimeState,
+    model: String,
+) -> WorkerStatusEvent {
+    WorkerStatusEvent {
+        state: if runtime.worker_ready {
+            "ready"
+        } else if runtime.last_error.is_some() {
+            "error"
+        } else {
+            "starting"
+        }
+        .into(),
+        message: runtime.status_message.clone(),
+        model: Some(model),
+    }
+}
+
 pub fn handle_worker_event(app: AppHandle, event: WorkerEvent) {
     if app.state::<AppState>().lifecycle.is_closing() {
         return;
@@ -26,14 +44,7 @@ pub fn handle_worker_event(app: AppHandle, event: WorkerEvent) {
                 runtime.status_message = format!("Silero VAD พร้อมใช้งานบน {device}");
                 runtime.last_error = None;
             });
-            let _ = app.emit(
-                "worker-status",
-                WorkerStatusEvent {
-                    state: "ready".into(),
-                    message: runtime.status_message,
-                    model: Some(model),
-                },
-            );
+            let _ = app.emit("worker-status", ready_worker_status(&runtime, model));
         }
         WorkerEvent::Status { message } => {
             state.update_runtime(|runtime| runtime.status_message = message.clone());
@@ -130,6 +141,11 @@ pub fn set_listening(app: &AppHandle, enabled: bool) -> Result<bool> {
         return Ok(false);
     }
     let settings = state.settings.snapshot();
+    #[cfg(feature = "local-stt")]
+    anyhow::ensure!(
+        state.snapshot().runtime.worker_ready,
+        "รอ VAD และ Whisper โหลดครบ หรือกดกู้คืน"
+    );
     if !state.gateway.can_submit() {
         return Err(anyhow::anyhow!(state.gateway.status().message));
     }
@@ -260,6 +276,11 @@ pub fn attach_listening_source(app: &AppHandle) -> Result<()> {
 pub fn start_push_to_talk(app: &AppHandle) -> Result<()> {
     let state = app.state::<AppState>();
     let _operation = state.lifecycle.operation()?;
+    #[cfg(feature = "local-stt")]
+    anyhow::ensure!(
+        state.snapshot().runtime.worker_ready,
+        "รอ VAD และ Whisper โหลดครบ หรือกดกู้คืน"
+    );
     if !state.gateway.can_submit() {
         return Err(anyhow::anyhow!(state.gateway.status().message));
     }

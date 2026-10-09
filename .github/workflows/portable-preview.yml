@@ -10,10 +10,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify:
-    if: github.repository == 'HectorRussia/wangai-overlay' && github.ref == 'refs/heads/codex/portable-preview-0.3.0'
+    if: github.repository == 'HectorRussia/wangai-overlay'
     uses: ./.github/workflows/verify.yml
   package:
-    if: github.repository == 'HectorRussia/wangai-overlay' && github.ref == 'refs/heads/codex/portable-preview-0.3.0'
+    if: github.repository == 'HectorRussia/wangai-overlay'
     needs: verify
     runs-on: windows-2022
     defaults:
@@ -41,6 +41,10 @@ jobs:
         with:
           name: windows-worker
           path: apps/desktop/output/worker/wangai-worker
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: windows-whisper
+          path: apps/desktop/output
       - run: pnpm install --frozen-lockfile
       - name: Build and sign preview using existing secrets
         shell: pwsh
@@ -55,7 +59,7 @@ jobs:
           foreach ($name in @('WANGAI_UPDATER_PUBLIC_KEY','TAURI_SIGNING_PRIVATE_KEY','TAURI_SIGNING_PRIVATE_KEY_PASSWORD')) {
             if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Missing required signing input: $name" }
           }
-          ./scripts/build-portable.ps1 -OutputRoot output/portable-preview
+          ./scripts/build-portable.ps1 -OutputRoot output/portable-preview -LocalStt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify production identity, signatures and record preview provenance
         shell: pwsh

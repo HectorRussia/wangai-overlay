@@ -36,9 +36,7 @@ class SileroVad:
         self.silent_samples = 0
 
     def process(self, samples: np.ndarray) -> dict | None:
-        import torch
-
-        probability = float(self.model(torch.from_numpy(samples), SAMPLE_RATE).item())
+        probability = float(self.model(samples, SAMPLE_RATE))
         strong_speech = probability >= self.threshold
         if probability >= self.adaptive_floor:
             self.weak_speech_frames += 1

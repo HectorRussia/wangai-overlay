@@ -30,14 +30,7 @@ class ProtocolTests(unittest.TestCase):
                 self.values = iter([0.08, 0.09, 0.07])
 
             def __call__(self, _samples, _sample_rate):
-                class Result:
-                    def __init__(self, value):
-                        self.value = value
-
-                    def item(self):
-                        return self.value
-
-                return Result(next(self.values))
+                return next(self.values)
 
             def reset_states(self):
                 pass

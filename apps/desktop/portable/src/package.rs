@@ -85,6 +85,9 @@ impl PackageManifestV1 {
                 "Missing packaged component: {required}"
             );
         }
+        let whisper = self.files.contains_key("whisper/wangai-whisper.exe");
+        let model = self.files.contains_key("whisper/ggml-base-q5_1.bin");
+        ensure!(whisper == model, "Incomplete Local STT package");
         Ok(total)
     }
 }
@@ -272,6 +275,8 @@ pub fn verify_installed(path: &Path, key: &str, full: bool) -> Result<PackageMan
                 "gamelingo.exe",
                 "worker/wangai-worker.exe",
                 "webview2/msedgewebview2.exe",
+                "whisper/wangai-whisper.exe",
+                "whisper/ggml-base-q5_1.bin",
             ]
             .contains(&name.as_str())
         {

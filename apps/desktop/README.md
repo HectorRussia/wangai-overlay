@@ -15,6 +15,9 @@ scripts/         Bootstrap, packaging, release และ acceptance checks
 
 ## เริ่มพัฒนา
 
+Portable 0.6 รวม Local STT พร้อมโมเดล ส่วนรุ่นพัฒนาเลือกใช้ผ่าน Launcher ได้ ดู [คู่มือส่งต่อ](../../docs/local-stt-handoff.md)
+สำหรับ Whisper base Q5_1 และ Grok คำสั่ง `pnpm tauri dev` ด้านล่างยังเป็นโหมด Cloud
+
 จาก repository root:
 
 ```powershell
@@ -33,6 +36,7 @@ pnpm test
 pnpm format:check
 pnpm build
 cargo test --locked --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml --features local-stt
 cargo test --locked --manifest-path portable/Cargo.toml --features host
 .packaging-venv/Scripts/python.exe -m unittest discover -s worker -v
 .packaging-venv/Scripts/python.exe scripts/test-package-portable.py

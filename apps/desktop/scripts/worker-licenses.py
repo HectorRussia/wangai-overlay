@@ -1,4 +1,4 @@
-"""Copy upstream license texts, including vendored torch/ORT notices, into the bundle."""
+"""Copy upstream license texts, including ONNX Runtime notices, into the bundle."""
 import importlib.metadata
 import pathlib
 import shutil

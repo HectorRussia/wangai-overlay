@@ -37,8 +37,9 @@ class PreviewTests(unittest.TestCase):
     def test_packaging_uses_matching_release_notes_and_keeps_test_fixture(self):
         self.assertIn('WANGAI 0.5.0', packaging.release_notes('0.5.0'))
         self.assertIn('WANGAI 0.5.1', packaging.release_notes('0.5.1'))
+        self.assertIn('WANGAI 0.6.0', packaging.release_notes('0.6.0'))
         self.assertEqual(packaging.release_notes('0.3.1'), packaging.release_notes('0.3.0'))
-        for invalid in ('../0.5.0', '0.5.0/notes', '0.5.0-beta', '0.6.0'):
+        for invalid in ('../0.5.0', '0.5.0/notes', '0.5.0-beta', '0.7.0'):
             with self.subTest(version=invalid), self.assertRaises(ValueError):
                 packaging.release_notes(invalid)
 
@@ -136,7 +137,8 @@ class PreviewTests(unittest.TestCase):
                 provenance.record(root)
 
     def test_refuses_wrong_repo_ref_commit_or_run_without_writing(self):
-        for field, value in [('GITHUB_REPOSITORY', 'someone/fork'), ('GITHUB_REF', 'refs/heads/main'),
+        for field, value in [('GITHUB_REPOSITORY', 'someone/fork'), ('GITHUB_REF', 'refs/tags/v0.6.0'),
+                             ('GITHUB_REF', 'refs/pull/16/merge'), ('GITHUB_REF', 'refs/heads/'),
                              ('GITHUB_SHA', 'bad'), ('GITHUB_RUN_ID', '../x'), ('WANGAI_API_BASE_URL', 'https://127.0.0.1')]:
             environment = self.environment()
             environment[field] = value
@@ -144,6 +146,25 @@ class PreviewTests(unittest.TestCase):
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     provenance.record(Path(temporary))
                 self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_records_current_release_from_a_dispatch_branch(self):
+        environment = {**self.environment(), 'GITHUB_REF': 'refs/heads/ponkritwo/ove-3-wangai-060'}
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, environment, clear=True):
+            root = Path(temporary)
+            (root / 'package-manifest.json').write_text('{"version":"0.6.0"}')
+            provenance.record(root)
+            record = json.loads((root / 'PREVIEW-BUILD.json').read_text())
+            self.assertEqual(record['version'], '0.6.0')
+            self.assertEqual(record['ref'], environment['GITHUB_REF'])
+            self.assertIn('WANGAI_0.6.0_x64-portable.exe', (root / 'PREVIEW.md').read_text(encoding='utf8'))
+
+    def test_refuses_invalid_manifest_version_without_writing_provenance(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment(), clear=True):
+            root = Path(temporary)
+            (root / 'package-manifest.json').write_text('{"version":"../bad"}')
+            with self.assertRaises(ValueError):
+                provenance.record(root)
+            self.assertEqual([p.name for p in root.iterdir()], ['package-manifest.json'])
 
 
 if __name__ == '__main__':

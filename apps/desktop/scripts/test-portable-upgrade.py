@@ -75,6 +75,7 @@ def main():
         assert prepared.returncode==0, f'Initial preparation failed; inspect {root / "Data/test-startup.json"} and test-report-0.3.0.json'
         before=wait(lambda:read(root/'Data/test-report-0.3.0.json'))
         wait(lambda:not alive(before['pid']) and not alive(before['workerPid']))
+        if before.get('localSttPid'):assert not alive(before['localSttPid']), 'Whisper survived initial shutdown'
         baseline=read(root/'Data/settings.json')
         assert before['workerReady'] and before['uiReady']
         assert before['commandParity'], before.get('commandParityError')
@@ -111,6 +112,7 @@ def main():
             wait(lambda:not (root/'App/transaction.json').exists())
             assert read(root/'App/active.json')=={'format':1,'current':'0.3.1','previous':'0.3.0'}
         wait(lambda:not alive(after['pid']) and not alive(after['workerPid']))
+        if after.get('localSttPid'):assert not alive(after['localSttPid']), 'Whisper survived shutdown'
         assert after['workerReady'] and after['uiReady']
         assert after['commandParity'], after.get('commandParityError')
         assert read(root/'Data/settings.json')==baseline,'Settings/installation ID changed'
@@ -118,6 +120,7 @@ def main():
         assert file_hash(root/'WANGAI.exe')==expected_launcher,'Launcher was not replaced/restored correctly'
         old=read(root/'Data/test-report-0.3.0.json')
         assert not alive(old['pid']) and not alive(old['workerPid'])
+        if old.get('localSttPid'):assert not alive(old['localSttPid']), 'Old Whisper process survived update'
         result={'result':'passed','scenario':'rollback' if args.rollback else 'upgrade','root':str(root),'seconds':round(time.time()-started,1),'before':before,'after':after,'cleanWindows':False,'realUserConfirmationClick':False,'manualUiConfirmation':args.manual_confirmation,'launcherHashes':launcher_hashes,'finalLauncherSha256':expected_launcher,'noDownloadBeforeConfirmation':True}
         write(root/'Data/acceptance-report.json',result)
         print(json.dumps({'result':'passed','scenario':result['scenario'],'report':str(root/'Data/acceptance-report.json')}))

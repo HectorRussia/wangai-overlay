@@ -31,6 +31,79 @@ fn config(url: &str) -> Config {
     .unwrap()
 }
 
+fn local_config(url: &str) -> Config {
+    Config::load(|key| match key {
+        "STT_MODE" => Some("local".into()),
+        "TRANSLATION_BASE_URL" => Some(url.into()),
+        "TRANSLATION_API_KEY" => Some("secret-not-for-clients".into()),
+        "TRANSLATION_MODEL" => Some("any-chat".into()),
+        "DATABASE_PATH" => Some(":memory:".into()),
+        _ => None,
+    })
+    .unwrap()
+}
+
+#[test]
+fn local_configuration_requires_translation_only_and_rejects_unknown_modes() {
+    let config = local_config("http://127.0.0.1:8888/v1");
+    assert!(config.local_stt);
+    assert!(config.stt_key.is_empty() && config.stt_url.is_empty());
+    assert_eq!(config.incoming_model, "local-on-device");
+    assert!(!super::tests::config("http://127.0.0.1:8888").local_stt);
+    assert!(Config::load(|key| (key == "STT_MODE").then(|| "typo".into())).is_err());
+    assert!(Config::load(|key| (key == "STT_MODE").then(|| "local".into())).is_err());
+}
+
+#[tokio::test]
+async fn local_gateway_rejects_audio_before_contacting_provider() {
+    let (url, task, calls) = mock(StatusCode::OK, json!({"text":"should not be called"})).await;
+    let gateway = Gateway::new(local_config(&url)).unwrap();
+    let response = router(gateway)
+        .oneshot(request("/v1/transcriptions", json!({})))
+        .await
+        .unwrap();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let error: ApiError = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(error.code, ErrorCode::UnsupportedModel);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    task.abort();
+}
+
+#[tokio::test]
+async fn local_translation_both_directions_marks_service_ready_without_speech_credentials() {
+    let (url, task, calls) = mock(
+        StatusCode::OK,
+        json!({"choices":[{"message":{"content":"translated"}}]}),
+    )
+    .await;
+    let gateway = Gateway::new(local_config(&url)).unwrap();
+    for (from, to, text) in [("en", "th", "go now"), ("th", "en", "ไปเลย")] {
+        let response = router(gateway.clone())
+            .oneshot(request(
+                "/v1/translations",
+                json!({"text":text,"from":from,"to":to,"glossary":[]}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    // A cloud-speech health failure must not affect a translation-only gateway.
+    gateway.health[0].lock().unwrap().error = Some((
+        crate::error::fail(ErrorCode::BillingBlocked).0,
+        std::time::Instant::now() + Duration::from_secs(60),
+    ));
+    let response = router(gateway)
+        .oneshot(Request::get("/v1/status").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let status: ServiceStatus = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(status.state, "ready");
+    assert_eq!(status.microphone_model, "local-on-device");
+    task.abort();
+}
+
 async fn mock(
     status: StatusCode,
     value: Value,

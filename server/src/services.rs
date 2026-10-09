@@ -12,6 +12,9 @@ pub(crate) async fn transcribe(
     audio: Vec<u8>,
     stream: Option<String>,
 ) -> Result<TranscriptionResponse, Failure> {
+    if state.config.local_stt {
+        return Err(fail(ErrorCode::UnsupportedModel));
+    }
     let duration = validate_wav(&audio)?;
     let (model, language) = match stream.as_deref() {
         Some("incoming") => (&state.config.incoming_model, "en"),

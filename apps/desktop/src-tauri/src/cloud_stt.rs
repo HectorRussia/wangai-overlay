@@ -4,6 +4,7 @@ mod dedupe;
 mod jobs;
 mod queue;
 mod signal;
+#[cfg(any(not(feature = "local-stt"), test))]
 mod transcription;
 mod wav;
 use buffer::*;
@@ -11,6 +12,7 @@ use constants::*;
 use dedupe::*;
 use queue::StreamQueue;
 use signal::*;
+#[cfg(any(not(feature = "local-stt"), test))]
 use transcription::TranscriptionResponse;
 use wav::*;
 

@@ -37,11 +37,19 @@ pub fn validate_base_url(value: &str, development: bool) -> Result<String> {
 
 impl GatewayClient {
     pub fn new(installation_id: String) -> Result<Self> {
-        let base = option_env!("WANGAI_API_BASE_URL").unwrap_or(if cfg!(debug_assertions) {
-            "http://127.0.0.1:8080"
+        let runtime_base = if cfg!(debug_assertions) {
+            std::env::var("WANGAI_API_BASE_URL").ok()
         } else {
-            ""
-        });
+            None
+        };
+        let base = runtime_base
+            .as_deref()
+            .or(option_env!("WANGAI_API_BASE_URL"))
+            .unwrap_or(if cfg!(debug_assertions) {
+                "http://127.0.0.1:8080"
+            } else {
+                ""
+            });
         Self::with_url(base, installation_id, cfg!(debug_assertions))
     }
 
@@ -63,7 +71,14 @@ impl GatewayClient {
     }
 
     pub fn status(&self) -> ServiceStatus {
-        self.status.lock().unwrap().clone()
+        let status = self.status.lock().unwrap().clone();
+        #[cfg(feature = "local-stt")]
+        let status = ServiceStatus {
+            incoming_model: crate::local_stt::model_name().into(),
+            microphone_model: crate::local_stt::model_name().into(),
+            ..status
+        };
+        status
     }
     pub fn can_submit(&self) -> bool {
         self.accepts_started_at(chrono::Utc::now().timestamp_millis())
@@ -161,6 +176,7 @@ impl GatewayClient {
         status.retry_after_ms = Some(delay);
     }
 
+    #[cfg(any(not(feature = "local-stt"), test))]
     pub async fn transcribe<T: DeserializeOwned>(&self, wav: Vec<u8>, stream: &str) -> Result<T> {
         let part = reqwest::multipart::Part::bytes(wav)
             .file_name("speech.wav")
@@ -251,7 +267,13 @@ mod tests {
         .unwrap();
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         client.refresh_status().await;
+        #[cfg(not(feature = "local-stt"))]
         assert_eq!(client.status().incoming_model, "from-server");
+        #[cfg(feature = "local-stt")]
+        assert_eq!(
+            client.status().incoming_model,
+            crate::local_stt::model_name()
+        );
         for stream in ["incoming", "microphone"] {
             let _: serde_json::Value = client.transcribe(vec![1, 2, 3, 4], stream).await.unwrap();
             let body = receive.recv().await.unwrap();

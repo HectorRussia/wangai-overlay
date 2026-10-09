@@ -1,6 +1,6 @@
 [package]
 name = "wangai-portable"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 rust-version = "1.86"
 build = "build.rs"
@@ -42,4 +42,5 @@ windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_Fil
 tempfile = "3"
 
 [build-dependencies]
+semver = "1"
 winresource = "0.1"

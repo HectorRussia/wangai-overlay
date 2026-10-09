@@ -7,6 +7,8 @@ mod desktop_windows;
 mod gateway;
 mod hotkeys;
 mod lifecycle;
+#[cfg(feature = "local-stt")]
+mod local_stt;
 mod models;
 mod pipeline;
 mod portable_runtime;
@@ -110,6 +112,8 @@ pub fn run() {
             #[cfg(feature = "release-test")]
             release_test::checkpoint(app.handle(), "worker-start-attempted");
             pipeline::start_auto_attach_monitor(app.handle().clone());
+            #[cfg(feature = "local-stt")]
+            local_stt::warm_up_in_background(app.handle().clone());
             #[cfg(feature = "release-test")]
             release_test::start(app.handle().clone());
             let handle = app.handle().clone();

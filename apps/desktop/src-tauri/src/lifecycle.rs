@@ -37,6 +37,8 @@ pub fn shutdown(app: &AppHandle) -> Result<(), String> {
                 // Invalidates every pending result before touching native capture.
                 state.ai_stt.reset_stream(StreamKind::Incoming);
                 state.ai_stt.reset_stream(StreamKind::Microphone);
+                #[cfg(feature = "local-stt")]
+                let local_result = state.local_stt.stop().map_err(|error| error.to_string());
                 let worker_result = state
                     .worker
                     .stop()
@@ -54,6 +56,16 @@ pub fn shutdown(app: &AppHandle) -> Result<(), String> {
                     .save()
                     .map_err(|_| "บันทึกการตั้งค่าก่อนอัปเดตไม่สำเร็จ".to_string())
                     .and(worker_result)
+                    .and({
+                        #[cfg(feature = "local-stt")]
+                        {
+                            local_result
+                        }
+                        #[cfg(not(feature = "local-stt"))]
+                        {
+                            Ok(())
+                        }
+                    })
             }))
             .unwrap_or_else(|_| Err("ปิดระบบเสียงไม่สำเร็จ กรุณาปิดแอปแล้วลองใหม่".into()));
             *state.lifecycle.result.lock().unwrap() = Some(result);

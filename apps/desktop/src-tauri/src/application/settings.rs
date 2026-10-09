@@ -266,5 +266,7 @@ pub(crate) fn restart_worker_inner(
         .worker
         .start(app.clone(), &settings)
         .map_err(|error| error.to_string())?;
+    #[cfg(feature = "local-stt")]
+    crate::local_stt::warm_up_in_background(app.clone());
     Ok(settings)
 }

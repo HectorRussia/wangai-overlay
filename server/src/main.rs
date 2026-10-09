@@ -2,7 +2,12 @@ use wangai_server::{config::Config, metrics, router, Gateway};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dotenvy::dotenv().ok();
+    if let Some(path) = std::env::var_os("WANGAI_SERVER_ENV_FILE") {
+        // An explicitly selected file must load successfully; never fall back to cloud credentials.
+        dotenvy::from_path_override(path)?;
+    } else {
+        dotenvy::dotenv().ok();
+    }
     if std::env::args().nth(1).as_deref() == Some("usage") {
         return metrics::summary(
             &std::env::var("DATABASE_PATH").unwrap_or_else(|_| "usage.sqlite3".into()),

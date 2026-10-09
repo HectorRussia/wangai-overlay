@@ -11,11 +11,9 @@ fn main() {
         } else {
             env!("CARGO_PKG_VERSION").into()
         };
-        let parts: Vec<u16> = version
-            .split('.')
-            .map(|part| part.parse().expect("Numeric Portable version"))
-            .collect();
-        assert_eq!(parts.len(), 3, "Portable version needs three components");
+        let parsed = semver::Version::parse(&version).expect("Valid Portable semantic version");
+        let parts = [parsed.major, parsed.minor, parsed.patch]
+            .map(|part| u16::try_from(part).expect("Portable version component exceeds 65535"));
         let numeric =
             ((parts[0] as u64) << 48) | ((parts[1] as u64) << 32) | ((parts[2] as u64) << 16);
         winresource::WindowsResource::new()

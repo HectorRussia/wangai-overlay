@@ -112,7 +112,7 @@ pub(super) async fn verify(app: &AppHandle) -> Result<()> {
             );
             let mut ready = false;
             for _ in 0..100 {
-                if state.runtime.read().unwrap().worker_ready {
+                if state.snapshot().runtime.worker_ready {
                     ready = true;
                     break;
                 }
@@ -120,6 +120,7 @@ pub(super) async fn verify(app: &AppHandle) -> Result<()> {
             }
             ensure!(ready, "Restarted worker did not become ready");
         }
+        crate::web_companion::verify_http_preview(app).await?;
         Ok(())
     }
     .await;
