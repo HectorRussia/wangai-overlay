@@ -43,7 +43,7 @@ process on Python 3.12.12, ONNX Runtime 1.29.0, NumPy 2.5.2 and Silero asset 6.2
 Frozen packaging separately uses its pinned ONNX Runtime 1.22.1/NumPy 2.2.6 locks.
 These are VAD measurements, not total application RAM; see [details](vad-onnx.md).
 
-## Remaining manual checks
+## Remaining manual checks at the alpha checkpoint
 
 - The follow-up smoke on 2026-10-09 verified real Grok translation with two short
   synthetic text requests. This does not establish live-game speech quality.
@@ -87,5 +87,14 @@ results above are retained; they are not claims about the later signed artifact.
   as text to the live Render/Grok gateway. Both translations returned HTTP 200.
   English matched the test phrase; Thai contained recognition errors. These are
   synthetic fixture results, not a live-game or microphone accuracy benchmark.
-- Signed Portable, upgrade/rollback and GitHub CI results will be recorded after
-  those exact artifacts and commits have been checked.
+- Signed isolated Portable fixtures passed Cloud `0.3.0` to bundled Local `0.3.1`
+  upgrade and the failed-readiness rollback on this development Windows machine.
+  Settings and launcher replacement/restoration were verified, both models were
+  ready before success, and the native process exited with the application.
+  The numbers identify isolated QA fixtures, not published product versions.
+  Reports are under `apps/desktop/output/whisper-portable-060-qa`; these tests do
+  not establish clean Windows compatibility or a real user's confirmation click.
+- The first upgrade attempt stopped safely because the test volume was full.
+  After archived test runs were moved to another volume, both scenarios passed.
+- GitHub CI and the exact production-signed Portable are checked before
+  publication; artifact/run results are linked from the PR and release.
