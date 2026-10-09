@@ -1,0 +1,5 @@
+{
+  "identifier": "dev.gamelingo.overlay.local-stt",
+  "productName": "WANGAI Local STT Preview",
+  "build": { "beforeBuildCommand": "pnpm build" }
+}

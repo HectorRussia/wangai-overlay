@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO = "https://github.com/HectorRussia/wangai-overlay/releases/download"
+MODEL_SHA = "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898"
 
 
 def digest(path):
@@ -18,7 +19,7 @@ def digest(path):
 
 
 def release_notes(version):
-    if version not in ("0.3.0", "0.3.1", "0.5.0", "0.5.1"):
+    if version not in ("0.3.0", "0.3.1", "0.5.0", "0.5.1", "0.6.0"):
         raise ValueError("Unsupported build version")
     # 0.3.1 is the isolated updater test fixture, not a published release.
     notes_version = "0.3.0" if version == "0.3.1" else version
@@ -102,6 +103,16 @@ def collect_inputs(args):
     collect(ROOT / "output/worker/wangai-worker", "worker", files)
     collect(ROOT / "dist", "web", files)
     collect(args.runtime.resolve(), "webview2", files)
+    if getattr(args, "local_stt", False):
+        model = ROOT / "output/models/ggml-base-q5_1.bin"
+        if digest(model) != MODEL_SHA:
+            raise ValueError("Whisper base Q5_1 model hash mismatch")
+        files.update({
+            "whisper/wangai-whisper.exe": ROOT / "output/whisper-build/Release/wangai-whisper.exe",
+            "whisper/ggml-base-q5_1.bin": model,
+            "whisper/LICENSE-whisper.cpp.txt": ROOT / "output/whisper-build/Release/LICENSE-whisper.cpp.txt",
+            "whisper/LICENSE-whisper-model.txt": ROOT / "worker/whisper/LICENSE-whisper-model.txt",
+        })
     for required in [
         "web/index.html",
         "worker/wangai-worker.exe",
@@ -240,4 +251,5 @@ if __name__ == "__main__":
     for name in ("core", "host", "runtime", "output", "verifier"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--version")
+    parser.add_argument("--local-stt", action="store_true")
     build(parser.parse_args())

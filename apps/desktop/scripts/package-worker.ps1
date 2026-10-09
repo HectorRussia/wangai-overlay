@@ -5,7 +5,9 @@ function Check-Exit { if ($LASTEXITCODE -ne 0) { throw 'Worker packaging command
 if (-not $SkipSync) {
     uv venv --python 3.12 --managed-python .packaging-venv
     Check-Exit
-    uv pip sync --python .packaging-venv/Scripts/python.exe --extra-index-url https://download.pytorch.org/whl/cpu --require-hashes worker/packaging/requirements.lock
+    uv pip sync --python .packaging-venv/Scripts/python.exe --require-hashes worker/packaging/requirements.lock
+    Check-Exit
+    uv pip install --python .packaging-venv/Scripts/python.exe --no-deps --require-hashes -r worker/packaging/model.lock
     Check-Exit
 }
 & .packaging-venv/Scripts/python.exe -c "import struct,sys; assert sys.version_info[:2] == (3,12) and struct.calcsize('P') == 8"

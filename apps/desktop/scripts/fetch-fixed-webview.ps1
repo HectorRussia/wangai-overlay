@@ -25,4 +25,8 @@ if (!(Test-Path -LiteralPath (Join-Path $expanded 'complete.json'))) {
 }
 $record = Get-Content -LiteralPath (Join-Path $expanded 'complete.json') -Raw | ConvertFrom-Json
 if ($record.version -ne $pin.version -or $record.sha256 -ne $pin.sha256) { throw 'Runtime cache manifest mismatch' }
-Write-Output $record.runtime
+# A cached extraction may have moved with the checkout. Resolve the executable
+# inside this cache instead of trusting an old absolute path in complete.json.
+$executables = @(Get-ChildItem -LiteralPath $expanded -Filter msedgewebview2.exe -Recurse -File)
+if ($executables.Count -ne 1 -or $executables[0].VersionInfo.FileVersion -ne $pin.version) { throw 'Cached runtime executable missing, ambiguous or wrong version' }
+Write-Output $executables[0].Directory.FullName

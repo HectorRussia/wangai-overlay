@@ -27,10 +27,10 @@ def run(args) -> int:
         if args.mock:
             incoming_vad = EnergyVad(args.silence_ms)
         else:
-            from silero_vad import load_silero_vad
+            from .silero_onnx import SileroOnnx
 
             incoming_vad = SileroVad(
-                load_silero_vad(onnx=True),
+                SileroOnnx(),
                 args.vad_threshold,
                 args.silence_ms,
                 args.adaptive_floor,

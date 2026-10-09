@@ -46,6 +46,21 @@ fn main() {
             42
         );
         let config = std::env::var("TAURI_CONFIG").unwrap_or_default();
+        if std::env::var_os("CARGO_FEATURE_LOCAL_STT").is_some() {
+            for file in [
+                "../output/whisper-build/Release/wangai-whisper.exe",
+                "../output/models/ggml-base-q5_1.bin",
+            ] {
+                assert!(
+                    std::path::Path::new(file).is_file(),
+                    "Missing packaged Local STT asset: {file}"
+                );
+                assert!(
+                    config.contains(file),
+                    "Use prepare-release.mjs --local-stt to bundle {file}"
+                );
+            }
+        }
         assert!(config.contains("../output/worker/wangai-worker/"), "Use scripts/prepare-release.mjs and the generated release config to include the worker");
         for file in [
             "wangai-worker.exe",

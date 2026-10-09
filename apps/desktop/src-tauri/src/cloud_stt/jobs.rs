@@ -45,7 +45,15 @@ impl AiSttManager {
             }
 
             let busy = manager.busy_jobs.fetch_add(1, Ordering::AcqRel) + 1;
-            set_stt_busy(&app, busy > 0, "กำลังส่งเสียงให้ บริการ AI");
+            set_stt_busy(
+                &app,
+                busy > 0,
+                if cfg!(feature = "local-stt") {
+                    "กำลังถอดเสียงด้วย Whisper บนเครื่อง"
+                } else {
+                    "กำลังส่งเสียงให้ บริการ AI"
+                },
+            );
             let result = match manager.process_job(&app, utterance).await {
                 Ok(Some(completed)) => {
                     crate::application::transcripts::handle_transcript_event(
@@ -97,6 +105,7 @@ impl AiSttManager {
             );
             return Ok(None);
         }
+        #[cfg(not(feature = "local-stt"))]
         let transcription: TranscriptionResponse = state
             .gateway
             .transcribe(
@@ -112,6 +121,7 @@ impl AiSttManager {
         if self.generation(job.stream) != job.generation {
             return Ok(None);
         }
+        #[cfg(not(feature = "local-stt"))]
         if transcription.is_low_confidence() {
             if job.diagnostic_probe {
                 report_probe_result(
@@ -126,7 +136,19 @@ impl AiSttManager {
             );
             return Ok(None);
         }
+        #[cfg(feature = "local-stt")]
+        let local_text = state
+            .local_stt
+            .transcribe(app, job.samples.clone(), language)
+            .await?;
+        // Local recognition returns text only; do not invent cloud confidence scores.
+        #[cfg(feature = "local-stt")]
+        let text = local_text.trim();
+        #[cfg(not(feature = "local-stt"))]
         let text = transcription.text.trim();
+        if self.generation(job.stream) != job.generation || state.lifecycle.is_closing() {
+            return Ok(None);
+        }
         if text.is_empty() {
             if job.diagnostic_probe {
                 report_probe_result(

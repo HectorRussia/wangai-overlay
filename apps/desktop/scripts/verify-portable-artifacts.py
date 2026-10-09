@@ -61,6 +61,12 @@ def audit(folder, verifier=None, production=False):
         assert 'worker/_internal/python312.dll' in names
         assert 'worker/_internal/silero_vad/data/silero_vad.onnx' in names
         assert 'webview2/msedgewebview2.exe' in names
+        if version == '0.6.0':
+            for required in ('whisper/wangai-whisper.exe', 'whisper/ggml-base-q5_1.bin',
+                             'whisper/LICENSE-whisper.cpp.txt', 'whisper/LICENSE-whisper-model.txt'):
+                assert required in names, f'Missing bundled Whisper component: {required}'
+            assert manifest['files']['whisper/ggml-base-q5_1.bin']['sha256'] == '422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898'
+            assert b'Whisper base Q5_1 (local CPU)' in package.read('gamelingo.exe'), 'Local STT is not enabled in 0.6.0'
         if production:
             verify_production_payload(package, os.environ.get('WANGAI_API_BASE_URL', ''),
                                       os.environ.get('WANGAI_UPDATER_PUBLIC_KEY', ''))

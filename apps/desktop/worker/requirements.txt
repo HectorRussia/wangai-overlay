@@ -1,3 +1,2 @@
-silero-vad>=6,<7
 onnxruntime>=1.21,<2
 numpy>=2,<3

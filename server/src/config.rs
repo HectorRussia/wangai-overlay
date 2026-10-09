@@ -3,6 +3,7 @@ use anyhow::{bail, Result};
 // Deliberately no Debug: configuration contains credentials.
 #[derive(Clone)]
 pub struct Config {
+    pub local_stt: bool,
     pub stt_url: String,
     pub stt_key: String,
     pub incoming_model: String,
@@ -23,6 +24,11 @@ impl Config {
     }
 
     pub fn load(get: impl Fn(&str) -> Option<String>) -> Result<Self> {
+        let local_stt = match get("STT_MODE").as_deref().unwrap_or("cloud") {
+            "local" => true,
+            "cloud" => false,
+            _ => bail!("Invalid STT_MODE: expected cloud or local"),
+        };
         let required = |name: &str| -> Result<String> {
             let value = get(name)
                 .filter(|v| !v.trim().is_empty())
@@ -100,10 +106,27 @@ impl Config {
             bail!("TRANSLATION_OPTIONS_JSON must use only one token limit field");
         }
         Ok(Self {
-            stt_url: endpoint("STT_BASE_URL", "/audio/transcriptions")?,
-            stt_key: credential("STT_API_KEY")?,
-            incoming_model: model("STT_INCOMING_MODEL")?,
-            microphone_model: model("STT_MICROPHONE_MODEL")?,
+            local_stt,
+            stt_url: if local_stt {
+                String::new()
+            } else {
+                endpoint("STT_BASE_URL", "/audio/transcriptions")?
+            },
+            stt_key: if local_stt {
+                String::new()
+            } else {
+                credential("STT_API_KEY")?
+            },
+            incoming_model: if local_stt {
+                "local-on-device".into()
+            } else {
+                model("STT_INCOMING_MODEL")?
+            },
+            microphone_model: if local_stt {
+                "local-on-device".into()
+            } else {
+                model("STT_MICROPHONE_MODEL")?
+            },
             translation_url: endpoint("TRANSLATION_BASE_URL", "/chat/completions")?,
             translation_key: credential("TRANSLATION_API_KEY")?,
             translation_model: model("TRANSLATION_MODEL")?,

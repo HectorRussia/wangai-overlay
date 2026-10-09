@@ -105,6 +105,42 @@ fn fixture(version: &str) -> (PackageManifestV1, BTreeMap<String, Vec<u8>>) {
     };
     (manifest, files)
 }
+
+#[test]
+fn local_stt_assets_must_be_complete_and_are_verified_on_every_launch() {
+    let (mut manifest, _) = fixture("0.6.0");
+    let component = PackageFile {
+        size: 1,
+        sha256: format!("{:x}", Sha256::digest(b"x")),
+    };
+    manifest
+        .files
+        .insert("whisper/wangai-whisper.exe".into(), component.clone());
+    assert!(manifest.validate().is_err());
+    manifest
+        .files
+        .insert("whisper/ggml-base-q5_1.bin".into(), component);
+    assert!(manifest.validate().is_ok());
+    let temp = tempfile::tempdir().unwrap();
+    for (name, file) in &manifest.files {
+        let path = temp.path().join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        // Reconstruct fixture bytes; Whisper assets contain a single x.
+        let bytes = if name.starts_with("whisper/") {
+            b"x".to_vec()
+        } else {
+            fixture("0.6.0").1[name].clone()
+        };
+        assert_eq!(file.size, bytes.len() as u64);
+        fs::write(path, bytes).unwrap();
+    }
+    let path = temp.path().join(MANIFEST);
+    fs::write(&path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    sign(&path);
+    assert!(verify_installed(temp.path(), &signer().public, false).is_ok());
+    fs::write(temp.path().join("whisper/ggml-base-q5_1.bin"), b"z").unwrap();
+    assert!(verify_installed(temp.path(), &signer().public, false).is_err());
+}
 fn archive(
     root: &Path,
     manifest: &PackageManifestV1,

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.chdir(root);
 const test = process.argv.includes('--test');
+const localStt = process.argv.includes('--local-stt');
 const version = JSON.parse(fs.readFileSync('package.json')).version;
 for (const [name, actual] of [
   ['Tauri', JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).version],
@@ -31,6 +32,12 @@ const config = {
   },
   plugins: { updater: { pubkey } },
 };
+if (localStt) {
+  for (const file of ['output/whisper-build/Release/wangai-whisper.exe', 'output/models/ggml-base-q5_1.bin']) {
+    if (!fs.existsSync(file)) throw Error(`Missing Local STT asset: ${file}`);
+    config.bundle.resources[`../${file}`] = `whisper/${path.basename(file)}`;
+  }
+}
 if (test) {
   config.identifier = 'dev.gamelingo.overlay.release-test';
   config.productName = 'WANGAI Release Test';

@@ -17,6 +17,8 @@ def frame(kind, stream=1, cursor=0, samples=()):
     return struct.pack('<I', len(payload)) + payload
 
 bundle = Path(sys.argv[1]).resolve()
+for entry in bundle.rglob('*'):
+    assert not entry.name.lower().startswith(('torch', 'torchaudio')), f'Unexpected PyTorch bundle file: {entry}'
 with tempfile.TemporaryDirectory(prefix='WANGAI ทดสอบ worker ') as directory:
     copied = Path(directory) / 'แอป เสียง'
     shutil.copytree(bundle, copied)

@@ -62,13 +62,13 @@ pub struct WebCompanionManager {
 
 impl WebCompanionManager {
     pub fn start(app: AppHandle) -> Result<Self> {
-        let bind_address = companion_bind_address(cfg!(debug_assertions));
-        let listener =
-            tauri::async_runtime::block_on(bind_companion_listener(cfg!(debug_assertions)))
-                .with_context(|| format!("เปิด Local Web Companion ที่ {bind_address} ไม่สำเร็จ"))?;
+        let development = cfg!(all(debug_assertions, not(feature = "local-stt")));
+        let bind_address = companion_bind_address(development);
+        let listener = tauri::async_runtime::block_on(bind_companion_listener(development))
+            .with_context(|| format!("เปิด Local Web Companion ที่ {bind_address} ไม่สำเร็จ"))?;
         let actual_address = listener.local_addr()?;
         let server_origin = format!("http://{actual_address}");
-        let public_origin = if cfg!(debug_assertions) {
+        let public_origin = if development {
             "http://127.0.0.1:1420".to_string()
         } else {
             server_origin.clone()
@@ -138,6 +138,75 @@ fn companion_bind_address(debug: bool) -> SocketAddr {
     } else {
         SocketAddr::from(([127, 0, 0, 1], 0))
     }
+}
+
+/// Exercise the real loopback HTTP adapter only in the isolated QA product.
+#[cfg(feature = "release-test")]
+pub(crate) async fn verify_http_preview(app: &AppHandle) -> Result<()> {
+    let companion = app.state::<WebCompanionManager>();
+    let origin = companion.context.server_origin.clone();
+    let token = companion.context.launch_token.lock().unwrap().clone();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()?;
+    let html = client
+        .get(format!("{origin}/index.html"))
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await?;
+    anyhow::ensure!(
+        html.contains("id=\"root\""),
+        "Web Companion did not serve the built UI"
+    );
+    let unauthenticated = client
+        .get(format!("{origin}/api/v1/snapshot"))
+        .send()
+        .await?;
+    anyhow::ensure!(
+        unauthenticated.status() == reqwest::StatusCode::UNAUTHORIZED,
+        "Snapshot must require a session"
+    );
+    let exchange = client
+        .post(format!("{origin}/api/v1/session"))
+        .header("origin", &origin)
+        .json(&json!({"token":token}))
+        .send()
+        .await?
+        .error_for_status()?;
+    let cookie = exchange
+        .headers()
+        .get("set-cookie")
+        .context("Missing session cookie")?
+        .to_str()?
+        .split(';')
+        .next()
+        .unwrap()
+        .to_owned();
+    client
+        .post(format!("{origin}/api/v1/command"))
+        .header("origin", &origin)
+        .header("cookie", &cookie)
+        .json(&json!({"command":"restart_worker"}))
+        .send()
+        .await?
+        .error_for_status()?;
+    for _ in 0..100 {
+        let snapshot: serde_json::Value = client
+            .get(format!("{origin}/api/v1/snapshot"))
+            .header("cookie", &cookie)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        if snapshot["runtime"]["workerReady"] == true {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    anyhow::bail!("HTTP recovery did not restore combined worker readiness")
 }
 
 async fn bind_companion_listener(debug: bool) -> std::io::Result<tokio::net::TcpListener> {
