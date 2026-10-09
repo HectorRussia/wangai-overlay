@@ -15,7 +15,7 @@ scripts/         Bootstrap, packaging, release และ acceptance checks
 
 ## เริ่มพัฒนา
 
-Local STT 0.6 เป็น debug preview แบบเลือกใช้ ดู [คู่มือส่งต่อ](../../docs/local-stt-handoff.md)
+Portable 0.6 รวม Local STT พร้อมโมเดล ส่วนรุ่นพัฒนาเลือกใช้ผ่าน Launcher ได้ ดู [คู่มือส่งต่อ](../../docs/local-stt-handoff.md)
 สำหรับ Whisper base Q5_1 และ Grok คำสั่ง `pnpm tauri dev` ด้านล่างยังเป็นโหมด Cloud
 
 จาก repository root:
