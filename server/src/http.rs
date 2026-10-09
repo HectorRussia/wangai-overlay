@@ -30,8 +30,11 @@ pub fn router(state: Arc<Gateway>) -> Router {
 }
 
 async fn status(State(state): State<Arc<Gateway>>) -> Json<ServiceStatus> {
-    let error = state.check(0).err().or_else(|| state.check(1).err());
-    let verified = state.health.iter().all(|h| h.lock().unwrap().verified);
+    let stages = if state.config.local_stt { 1..2 } else { 0..2 };
+    let error = stages.clone().find_map(|stage| state.check(stage).err());
+    let verified = stages
+        .clone()
+        .all(|stage| state.health[stage].lock().unwrap().verified);
     Json(ServiceStatus {
         state: if error.is_some() {
             "degraded"
@@ -73,6 +76,9 @@ async fn transcribe(
     headers: HeaderMap,
     body: Result<Multipart, MultipartRejection>,
 ) -> Result<Json<TranscriptionResponse>, Failure> {
+    if state.config.local_stt {
+        return Err(fail(ErrorCode::UnsupportedModel));
+    }
     let id = installation(&headers)?;
     let start = Instant::now();
     let mut body = body.map_err(|_| fail(ErrorCode::InvalidRequest))?;

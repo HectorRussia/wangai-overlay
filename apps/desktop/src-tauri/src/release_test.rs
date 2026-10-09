@@ -50,8 +50,9 @@ pub fn start(app: AppHandle) {
     let action = portable_action(&app);
     let upgrade = action.as_deref() == Some("upgrade")
         || std::env::args().any(|a| a == "--release-test-upgrade");
-    let smoke =
-        action.as_deref() == Some("smoke") || std::env::args().any(|a| a == "--release-test-smoke");
+    let smoke = action.as_deref() == Some("smoke")
+        || std::env::args().any(|a| a == "--release-test-smoke")
+        || std::env::var("WANGAI_TEST_START_SMOKE").as_deref() == Ok("1");
     if !upgrade && !smoke {
         return;
     }
@@ -64,7 +65,7 @@ pub fn start(app: AppHandle) {
         });
         for _ in 0..60 {
             let _ = window.eval(READY_ROOM_PROBE);
-            if app.state::<AppState>().runtime.read().unwrap().worker_ready
+            if app.state::<AppState>().snapshot().runtime.worker_ready
                 && ui_ready.load(Ordering::SeqCst)
             {
                 break;
@@ -75,7 +76,7 @@ pub fn start(app: AppHandle) {
         let ui_ready = ui_ready.load(Ordering::SeqCst);
         let command_parity = command_parity::verify(&app).await;
         let state = app.state::<AppState>();
-        let ready = state.runtime.read().unwrap().worker_ready;
+        let ready = state.snapshot().runtime.worker_ready;
         // Wait for the startup check to release the shared operation lock.
         let mut status = updater::check(app.clone()).await;
         for _ in 0..20 {
@@ -110,14 +111,19 @@ pub fn start(app: AppHandle) {
                     .map(|p| p.to_string_lossy().into_owned())
             })
             .collect();
+        #[cfg(feature = "local-stt")]
+        let local_stt_pid = state.local_stt.test_pid();
+        #[cfg(not(feature = "local-stt"))]
+        let local_stt_pid = Option::<u32>::None;
         let report = serde_json::json!({
             "version": version, "pid": std::process::id(), "workerReady": ready,
             "uiReady": ui_ready,
             "commandParity": command_parity.is_ok(), "commandParityError": command_parity.as_ref().err().map(ToString::to_string),
             "workerPid": state.worker.test_pid(), "settings": state.settings.snapshot(), "update": status,
+            "localSttPid": local_stt_pid,
             "runtimeFolder":std::env::var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER").ok(),
             "profileFolder":std::env::var("WEBVIEW2_USER_DATA_FOLDER").ok(),"childPaths":child_paths,
-            "runtime":state.runtime.read().unwrap().clone(),
+            "runtime":state.snapshot().runtime,
         });
         let directory = app
             .state::<crate::portable_runtime::PortableRuntime>()

@@ -27,6 +27,8 @@ pub struct AppState {
     pub partial: RwLock<Option<TranscriptEvent>>,
     pub audio: AudioManager,
     pub worker: WorkerManager,
+    #[cfg(feature = "local-stt")]
+    pub local_stt: crate::local_stt::LocalStt,
     pub ai_stt: AiSttManager,
     pub translator: GatewayTranslator,
     pub gateway: GatewayClient,
@@ -51,6 +53,8 @@ impl AppState {
             partial: RwLock::new(None),
             audio: AudioManager::default(),
             worker: WorkerManager::default(),
+            #[cfg(feature = "local-stt")]
+            local_stt: crate::local_stt::LocalStt::default(),
             ai_stt: AiSttManager::new(vad.pre_roll_ms, vad.silence_ms, vad.max_utterance_ms),
             translator: GatewayTranslator(gateway.clone()),
             gateway,
@@ -63,6 +67,10 @@ impl AppState {
             runtime: {
                 let mut runtime = self.runtime.read().expect("runtime lock poisoned").clone();
                 runtime.ai_service = self.gateway.status();
+                #[cfg(feature = "local-stt")]
+                {
+                    runtime = self.local_stt.decorate_runtime(runtime);
+                }
                 runtime
             },
             history: self
@@ -84,7 +92,10 @@ impl AppState {
         let mut runtime = self.runtime.write().expect("runtime lock poisoned");
         update(&mut runtime);
         runtime.ai_service = self.gateway.status();
-        runtime.clone()
+        let result = runtime.clone();
+        #[cfg(feature = "local-stt")]
+        let result = self.local_stt.decorate_runtime(result);
+        result
     }
 
     pub fn set_partial(&self, partial: Option<TranscriptEvent>) {

@@ -1,5 +1,5 @@
 # Opt-in: isolated identity, disposable key, loopback updater, no real AI traffic.
-param([Parameter(Mandatory=$true)][string]$OutputRoot,[string]$RuntimeCache,[ValidateSet('0.3.0','0.3.1')][string[]]$Versions=@('0.3.0','0.3.1'))
+param([Parameter(Mandatory=$true)][string]$OutputRoot,[string]$RuntimeCache,[ValidateSet('0.3.0','0.3.1')][string[]]$Versions=@('0.3.0','0.3.1'),[switch]$LocalStt)
 $ErrorActionPreference='Stop'
 Set-Location -LiteralPath (Join-Path $PSScriptRoot '..')
 $output=[IO.Path]::GetFullPath($OutputRoot)
@@ -24,17 +24,24 @@ try {
     if (!$RuntimeCache) { $RuntimeCache=Join-Path $output 'runtime-download' }
     $runtime=& "$PSScriptRoot/fetch-fixed-webview.ps1" -CacheRoot $RuntimeCache
     foreach ($version in $Versions) {
+        # Exercise migration from the existing Cloud Portable to bundled Local STT.
+        $versionLocalStt = $LocalStt -and $version -eq '0.3.1'
         $env:WANGAI_TEST_VERSION=$version
-        node scripts/prepare-release.mjs --test
+        $prepareArgs=@('scripts/prepare-release.mjs','--test')
+        if ($versionLocalStt) { $prepareArgs+='--local-stt' }
+        node @prepareArgs
         if ($LASTEXITCODE -ne 0) { throw 'Fixture input validation failed' }
-        pnpm tauri build --ci --no-bundle --features release-test --config src-tauri/tauri.release.generated.json
+        $coreFeatures=if ($versionLocalStt) {'release-test,local-stt'} else {'release-test'}
+        pnpm tauri build --ci --no-bundle --features $coreFeatures --config src-tauri/tauri.release.generated.json
         if ($LASTEXITCODE -ne 0) { throw 'Fixture core build failed' }
         cargo build --locked --release --manifest-path portable/Cargo.toml --features host,release-test,tools
         if ($LASTEXITCODE -ne 0) { throw 'Fixture host build failed' }
         $target=if ($env:CARGO_TARGET_DIR) {[IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)} else {'src-tauri/target'}
         $hostTarget=if ($env:CARGO_TARGET_DIR) {$target} else {'portable/target'}
         $python=if (Test-Path -LiteralPath '.packaging-venv/Scripts/python.exe') {'.packaging-venv/Scripts/python.exe'} else {(Get-Command python.exe -ErrorAction Stop).Source}
-        & $python scripts/package-portable.py --core "$target/release/gamelingo.exe" --host "$hostTarget/release/WANGAI.exe" --verifier "$hostTarget/release/portable-verify.exe" --runtime $runtime --version $version --output (Join-Path $output "v$version")
+        $packArgs=@('scripts/package-portable.py','--core',"$target/release/gamelingo.exe",'--host',"$hostTarget/release/WANGAI.exe",'--verifier',"$hostTarget/release/portable-verify.exe",'--runtime',$runtime,'--version',$version,'--output',(Join-Path $output "v$version"))
+        if ($versionLocalStt) { $packArgs+='--local-stt' }
+        & $python @packArgs
         if ($LASTEXITCODE -ne 0) { throw 'Fixture packaging failed' }
         & $python scripts/verify-portable-artifacts.py (Join-Path $output "v$version") --verifier "$hostTarget/release/portable-verify.exe"
         if ($LASTEXITCODE -ne 0) { throw 'Fixture artifact verification failed' }

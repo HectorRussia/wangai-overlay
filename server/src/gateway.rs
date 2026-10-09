@@ -39,7 +39,8 @@ impl Gateway {
             }
         });
         let first = Arc::new(Mutex::new(Health::default()));
-        let shared = config.stt_key == config.translation_key
+        let shared = !config.local_stt
+            && config.stt_key == config.translation_key
             && reqwest::Url::parse(&config.stt_url)?.origin()
                 == reqwest::Url::parse(&config.translation_url)?.origin();
         let second = if shared {

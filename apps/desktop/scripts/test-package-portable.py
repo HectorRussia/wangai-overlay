@@ -33,6 +33,39 @@ def fixture_sign(path, _verifier):
 
 
 class PackageLayoutTests(unittest.TestCase):
+    def test_whisper_worker_model_and_licenses_are_signed_package_inputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'apps/desktop'
+            inputs = {
+                'package.json': b'{"version":"0.6.0"}',
+                '../../docs/releases/v0.6.0.md': b'Whisper release',
+                '../../docs/THIRD-PARTY-NOTICES.md': b'Notices',
+                'portable/webview2.lock.json': b'{"version":"1.2.3"}',
+                'host.exe': fake_pe(2), 'core.exe': fake_pe(2),
+                'output/worker/wangai-worker/wangai-worker.exe': fake_pe(3),
+                'dist/index.html': b'<main>UI</main>',
+                'runtime/msedgewebview2.exe': fake_pe(2),
+                'output/whisper-build/Release/wangai-whisper.exe': fake_pe(3),
+                'output/whisper-build/Release/LICENSE-whisper.cpp.txt': b'MIT native',
+                'worker/whisper/LICENSE-whisper-model.txt': b'MIT model',
+                'output/models/ggml-base-q5_1.bin': b'fixture model',
+            }
+            for name, content in inputs.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            args = SimpleNamespace(version=None, host=root/'host.exe', core=root/'core.exe',
+                                   runtime=root/'runtime', local_stt=True)
+            with patch.object(packaging, 'ROOT', root):
+                with self.assertRaisesRegex(ValueError, 'model hash mismatch'):
+                    packaging.collect_inputs(args)
+                with patch.object(packaging, 'MODEL_SHA', packaging.digest(root/'output/models/ggml-base-q5_1.bin')):
+                    version, _, _, files, _ = packaging.collect_inputs(args)
+                    self.assertEqual(version, '0.6.0')
+                    self.assertEqual(files['whisper/ggml-base-q5_1.bin'].read_bytes(), b'fixture model')
+                    for name in ('wangai-whisper.exe', 'LICENSE-whisper.cpp.txt', 'LICENSE-whisper-model.txt'):
+                        self.assertIn('whisper/' + name, files)
+
     def test_payload_manifest_embedded_bytes_and_release_metadata_agree(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "apps" / "desktop"

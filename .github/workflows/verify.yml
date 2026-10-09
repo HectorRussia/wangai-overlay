@@ -53,6 +53,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --features local-stt
       - run: cargo test --locked --manifest-path portable/Cargo.toml --features host
       - run: ./scripts/package-worker.ps1
         shell: pwsh
@@ -63,6 +64,15 @@ jobs:
           cargo test --locked --manifest-path src-tauri/Cargo.toml packaged_worker_events_follow_rust_contract -- --ignored --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: .packaging-venv/Scripts/python.exe -m unittest discover -s worker -v
+      - name: Build pinned CPU Whisper and verify the real model
+        shell: pwsh
+        run: |
+          ./scripts/setup-whisper.ps1 -Python .packaging-venv/Scripts/python.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .packaging-venv/Scripts/python.exe -m unittest discover -s worker -p test_whisper_worker.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .packaging-venv/Scripts/python.exe scripts/test-whisper-bundle.py output/whisper-build/Release output/models/ggml-base-q5_1.bin
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: .packaging-venv/Scripts/python.exe scripts/test-portable-preview.py
       - run: .packaging-venv/Scripts/python.exe scripts/test-package-portable.py
       - run: node scripts/desktop-licenses.mjs
@@ -71,6 +81,15 @@ jobs:
           name: windows-worker
           path: apps/desktop/output/worker/wangai-worker/
           include-hidden-files: true
+          retention-days: 3
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-whisper
+          path: |
+            apps/desktop/output/whisper-build/Release/wangai-whisper.exe
+            apps/desktop/output/whisper-build/Release/LICENSE-whisper.cpp.txt
+            apps/desktop/output/models/ggml-base-q5_1.bin
+          if-no-files-found: error
           retention-days: 3
   server:
     runs-on: ubuntu-22.04

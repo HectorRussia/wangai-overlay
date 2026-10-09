@@ -1,0 +1,2 @@
+# Model assets only: always install this file with --no-deps.
+silero-vad==6.2.1

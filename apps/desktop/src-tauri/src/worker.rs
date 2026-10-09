@@ -308,7 +308,7 @@ fn resolve_worker_path(app: &AppHandle) -> Result<PathBuf> {
 }
 
 #[cfg(debug_assertions)]
-fn resolve_python(worker_path: &Path) -> PathBuf {
+pub(crate) fn resolve_python(worker_path: &Path) -> PathBuf {
     if let Ok(value) = std::env::var("GAMELINGO_PYTHON") {
         let path = PathBuf::from(value);
         if path.exists() {

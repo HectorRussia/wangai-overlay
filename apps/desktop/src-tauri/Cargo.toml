@@ -1,6 +1,6 @@
 [package]
 name = "gamelingo"
-version = "0.5.1"
+version = "0.6.0"
 description = "Near-realtime game voice translator overlay"
 authors = ["GameLingo"]
 edition = "2021"
@@ -11,6 +11,8 @@ name = "gamelingo_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
+# CPU speech recognition; ordinary builds retain cloud STT.
+local-stt = []
 # Isolated installer QA only; release workflow rejects this feature.
 release-test = ["wangai-portable/release-test"]
 

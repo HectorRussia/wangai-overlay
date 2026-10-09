@@ -94,9 +94,7 @@ pub fn start_readiness_monitor(app: AppHandle) {
             if state.lifecycle.is_closing() {
                 return;
             }
-            if portable.ui_ready.load(Ordering::Acquire)
-                && state.runtime.read().unwrap().worker_ready
-            {
+            if portable.ui_ready.load(Ordering::Acquire) && state.snapshot().runtime.worker_ready {
                 let result = wangai_portable::transaction::acknowledge(
                     portable.layout.as_ref().unwrap(),
                     &StartupReady {

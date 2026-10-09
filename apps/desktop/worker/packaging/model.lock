@@ -1,0 +1,4 @@
+# Model assets only; install with --no-deps.
+silero-vad==6.2.1 \
+    --hash=sha256:09de93c4d874bb19c53e62a47dd38be5f163cedad2b5599583231f2a84ef79cb \
+    --hash=sha256:b23062b0e39fad17b1266fc23c1e7b4290219dbe82ce08510889e32f681f4b3b
