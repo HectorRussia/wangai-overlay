@@ -18,8 +18,8 @@ import zipfile
 
 def processes():
     result = subprocess.run(['powershell', '-NoProfile', '-Command',
-        'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name | ConvertTo-Json -Compress'],
-        capture_output=True, text=True, check=True, timeout=15)
+        '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath | ConvertTo-Json -Compress'],
+        capture_output=True, text=True, encoding='utf8', check=True, timeout=15)
     rows = json.loads(result.stdout)
     return rows if isinstance(rows, list) else [rows]
 
@@ -80,8 +80,14 @@ try:
             break
         owned = expanded
     dependencies = [row for row in rows if row['ProcessId'] in owned and row['ProcessId'] != process.pid]
-    assert {'wangai-worker.exe', 'wangai-whisper.exe', 'msedgewebview2.exe'} <= {row['Name'].lower() for row in dependencies}, 'Bundled dependency tree was not observed'
     report['dependencies'] = dependencies
+    for dependency in ('worker/wangai-worker.exe', 'whisper/wangai-whisper.exe', 'webview2/msedgewebview2.exe'):
+        def same_dependency(row):
+            try:
+                return row['ExecutablePath'] and Path(row['ExecutablePath']).samefile(version_root/dependency)
+            except OSError:
+                return False
+        assert any(same_dependency(row) for row in dependencies), f'Bundled dependency was not observed: {dependency}'
     user = ctypes.WinDLL('user32', use_last_error=True)
     user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     user.GetWindowThreadProcessId.restype = wintypes.DWORD

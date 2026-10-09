@@ -98,3 +98,28 @@ results above are retained; they are not claims about the later signed artifact.
   After archived test runs were moved to another volume, both scenarios passed.
 - GitHub CI and the exact production-signed Portable are checked before
   publication; artifact/run results are linked from the PR and release.
+
+## Signed Portable preview acceptance — 2026-10-09
+
+The [production-signed preview](https://github.com/HectorRussia/wangai-overlay/actions/runs/37951915804)
+passed its full Windows/Server verification, packaging and provenance workflow.
+The [isolated package QA](https://github.com/HectorRussia/wangai-overlay/actions/runs/37948759360)
+also passed upgrade and failed-readiness rollback on Windows CI.
+
+The downloaded `0.6.0` preview contains 1,423 signed-manifest payload files;
+its Portable executable is 480,415,479 bytes. Package/embedded-payload hashes,
+three cryptographic signatures, production identity/gateway and the pinned model
+hash were verified again locally without modifying the downloaded artifact.
+
+The exact production core passed first launch from a fresh Thai/spaced directory
+with a new Portable profile, system-only PATH and deliberately wrong inherited
+WebView overrides. Its ordinary startup acknowledgement waited for VAD, Whisper
+and the frontend. All three bundled executables were observed by file identity;
+normal UI event-loop exit returned 0 and every observed child PID exited.
+The smoke did not record audio or invoke production QA commands.
+
+Initial smoke observer checks failed on NTFS short executable names and PowerShell
+output decoded with the wrong encoding. The observer now compares file identities
+and reads explicit UTF-8 output; the complete smoke passed after these fixes.
+This is development-machine acceptance, not a clean Windows or real-voice claim.
+Local logs are under `apps/desktop/output/local-stt-import/production-preview-060-*`.
