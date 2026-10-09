@@ -15,6 +15,15 @@ import time
 import uuid
 import zipfile
 
+
+def processes():
+    result = subprocess.run(['powershell', '-NoProfile', '-Command',
+        'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name | ConvertTo-Json -Compress'],
+        capture_output=True, text=True, check=True, timeout=15)
+    rows = json.loads(result.stdout)
+    return rows if isinstance(rows, list) else [rows]
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('artifacts', type=Path)
 parser.add_argument('--verifier', type=Path, required=True)
@@ -62,6 +71,17 @@ try:
     assert ready and ready['pid'] == process.pid and ready['workerReady'] and ready['uiReady'], 'No combined readiness acknowledgement'
     report['readiness'] = ready
     assert not (root/'wrong-profile').exists(), 'Inherited profile override was used'
+    rows = processes()
+    owned = {process.pid}
+    while True:
+        descendants = {row['ProcessId'] for row in rows if row['ParentProcessId'] in owned}
+        expanded = owned | descendants
+        if expanded == owned:
+            break
+        owned = expanded
+    dependencies = [row for row in rows if row['ProcessId'] in owned and row['ProcessId'] != process.pid]
+    assert {'wangai-worker.exe', 'wangai-whisper.exe', 'msedgewebview2.exe'} <= {row['Name'].lower() for row in dependencies}, 'Bundled dependency tree was not observed'
+    report['dependencies'] = dependencies
     user = ctypes.WinDLL('user32', use_last_error=True)
     user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     user.GetWindowThreadProcessId.restype = wintypes.DWORD
@@ -83,6 +103,10 @@ try:
         assert user.PostThreadMessageW(thread, 0x0012, 0, 0), 'Could not quit test event loop'
     report['exitCode'] = process.wait(timeout=20)
     time.sleep(1)
+    deadline = time.monotonic() + 10
+    while owned & {row['ProcessId'] for row in processes()}:
+        assert time.monotonic() < deadline, 'An observed bundled process survived shutdown'
+        time.sleep(0.25)
     leftovers = subprocess.run(['powershell', '-NoProfile', '-Command',
         "$p = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith('" + str(root).replace("'", "''") + "') }); if ($p.Count) { exit 1 }"], capture_output=True)
     assert leftovers.returncode == 0, 'A bundled dependency survived shutdown'
